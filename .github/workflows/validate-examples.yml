@@ -1,0 +1,44 @@
+name: Validate examples
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  json-syntax-check:
+    name: JSON syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate every example JSON file parses
+        run: |
+          set -e
+          shopt -s nullglob
+          count=0
+          for f in examples/*.json; do
+            jq empty "$f"
+            count=$((count + 1))
+          done
+          echo "Validated $count JSON example files."
+
+  sanitization-check:
+    name: Sanitization
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Grep for forbidden strings
+        run: |
+          set -e
+          forbidden='Claude|Anthropic|Co-Authored-By|Generated with|@AI|claude\.ai|noreply@anthropic\.com|crates/|PRDs/|_recon/|MEMORY\.md'
+          if grep -rE "$forbidden" \
+              --exclude-dir=.git \
+              --exclude-dir=.github \
+              .; then
+            echo "Sanitization FAILED - forbidden marker(s) detected above." >&2
+            exit 1
+          fi
+          echo "Sanitization clean."
