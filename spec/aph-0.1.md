@@ -512,7 +512,7 @@ The compact JWS form (header.signature, with empty payload) is placed in `proof.
 A Recipient Endpoint MUST execute the following verification steps before accepting the message:
 
 1. **Parse the envelope.** Reject if any REQUIRED field is missing or if the parser encounters an unknown field at the envelope level (forward-compatibility behavior: fail fast on spec drift). Per-channel `recipientAddressing` sub-fields are opaque and not subject to strict deserialization.
-2. **Resolve the verification method.** Use the DID URL in `proof.verificationMethod` to obtain the public key. The resolver SHOULD support at minimum `did:key` (offline-resolvable). `did:web` resolution requires network access and SHOULD be performed against the DID Document at the well-known URI.
+2. **Resolve the verification method.** Use the DID URL in `proof.verificationMethod` to obtain the notary public key. The resolver MUST support at least one of the publication mechanisms defined in §8.4 (`did:key` offline decode, `did:web` `.well-known/did.json`, or DNS TXT). Production verifiers SHOULD support all three. See §8.4 for the full resolution flow, key rotation rules, and trust models.
 3. **Strip the proof value.** Take a working copy of the envelope and remove `proof.proofValue`.
 4. **Canonicalize.** Apply JCS (RFC 8785) to the stripped working copy.
 5. **Verify the signature.** Validate `proof.proofValue` against the canonical bytes using the public key from step 2 and the algorithm pinned by `proof.cryptosuite` or the JWS protected header `alg`.
@@ -522,6 +522,169 @@ A Recipient Endpoint MUST execute the following verification steps before accept
 9. **Emit the verified credential.** If all checks pass, the recipient MAY render a "Notarized" badge in its UI, store the verified credential for audit, and accept the message.
 
 If any step fails, the verifier MUST reject the envelope and SHOULD emit the appropriate error code from §11.
+
+### 8.4 Notary Key Material + Public-Key Discovery
+
+A Notary Service operates on a public/private keypair. The PRIVATE key MUST be held under the Notary Service operator's exclusive control and is used to sign every envelope's `proof.proofValue` and the `notarySignature` field of any Delegation or Communication Mandate the notary mints. The PUBLIC key MUST be discoverable by ANY third-party verifier WITHOUT a prior trust relationship with the Notary Service or its operator.
+
+Public-key discoverability is the property that makes APH function as a notarization protocol rather than as a closed signing system. A recipient that has never previously transacted with the notary MUST be able to resolve the public key, verify the signature, and accept the credential — analogous to how a TLS client can verify a server certificate against a publicly-anchored chain of trust without contacting the server's operator out-of-band.
+
+This section defines the publication mechanisms a Notary Service MUST and MAY support, the record formats those mechanisms use, and the resolution flow a verifier follows to obtain a notary public key.
+
+#### 8.4.1 Public/Private key separation
+
+The Notary Service operator's responsibilities are:
+
+- Generate a long-lived Ed25519 or P-256 keypair using a secure RNG and standard parameters (RFC 8032 for Ed25519, NIST FIPS 186-4 for P-256).
+- Store the PRIVATE key in hardware (HSM) where available, or in operating-system-protected key storage (Keychain, TPM, Secure Enclave) otherwise. The PRIVATE key MUST NOT leave the controlled boundary except to produce a signature.
+- Publish the PUBLIC key via at least one of the mechanisms in §8.4.2.
+- Periodically rotate the keypair per §8.4.7 and overlap publication windows so verifiers see a continuous valid set.
+
+The public key is encoded according to the binding DID method or publication mechanism:
+
+- For `did:key`, the public key bytes are embedded directly in the DID identifier (multicodec + multibase per the `did:key` method specification). No external lookup is required.
+- For `did:web`, the public key appears in the `verificationMethod` array of the DID Document resolved at the well-known URI.
+- For DNS TXT publication, the public key is encoded as a base64url-encoded string in the TXT record value (see §8.4.5).
+
+#### 8.4.2 Publication mechanisms — overview
+
+APH v0.1 defines THREE publication mechanisms, in increasing order of operational complexity. A conformant Notary Service MUST support at least one; production-grade deployments SHOULD support at least two of the three for defense in depth.
+
+| Mechanism | Anchor | Verifier action | When to use |
+|---|---|---|---|
+| `did:key` (§8.4.3) | Self-describing — key bytes embedded in DID | Decode in-process, no I/O | Self-issued or pinned-key notaries; air-gapped verification |
+| `did:web` (§8.4.4) | HTTPS — `.well-known/did.json` at the notary's web origin | HTTPS GET, parse JSON, locate `verificationMethod[i]` matching the DID URL fragment | Mainstream production notaries with a public web origin |
+| DNS TXT (§8.4.5) | DNS — TXT record at `_aph._notary.<domain>` | DNS query, parse tag-list | Defense-in-depth alongside `did:web`; survives website outages; independent of HTTPS origin |
+
+#### 8.4.3 `did:key` — self-describing
+
+A notary with DID `did:key:z6Mk...` carries its own public key bytes in the DID identifier itself. No external lookup is required.
+
+Verifier action:
+
+1. Parse the DID URL from `proof.verificationMethod`. Example: `did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV`.
+2. Decode the multibase-encoded suffix (`z6Mk...`) to recover the multicodec + raw public key bytes. The multicodec prefix `0xed01` indicates Ed25519; `0x1200` indicates P-256 (per the multicodec registry).
+3. Use the raw public key bytes to verify the signature with the algorithm pinned in `proof.cryptosuite` or the JWS protected header `alg`.
+
+Trust model: The verifier trusts whatever produced the DID URL in `proof.verificationMethod`. There is no out-of-band check that the notary "owns" this `did:key`; possession of the private key is the only proof. `did:key` is RECOMMENDED for self-issued notaries (e.g., an individual operator running a personal notary service) and for air-gapped recipient environments. It is NOT RECOMMENDED as the sole anchor for production multi-tenant notaries; pair with §8.4.4 or §8.4.5.
+
+#### 8.4.4 `did:web` — HTTPS well-known DID Document
+
+A notary with DID `did:web:notary.example.com` publishes a DID Document at:
+
+```
+https://notary.example.com/.well-known/did.json
+```
+
+The DID Document contains the notary's `verificationMethod` array, each entry binding a key id (the DID URL fragment) to a public key encoded in `publicKeyMultibase` or `publicKeyJwk` form. Example:
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/did/v1"],
+  "id": "did:web:notary.example.com",
+  "verificationMethod": [
+    {
+      "id": "did:web:notary.example.com#k1",
+      "type": "Multikey",
+      "controller": "did:web:notary.example.com",
+      "publicKeyMultibase": "z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV"
+    }
+  ],
+  "assertionMethod": ["did:web:notary.example.com#k1"]
+}
+```
+
+Verifier action:
+
+1. Parse the DID URL from `proof.verificationMethod`. Extract the DID-method-specific identifier (the part after `did:web:`) and the fragment (the part after `#`).
+2. Construct the well-known URL by percent-decoding the identifier and prefixing `https://` and suffixing `/.well-known/did.json`. Per the `did:web` method, colons in the identifier map to path segments.
+3. Fetch the URL over TLS. The TLS certificate MUST validate against the verifier's trust store; certificate failure is a fatal verification error.
+4. Parse the JSON DID Document.
+5. Locate the `verificationMethod` entry whose `id` matches the full DID URL from step 1.
+6. Decode the `publicKeyMultibase` (or `publicKeyJwk`) field to recover the raw public key bytes.
+7. Use the raw public key bytes to verify the signature.
+
+Trust model: The verifier trusts the TLS certificate authority chain that validated the notary's web origin. This anchors notary identity to domain ownership — the same trust property that backs TLS, OAuth issuer URLs, and BIMI logo publication.
+
+#### 8.4.5 DNS TXT — DKIM-style publication
+
+A notary MAY publish its public key in a DNS TXT record at a well-known sub-name. This mechanism is analogous to DKIM (RFC 6376) and provides:
+
+- **Domain-level chain of custody** anchored in DNS (and, where deployed, DNSSEC).
+- **Survival when the website is down** — DNS resolution does not depend on the notary's HTTP origin being reachable.
+- **Independent verifiability** for recipients that do not (or cannot) speak HTTPS to the notary's origin (e.g., constrained gateways, edge appliances).
+
+TXT record name: `_aph._notary.<domain>` where `<domain>` is the registrable domain of the notary's `did:web` identifier (or, for notaries without a `did:web`, the domain operationally controlled by the notary operator).
+
+TXT record value: a tag-list of semicolon-separated `key=value` pairs. The tag-list format is intentionally aligned with DKIM (RFC 6376 §3.6.1) for operator familiarity.
+
+Required tags:
+
+- `v` — protocol version literal `APHv1`.
+- `alg` — signing algorithm. One of `ed25519` or `p256`.
+- `k` — public key bytes, base64url-encoded (RFC 7515 §2; no padding).
+
+Optional tags:
+
+- `did` — the full DID URL this key entry is bound to (e.g., `did:web:notary.example.com#k1`). When present, it ties the DNS-published key to a specific DID Document entry.
+- `notBefore` — RFC 3339 timestamp before which this key MUST NOT be considered valid. Verifiers MUST reject if `now < notBefore`.
+- `notAfter` — RFC 3339 timestamp after which this key MUST NOT be considered valid. Verifiers MUST reject if `now > notAfter`.
+- `kid` — opaque key identifier matching the fragment of `proof.verificationMethod`. When present, allows a single DNS name to disambiguate multiple keys.
+
+Example TXT record (single key):
+
+```
+_aph._notary.notary.example.com.  IN  TXT  "v=APHv1; alg=ed25519; k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw"
+```
+
+Example TXT record (key with rotation window):
+
+```
+_aph._notary.notary.example.com.  IN  TXT  "v=APHv1; alg=ed25519; kid=k1; k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw; notBefore=2026-05-21T00:00:00Z; notAfter=2027-05-21T00:00:00Z"
+```
+
+Multiple keys MAY coexist as multiple TXT records at the same name (one record per active key). Verifiers MUST iterate all returned TXT records and select the one whose `kid` matches the DID URL fragment from `proof.verificationMethod`, then validate `notBefore <= now <= notAfter` if present, then attempt signature verification.
+
+Verifier action:
+
+1. Parse the DID URL from `proof.verificationMethod`. Extract the registrable domain. For `did:web`, this is the identifier; for `did:key`, this discovery path is not applicable — use §8.4.3.
+2. Query the authoritative DNS for the TXT record(s) at `_aph._notary.<domain>`. Where DNSSEC is deployed, the resolver MUST validate the DNSSEC chain; DNSSEC failure SHOULD raise a verification warning but is NOT a fatal error for v0.1 (a stricter profile is deferred to v0.2).
+3. For each returned TXT record:
+   a. Parse the tag-list. Reject records with missing required tags or with `v` other than `APHv1`.
+   b. If `kid` is present and the DID URL has a fragment, accept only the record whose `kid` matches the fragment.
+   c. Validate `notBefore <= now <= notAfter` if both are present.
+   d. Decode `k` (base64url) into raw public key bytes.
+   e. Attempt signature verification using the algorithm pinned by `alg` and the recovered key bytes.
+4. If verification succeeds against any record, accept the envelope. If all records fail, the envelope is rejected.
+
+Trust model: The verifier trusts the DNS resolution chain and, where deployed, DNSSEC. The notary operator anchors notary identity to domain ownership in the same way DKIM anchors email signing keys to sending-domain ownership.
+
+#### 8.4.6 Verifier resolution order
+
+When multiple publication mechanisms are present on a single envelope, verifiers SHOULD attempt resolution in the following order:
+
+1. **`did:key` (offline)** — if `proof.verificationMethod` is a `did:key` URL, decode in-process and skip all network I/O.
+2. **DNS TXT (§8.4.5)** — if the DID method permits and the operator has published a TXT record, query DNS. This is faster than HTTPS in many environments and survives HTTP-origin outages.
+3. **`did:web` HTTPS (§8.4.4)** — if `did:web`, fetch `.well-known/did.json` as the final fallback.
+
+A verifier MAY pin a preferred mechanism per notary (typically via configuration or via prior successful resolution). A verifier MUST NOT silently fall back from a stronger anchor to a weaker one mid-resolution; failures escalate to envelope rejection.
+
+#### 8.4.7 Key rotation + overlap
+
+Notary Service operators rotating a key MUST:
+
+1. Publish the NEW key alongside the OLD key (multiple TXT records OR multiple `verificationMethod` entries in the DID Document) for a minimum overlap window. RECOMMENDED minimum overlap: 30 days.
+2. Continue signing envelopes with the OLD key during the overlap window; do NOT switch the active signing key on day zero.
+3. After the overlap window, switch the active signing key to the NEW key and set the OLD key's `notAfter` to a timestamp inside the overlap window.
+4. Keep the OLD key's record visible (with a past `notAfter`) for a further window (RECOMMENDED 1 year) so verifiers checking older envelopes can still resolve the historical key.
+
+Verifiers MUST consult the `notBefore`/`notAfter` window of the TXT record (or, for DID Documents, the per-`verificationMethod` validity metadata if present) and accept any envelope where the signing key was valid at the envelope's `decisionTimestamp`.
+
+#### 8.4.8 Trust-on-first-use + pinning
+
+Recipient applications that store a notary's resolved public key after the first successful verification MAY pin the key locally and prefer the pinned copy on subsequent verifications. Pinning is OPTIONAL in v0.1 and is RECOMMENDED for high-stakes verifiers (e.g., compliance-recording systems) that want to detect notary-key compromise via mismatch with the pinned copy.
+
+When pinned-vs-published mismatch occurs, verifiers SHOULD raise a warning, SHOULD validate the envelope against BOTH the pinned key and the currently-published key, and MUST treat mismatch with both as a fatal verification failure.
 
 ---
 
@@ -663,6 +826,8 @@ A full threat model is published as the companion document `security-considerati
 
 **URI scheme.** APH defines the `aph://` URI scheme for protocol-level extension URIs (e.g., the A2A extension URI `aph://extensions/notarization/v1`). Formal IANA registration of the `aph://` URI scheme is deferred to v0.2. v0.1 uses the scheme by convention only, similar to how `did:` was used in early DID drafts prior to formal registration. Implementations MUST treat `aph://` URIs as opaque identifiers and MUST NOT attempt to dereference them as URLs.
 
+**DNS underscore-prefixed sub-name.** APH §8.4.5 publishes notary public keys at `_aph._notary.<domain>`. v0.1 reserves the underscore-prefixed labels `_aph` and `_aph._notary` by convention. Formal registration in the IANA "Underscored and Globally Scoped DNS Node Names" registry is deferred to v0.2. The underscore-prefix convention follows established practice in DKIM (`_domainkey`), DMARC (`_dmarc`), and TLSA (`_<port>._<proto>`).
+
 ---
 
 ## 14. References
@@ -683,6 +848,12 @@ The following references are normative for APH v0.1:
 - `draft-ietf-oauth-selective-disclosure-jwt-22` — Selective Disclosure JWT base spec (active IETF draft).
 - W3C Decentralized Identifiers (DIDs) v1.0 (W3C Recommendation).
 - W3C Verifiable Credential Data Integrity 1.0 (W3C Recommendation).
+- W3C DID Method `did:key` — self-describing DID method (W3C Community Group spec).
+- W3C DID Method `did:web` — domain-anchored DID method (W3C Community Group spec).
+- RFC 1035 — Domain Names: Implementation and Specification.
+- RFC 4034 — Resource Records for the DNS Security Extensions (DNSSEC).
+- The Multicodec Registry — multicodec.io (informative — public key prefix table for `did:key`).
+- The Multibase Specification — IETF Internet-Draft (informative — encoding for `publicKeyMultibase`).
 
 ### 14.2 Informative
 
