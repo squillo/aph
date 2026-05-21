@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - §14.2 informative references extended with multicodec + multibase pointers.
 - §8.3 step 2 cross-references §8.4 for resolution detail.
 
+### Added (revision 2026-05-21b — driver's-license framing + revocation conceptual model within 0.1.0-draft)
+
+- New §1.1 **Mental model — the agent's driver's license**. Frames APH credentials as drivers' licenses for agents, with the human as the issuing authority, the notary as the DMV, and bounded scope (channels, rate, time window, policy decision) directly analogous to license endorsements + restrictions + expiration. Establishes cross-jurisdiction portability (interstate-license framing) as a first-class property.
+- New §1.1.1 **Concrete example** — two agents from different organizations negotiating a meeting across an A2A channel under APH, including notary-key resolution via `did:web` and DNS TXT (§8.4), revocation, and the recipient-side verification flow.
+- §6.3 **Mandate lifecycle** rewritten. NEW §6.3.1 makes mandate revocation NORMATIVE in v0.1 at the conceptual layer (issuer-side `revoked` state, downstream issuance cutoff, recipient policy guidance, short-validity-window posture for v0.1). On-wire revocation transport (W3C Verifiable Credential Status List 2021 or equivalent) remains deferred to v0.2. NEW §6.3.2 makes expiration semantics explicit (no re-activation; new mandate required).
+- §10.1 **A2A composition** expanded with explicit positioning ("A2A defines transport; APH defines the human authorization that rides on top") + back-reference to §1.1.1 worked example.
+- §10.2 **AP2 composition** expanded with explicit positioning ("AP2 authorizes payment; APH authorizes the broader category of human-on-behalf-of actions, including the communication that surrounds a payment"). Adds the toll-booth / driver's-license / road-network framing of the A2A + AP2 + APH triad.
+- §1 Abstract reworded to scope "outbound actions" more broadly than "outbound communications" — APH covers any human-authorized agent action, including messaging, scheduling, content authorship, and the communications surrounding payments.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

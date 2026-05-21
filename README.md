@@ -1,6 +1,44 @@
 # APH — Agent per Human Notarization Protocol
 
-APH is an open protocol for cryptographically notarizing an agent's outbound communication on behalf of a specific human, producing a W3C Verifiable Credential 2.0-shaped envelope that downstream recipients can independently verify across vendors.
+APH is an open protocol for cryptographically notarizing the actions an autonomous agent takes on behalf of a specific human, producing a W3C Verifiable Credential 2.0-shaped envelope that any downstream recipient can independently verify across vendors and across organizations.
+
+## Mental model — the agent's driver's license
+
+Think of an APH credential as an **agent's driver's license**:
+
+- **A human (the issuing authority)** authorizes a specific agent to act on their behalf within bounded parameters.
+- **A notary service (the DMV)** issues the license, signs it, and publishes its verification key so anyone can independently check the license against the public record.
+- **The license carries a scope** — which channels, which content classes, which recipients, how often, for how long.
+- **The license is revocable** — the issuing human can pull it at any time.
+- **The license is portable across jurisdictions** — like an interstate driver's license, an APH credential issued by one organization's notary is verifiable by any other organization's agent or system using only public standards. No bilateral integration required.
+
+When an agent presents a notarized message, the recipient can verify, without trusting the sending agent's runtime or its identity provider, that:
+
+1. A specific human authorized this specific action.
+2. The action falls within the scope of the human's standing delegation.
+3. The notary that signed the license holds the private key it claims to hold (verifiable via DNS-anchored public key publication — see spec §8.4).
+4. The license has not expired and (when revocation transport is wired) has not been revoked.
+
+## Where APH fits next to A2A and AP2
+
+APH is a complement to Google's open agent protocols, not a replacement:
+
+- **A2A (Agent2Agent)** — standardizes how two agents discover each other and exchange messages. APH attaches to A2A messages as a Verifiable Credential extension so the receiving agent can verify the sending agent actually has its human's permission for this specific action.
+- **AP2 (Agentic Payments)** — standardizes how an agent obtains a human-signed mandate to make a payment. APH covers the broader case: any human-authorized action an agent takes, including but not limited to payment. AP2 and APH cross-link via the envelope's `linkedMandate` field so a single agent action can carry both a payment mandate AND a communication authorization.
+- **APH (Agent per Human)** — the missing piece. Where A2A defines the transport and AP2 defines payment authorization, APH defines **per-action human authorization** — an agent's verifiable credential to act on a specific human's behalf for a specific task on a specific channel.
+
+In one sentence: **A2A is the road network, AP2 is the toll booth, APH is the driver's license.**
+
+## Concrete example — two agents negotiating a meeting
+
+Alice's agent and Bob's agent are negotiating a meeting time over a public channel. Both agents act with autonomy within bounded parameters their humans set in advance. Each outbound message carries an APH envelope:
+
+- Alice's agent emits a message proposing 3 pm Tuesday. The envelope is notarized by Squillo's notary on Alice's behalf, with `channel = a2a`, `contentClass = Reply`, `policy.matchedScope = per-channel`, and a `DelegationMandate` reference showing Alice pre-authorized her agent to schedule meetings on this channel for the next 30 days.
+- Bob's agent verifies the APH envelope by resolving Squillo's notary public key (via `did:web` `.well-known/did.json` or via the `_aph._notary.squillo.io` DNS TXT record — both anchored in public infrastructure Bob doesn't need a Squillo account to read), then checks the signature, the time window, the scope, and the body hash.
+- Bob's agent replies with a counter-proposal under its own APH envelope, notarized by Bob's organization's notary, which Alice's agent verifies the same way.
+- Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a license its human issued ahead of time and can revoke at any time.
+
+If Alice decides she no longer wants her agent scheduling on her behalf, she revokes the DelegationMandate; subsequent envelopes from her agent referencing that mandate will fail verification on Bob's side.
 
 ## What problem APH solves
 

@@ -16,7 +16,35 @@ This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, publ
 
 ## 1. Abstract
 
-APH (Agent per Human) defines a wire protocol for cryptographically notarizing outbound communications that an autonomous agent sends on behalf of a human principal. Each notarized message carries a Verifiable Credential — issued by a Notary Service under one of three human-configured policy decisions (`AlwaysAllow`, `AskEveryTime`, `NeverAllow`) — that binds the outbound payload to the human's keypair, the agent's identity, the channel transport, and the policy context. APH is transport-agnostic: envelopes ride alongside the message itself on whatever channel the agent uses (email, chat, messaging, voice), so that any recipient — regardless of vendor — can independently verify that a specific human authorized this specific message. APH complements adjacent protocols (A2A for agent-to-agent transport, AP2 for payment authorization, MCP for tool exposure, W3C VC 2.0 for credential format) without replacing any of them.
+APH (Agent per Human) defines a wire protocol for cryptographically notarizing actions an autonomous agent takes on behalf of a human principal. Each notarized action carries a Verifiable Credential — issued by a Notary Service under one of three human-configured policy decisions (`AlwaysAllow`, `AskEveryTime`, `NeverAllow`) — that binds the action's payload to the human's keypair, the agent's identity, the channel transport, and the policy context. APH is transport-agnostic: envelopes ride alongside the action itself on whatever channel the agent uses (email, chat, messaging, voice, agent-to-agent), so that any recipient — regardless of vendor or organization — can independently verify that a specific human authorized this specific action. APH complements adjacent protocols (A2A for agent-to-agent transport, AP2 for payment authorization, MCP for tool exposure, W3C VC 2.0 for credential format) without replacing any of them. Where A2A defines the transport and AP2 defines payment authorization, APH defines per-action human authorization — the agent's verifiable license to act on a specific human's behalf for a specific task on a specific channel.
+
+---
+
+## 1.1 Mental model — the agent's driver's license
+
+APH credentials function as **drivers' licenses for agents**. The metaphor maps directly to the protocol structure:
+
+- **The issuing authority is the human principal.** Like a state issuing a license, the human is the only party with the authority to grant an agent permission to act on their behalf. The human's signature (directly or transitively via the Notary Service capturing explicit attestation) is the root of every APH credential.
+- **The notary service is the DMV.** It runs the human's policy, captures attestation when required, signs the credential with its own keypair, and publishes its public verification key via DNS or HTTPS so any recipient can independently confirm the signature is genuine (§8.4). The notary does NOT decide whether to issue — it executes the human's pre-declared policy.
+- **Every credential carries a bounded scope.** A Delegation Mandate names the channels the agent may operate on (`allowedChannels`), the rate at which it may act (`rateLimitPerHour`), the time window during which authority is valid (`validFrom` … `validUntil`), and the policy decision the human selected (`AlwaysAllow` / `AskEveryTime` / `NeverAllow`). A Communication Mandate further binds a single action to a specific outbound payload hash. Like a driver's license that authorizes operating a specific class of vehicle in specific places, APH credentials authorize specific actions on specific channels.
+- **The license is revocable at any time.** The issuing human can revoke a Delegation Mandate before its `validUntil`. The conceptual revocation model is normative in this version of the spec (§6.3); the on-wire revocation transport (status list / status credential) is deferred to v0.2.
+- **The license is portable across jurisdictions.** Like an interstate driver's license, an APH credential issued by one organization's notary is verifiable by any other organization's agent or system using only public standards (W3C VC 2.0, RFC 8785, RFC 7515, RFC 8032, DNS). No bilateral integration, no shared identity provider, no out-of-band trust establishment. The notary's public key is published in DNS or at a `.well-known` URI; any recipient on the open internet can resolve it.
+- **The license is independently auditable.** Every credential is a self-contained Verifiable Credential. Recipients store them in their own audit logs. Disputes can be resolved by re-verifying the credential against the notary's published key — by the recipient, by a third-party auditor, or by a regulator — without ever contacting the notary.
+
+The notarization step matters precisely because it produces a third-party-verifiable artifact. A signed action without public-key publication is closed signing; a signed action with publicly-anchored public keys is notarization. APH is the latter.
+
+### 1.1.1 Concrete example — two agents negotiating
+
+Alice's agent and Bob's agent are negotiating a meeting time over a shared channel. Both agents are acting with autonomy within bounded parameters their humans set in advance.
+
+1. Alice opens her agent and grants it a Delegation Mandate scoped to channel `a2a`, content class `Reply` and `New`, valid for 30 days, with `rateLimitPerHour = 12`. Squillo's notary signs the mandate and persists it to Alice's local store.
+2. Alice's agent drafts the first message: "How about 3 pm Tuesday?" The agent sends it under an APH envelope notarized by Squillo's notary on Alice's behalf, with `credentialSubject.policy.delegationMandateId` pointing at the just-issued mandate.
+3. Bob's agent receives the envelope. Bob's agent has never previously transacted with Squillo. It resolves Squillo's notary public key via `did:web:notary.squillo.io` (fetching `https://notary.squillo.io/.well-known/did.json`) OR via the `_aph._notary.squillo.io` DNS TXT record. Both publication mechanisms are anchored in public infrastructure Bob does not need a Squillo account to read.
+4. Bob's agent verifies the envelope signature, validates the time window, confirms the body hash matches the received payload, confirms the scope permits this channel + content class, and accepts the message.
+5. Bob's agent replies under its own APH envelope, notarized by Bob's organization's notary. Alice's agent verifies the reply using the same flow.
+6. Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a credential its human issued ahead of time and can revoke at any time.
+
+If Alice changes her mind and revokes the Delegation Mandate, Squillo's notary records the revocation; subsequent envelopes from Alice's agent referencing that mandate fail verification on Bob's side once the revocation transport (v0.2) is wired. In v0.1 the recovery posture is to use short validity windows (RECOMMENDED: hours-to-days, not weeks-to-months) so revocation gaps are small.
 
 ---
 
@@ -225,9 +253,26 @@ Validation rules:
 
 ### 6.3 Mandate lifecycle
 
-A Delegation Mandate is issued by the Human Principal, signed by the Notary Service, and persisted to the human's local store. Its validity window is bounded by `validFrom` and `validUntil`. A Communication Mandate is issued at outbound-message time; it MAY reference a Delegation Mandate (the standing-authority path) or stand alone (the AskEveryTime path). Communication Mandates are single-use: one Communication Mandate per outbound message. Both mandate types are bound by the Notary Service signature.
+A Delegation Mandate is issued by the Human Principal, signed by the Notary Service, and persisted to the human's local store. Its validity window is bounded by `validFrom` and `validUntil`. A Communication Mandate is issued at outbound-action time; it MAY reference a Delegation Mandate (the standing-authority path) or stand alone (the AskEveryTime path). Communication Mandates are single-use: one Communication Mandate per outbound action. Both mandate types are bound by the Notary Service signature.
 
-v0.1 does NOT define a mandate revocation mechanism. Implementations that need revocation before v0.2 SHOULD use short validity windows. v0.2 will define a status credential or revocation list mechanism.
+#### 6.3.1 Revocation — conceptual model
+
+A Delegation Mandate is REVOCABLE by the issuing Human Principal at any time before its `validUntil`. Revocation is normative in v0.1 even though the on-wire revocation transport is deferred. Revocation is the corollary of the driver's-license framing: a license that cannot be pulled is not a license.
+
+The conceptual revocation model is:
+
+1. **Issuer-side state.** The Notary Service tracks, for every Delegation Mandate it has signed, a `revoked: bool` state and a `revokedAt: RFC 3339 string` timestamp (set when revoked, absent otherwise). The Notary Service exposes a revocation operation to the Human Principal; calling it sets `revoked = true` and stamps `revokedAt = now`.
+2. **Effect on downstream Communication Mandates.** A Notary Service MUST NOT issue a new Communication Mandate referencing a revoked Delegation Mandate. A Communication Mandate signed before its parent Delegation Mandate was revoked remains cryptographically valid; the revocation cuts off issuance of NEW mandates rather than invalidating existing signatures.
+3. **Effect on issued envelopes.** Envelopes already in flight when the parent mandate is revoked remain verifiable as signed credentials. Recipient policy MAY treat envelopes whose parent Delegation Mandate is currently revoked as suspect even if cryptographically valid; v0.1 leaves this policy to the recipient.
+4. **Revocation transport.** v0.1 does NOT specify how a third-party recipient discovers that a mandate has been revoked. Implementations that need recipient-side revocation before v0.2 SHOULD use short validity windows (RECOMMENDED: hours to days, not weeks to months) so revocation gaps are bounded. v0.2 will define a status credential (W3C Verifiable Credential Status List 2021) or equivalent transport so recipients can pull revocation state at verification time.
+
+A Communication Mandate is single-use and conceptually "consumed" by issuing the corresponding envelope; revocation of a Communication Mandate has no practical meaning (the envelope has either been issued or it has not). Revocation applies to Delegation Mandates only.
+
+#### 6.3.2 Expiration
+
+When `now > validUntil`, a Delegation Mandate is EXPIRED. A Notary Service MUST NOT issue a new Communication Mandate referencing an expired Delegation Mandate. Verifiers MUST reject envelopes whose Communication Mandate's `delegationMandateId` resolves to an expired Delegation Mandate (when the verifier has access to that lookup).
+
+A Delegation Mandate that has reached its `validUntil` cannot be "re-activated" — the human must issue a new mandate with a new `id` and new validity window.
 
 ---
 
@@ -752,17 +797,23 @@ APH is designed to compose cleanly with adjacent agent and credential protocols.
 
 ### 10.1 A2A (Agent2Agent)
 
+A2A defines how two agents discover each other and exchange messages. APH attaches to A2A messages as a Verifiable Credential extension so the receiving agent can verify the sending agent actually holds its human's permission for this specific action. Without APH, A2A messages carry no portable, third-party-verifiable proof of human authorization; with APH, every A2A message can be independently audited back to a human-issued mandate.
+
 APH advertises support via an A2A AgentCard extension declaration. The extension URI is:
 
 ```
 aph://extensions/notarization/v1
 ```
 
-When an agent advertises APH support, it adds an `AgentExtension` declaration to `AgentCard.capabilities.extensions` with the URI above, a short description, and `required: false`. Recipient agents that wish to require notarization MAY set `required: true` on their side. Refer to the companion document `a2a-extension.md` for the full descriptor and integration example.
+When an agent advertises APH support, it adds an `AgentExtension` declaration to `AgentCard.capabilities.extensions` with the URI above, a short description, and `required: false`. Recipient agents that wish to require notarization MAY set `required: true` on their side. Refer to the companion document `a2a-extension.md` for the full descriptor and integration example. The driver's-license framing applies directly: an agent's APH credential is the credential a receiving agent checks before granting the sending agent's request, the way an officer checks a driver's license at a traffic stop.
+
+A worked end-to-end example of two agents negotiating across organizations under APH appears in §1.1.1.
 
 ### 10.2 AP2 (Agentic Payments Protocol)
 
-APH and AP2 are complementary: AP2 authorizes payment, APH authorizes communication. An APH envelope MAY ride alongside an AP2 IntentMandate by setting `linkedMandate.ap2IntentMandateUri` to the IntentMandate's URI. APH does NOT replace AP2 — payment authorization remains in AP2's IntentMandate / CartMandate / PaymentMandate chain. Both protocols share canonicalization (JCS) and signing primitives.
+AP2 defines how an agent obtains a human-signed mandate to make a payment. APH and AP2 are complementary: AP2 authorizes payment, APH authorizes the broader category of human-on-behalf-of actions (including communication, scheduling, content creation, and the actions that surround a payment). An APH envelope MAY ride alongside an AP2 IntentMandate by setting `linkedMandate.ap2IntentMandateUri` to the IntentMandate's URI; the two credentials together let a recipient verify both that a payment was authorized AND that the surrounding communication carrying the payment instruction was itself authorized. APH does NOT replace AP2 — payment authorization remains in AP2's IntentMandate / CartMandate / PaymentMandate chain. Both protocols share canonicalization (JCS) and signing primitives.
+
+In the driver's-license framing: AP2 is the toll booth (specifically authorizes paying for road use); APH is the underlying driver's license (the general license to operate); A2A is the road network itself.
 
 ### 10.3 MCP (Model Context Protocol)
 
