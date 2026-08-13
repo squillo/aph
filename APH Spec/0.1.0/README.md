@@ -108,6 +108,30 @@ directory; without that entry the files are simply never read.
 Keep `nlang_code` copied from the `.n.md` sources rather than paraphrased,
 so an example cannot drift from the type it documents.
 
+## Round-trip verification
+
+The published example envelopes are checked against these blocks by
+`interpreters/rust/aph-conformance/tests/nlang_snapp_test.rs`, which runs
+under `cargo test` in CI. It reads the committed bundle rather than
+invoking the N Lang compiler, so it needs no toolchain beyond Rust.
+
+It checks both directions. Every key of every published example must map to
+a declared prop, walking nested objects and validating internally tagged
+enum variants against their declared items; and every required prop must be
+exercised by at least one example, so the types cannot declare surface the
+protocol never sends.
+
+The check is mutation-tested — renaming a prop, adding an unexercised
+required prop, and adding an undeclared enum item were each confirmed to
+fail it before it was trusted.
+
+One caveat worth knowing: a **typed ledger binding is not structurally
+validated** by the compiler today. Unknown props, missing required props,
+and wrong-typed values are all accepted in a `x: <Block> = { ... }`
+construction. That is why this round-trip lives outside N Lang rather than
+as an in-Snapp test — an in-Snapp version would pass unconditionally and
+prove nothing.
+
 ## Notes for editors
 
 Three N Lang rules shape these files, each learned from a compiler error
