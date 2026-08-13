@@ -14,6 +14,21 @@ This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, publ
 
 ---
 
+> ### ⚠ Superseded in part by v0.2 — read this first
+>
+> §1.1 and §3.1 below promise that the human principal may sign **directly**.
+> The v0.1 wire format cannot express that: `proof` is a single object whose
+> `verificationMethod` names the *Notary Service's* key, and the mandate
+> structs carry only `notarySignature`. **Every v0.1 credential is therefore
+> notary-attested**, meaning a verifier learns that *a notary asserts* the
+> human authorized an action — not that the human did.
+>
+> [**aph-0.2.md**](./aph-0.2.md) adds the principal proof, names the two
+> modes so a verifier can tell them apart, and makes a Notary Service
+> hostable by anyone because it can no longer forge an authorization. v0.1
+> envelopes remain valid and are not deprecated. See v0.2 Appendix "Errata to
+> v0.1" for the full list.
+
 ## 1. Abstract
 
 APH (Agent per Human) defines a wire protocol for cryptographically notarizing actions an autonomous agent takes on behalf of a human principal. Each notarized action carries a Verifiable Credential — issued by a Notary Service under one of three human-configured policy decisions (`AlwaysAllow`, `AskEveryTime`, `NeverAllow`) — that binds the action's payload to the human's keypair, the agent's identity, the channel transport, and the policy context. APH is transport-agnostic: envelopes ride alongside the action itself on whatever channel the agent uses (email, chat, messaging, voice, agent-to-agent), so that any recipient — regardless of vendor or organization — can independently verify that a specific human authorized this specific action. APH complements adjacent protocols (A2A for agent-to-agent transport, AP2 for payment authorization, MCP for tool exposure, W3C VC 2.0 for credential format) without replacing any of them. Where A2A defines the transport and AP2 defines payment authorization, APH defines per-action human authorization — the agent's verifiable license to act on a specific human's behalf for a specific task on a specific channel.

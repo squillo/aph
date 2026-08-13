@@ -8,15 +8,15 @@ APH is an open protocol for cryptographically notarizing the actions an autonomo
 
 Think of an APH credential as an **agent's driver's license**:
 
-- **A human (the issuing authority)** authorizes a specific agent to act on their behalf within bounded parameters.
-- **A notary service (the DMV)** issues the license, signs it, and publishes its verification key so anyone can independently check the license against the public record.
+- **A human (the issuing authority)** authorizes a specific agent to act on their behalf within bounded parameters — and, from v0.2, **signs that authorization with their own key**.
+- **A notary service (the DMV)** witnesses the decision, records when policy was evaluated, countersigns, and publishes its verification key so anyone can independently check the credential against the public record. Because it never holds the human's key, a notary **cannot forge an authorization** — which is why anyone may host one.
 - **The license carries a scope** — which channels, which content classes, which recipients, how often, for how long.
 - **The license is revocable** — the issuing human can pull it at any time.
 - **The license is portable across jurisdictions** — like an interstate driver's license, an APH credential issued by one organization's notary is verifiable by any other organization's agent or system using only public standards. No bilateral integration required.
 
 When an agent presents a notarized message, the recipient can verify, without trusting the sending agent's runtime or its identity provider, that:
 
-1. A specific human authorized this specific action.
+1. A specific human authorized this specific action — proved by the human's own signature in v0.2 `PrincipalSigned` mode, or asserted by a notary in v0.1 `NotaryAttested` mode. The envelope says which, so a recipient never has to guess.
 2. The action falls within the scope of the human's standing delegation.
 3. The notary that signed the license holds the private key it claims to hold (verifiable via DNS-anchored public key publication — see spec §8.4).
 4. The license has not expired and (when revocation transport is wired) has not been revoked.
@@ -54,7 +54,7 @@ A Notary Service is meaningful only if a **third party can independently verify*
 
 ## Status
 
-**v0.1.0-draft** — protocol design phase. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes). JSON Schema files and signed conformance test vectors are deferred to v0.2.
+**v0.1.0-draft**, with **v0.2.0-draft** amending the trust model. [`spec/aph-0.2.md`](spec/aph-0.2.md) adds the principal's own signature as a proof chain, names the two attestation modes, and defines k-of-3 code attestation for hostable notaries; v0.1 envelopes stay valid. Protocol design phase. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes). JSON Schema files and signed conformance test vectors are deferred to v0.2.
 
 ## Relationship to other protocols
 
@@ -141,6 +141,7 @@ The envelope ships on the wire in two simultaneous encodings:
 aph/
   spec/
     aph-0.1.md          Specification text (v0.1 draft)
+    aph-0.2.md          v0.2 amendment — the principal signs; notary code attestation
     a2a-extension.md    A2A AgentCard extension descriptor
     security-considerations.md   Threat model / security companion
   assets/

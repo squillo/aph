@@ -5,6 +5,29 @@ All notable changes to APH (Agent per Human Notarization Protocol) will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0-draft] — 2026-08-13
+
+### Added
+
+- **`spec/aph-0.2.md`** — an amendment to v0.1, not a replacement. v0.1 sections it does not modify remain in force.
+- **The principal signs.** `proof` MAY be a W3C Verifiable Credentials 2.0 **proof chain**: a principal proof (`proofPurpose: assertionMethod`, the principal's own key — this IS the authorization) followed by a notary countersignature covering the complete principal proof, so a notary cannot move a principal's signature onto a different envelope.
+- **`credentialSubject.policy.attestationMode`** — closed enum, `PrincipalSigned` | `NotaryAttested`. A verifier requiring `PrincipalSigned` MUST refuse `NotaryAttested` rather than silently accept the weaker claim, mirroring the no-silent-downgrade rule §8.4.6 already applies to key discovery.
+- **`DelegationMandate.principalSignature`** — the principal's own signature over the standing grant, the highest-value document in the protocol.
+- **§15 Notary Code Attestation** — a k-of-3 authority over content digests of reproducible builds, reusing Sigstore / in-toto / SLSA vocabulary rather than defining an APH schema. Numbered §15 because v0.1 §12 is Security Considerations.
+- **Canonicalization pinned per proof** (§2.1): the principal proof covers the envelope with every `proofValue` emptied; the notary proof covers it with the principal `proofValue` present and its own emptied. This settles the strip-vs-empty question v0.1 §7.2 left open — normatively, as the empty string.
+
+### Changed
+
+- **A Notary Service is now hostable by anyone.** In `PrincipalSigned` mode a notary never holds the principal's key and therefore cannot forge an authorization; its compromise costs availability and metadata, not credentials. The question about a notary becomes supply-chain (does it run published code) rather than custodial (is it trusted with a key).
+- Envelopes carrying a principal proof set `aphVersion` to `"0.2"`. A v0.1 verifier MUST reject `"0.2"` rather than partially verify it.
+
+### Notes
+
+- **v0.1 envelopes remain valid and are not deprecated.** `NotaryAttested` is retained deliberately for devices where the principal has no separable key.
+- **A `did:key` principal needs no key lookup** — the public key is the identifier, so the principal proof verifies offline with no publication and no prior relationship. The trade-off, documented wherever `did:key` is recommended: such a principal cannot rotate, because the key is the name.
+- **Errata to v0.1** are listed in the v0.2 appendix. The most consequential: §1.1 and §3.1 promised a direct-principal-signature mode the v0.1 wire format could not express, so every v0.1 credential is notary-attested.
+- **Stated limit on attestation:** it proves what code was *published*, never what is *running*. Absent hardware-backed remote attestation it raises the cost of a malicious notary without making a remote one honest, and any surface rendering an attestation badge must convey that.
+
 ## [0.1.0-draft] — 2026-05-21
 
 ### Added

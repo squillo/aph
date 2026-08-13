@@ -43,7 +43,7 @@ Top-level fields of a `NotarizationEnvelope` (all camelCase, strict parse):
 | `validFrom` / `validUntil` | RFC 3339; verifiers enforce `validFrom <= now <= validUntil` (±60s skew) |
 | `credentialSubject` | the notarized claim (below) |
 | `linkedMandate` | optional / nullable; carries `ap2IntentMandateUri` for AP2 cross-links (§7.1.10). The reference implementation additionally accepts optional `ap2SignedPayloadB64` and `vaultMutation` extension fields not yet in the spec text (see sharp edge 3) |
-| `proof` | single proof block (§7.1.11) |
+| `proof` | single proof block in v0.1 (§7.1.11); a **proof chain array** in v0.2 (see Trust model below) |
 
 `credentialSubject` contains exactly six objects per spec v0.1 (§7.1.2–§7.1.9;
 the reference implementation also accepts an optional `appleAurAcceptance`
@@ -125,6 +125,48 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E008` | `NotaryServiceUnreachable` | Remote notary timed out |
 | `APH_E009` | `EnvelopeBodyHashMismatch` | Recipient's SHA-256 of the body != `communication.bodySha256` |
 | `APH_E010` | `UnsupportedAlgorithm` | Algorithm outside {`ES256`, `EdDSA`}, or `alg: none` |
+
+## Trust model — WHO signs (v0.1 vs v0.2)
+
+This is the single most important thing to get right about APH, and v0.1 and
+v0.2 differ on it.
+
+**v0.1 — `NotaryAttested`.** `proof` is one object and its
+`verificationMethod` names the **Notary Service's** key. Mandates carry only
+`notarySignature`. There is no principal signature anywhere. So a v0.1
+verifier learns *"a notary asserts this human authorized this"* — NOT *"this
+human authorized this."* Never describe a v0.1 envelope as proof the human
+signed something; it is not.
+
+**v0.2 — `PrincipalSigned`.** `proof` becomes a W3C VC 2.0 **proof chain**:
+
+1. **Principal proof** — `proofPurpose: assertionMethod`,
+   `verificationMethod` = the principal's DID URL. This IS the authorization.
+2. **Notary proof** — `proofPurpose: authentication`, countersigning over
+   the complete principal proof, so a notary cannot move a principal's
+   signature onto a different envelope.
+
+`credentialSubject.policy.attestationMode` declares which mode an envelope
+is in. **A verifier requiring `PrincipalSigned` MUST refuse `NotaryAttested`
+— never silently accept the weaker claim.**
+
+Two consequences worth carrying:
+
+- **A `did:key` principal needs no lookup.** The public key IS the
+  identifier, so the verifying key ships inside the envelope and the
+  principal proof verifies offline with no prior relationship. The
+  trade-off: a `did:key` principal cannot rotate, because the key is the
+  name. Rotatable principals use `did:web` or DNS TXT.
+- **A v0.2 notary cannot forge an authorization**, because it never holds
+  the principal's key. That is why a Notary Service is infrastructure anyone
+  may host, and why the question about a notary is code attestation
+  (v0.2 §15, k-of-3 authority over reproducible builds) rather than key
+  custody. Note the stated limit: attestation proves what was *published*,
+  never what is *running*.
+
+Canonicalization per proof (v0.2 §2.1): the principal proof covers the
+envelope with EVERY `proofValue` emptied; the notary proof covers it with the
+principal `proofValue` present and its own emptied.
 
 ## Signing profiles + canonicalization (spec §7.2, §8.1, §8.2)
 
