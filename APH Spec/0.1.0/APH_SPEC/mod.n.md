@@ -21,4 +21,5 @@ mod APH {};
 mod APH_PROTOCOL {};
 mod APH_ENVELOPE {};
 mod APH_MANDATES {};
+mod APH_TESTS {};
 ```

@@ -47,6 +47,7 @@ The specification text is normative. Where this Snapp and
 | `APH_SPEC/APH_PROTOCOL.n.md` | Roles, closed vocabularies, both flow state machines, the error taxonomy, key discovery (§5, §8.4, §9, §11). |
 | `APH_SPEC/APH_ENVELOPE.n.md` | The notarization envelope and its subject objects (§7). |
 | `APH_SPEC/APH_MANDATES.n.md` | Delegation and Communication Mandates (§6). |
+| `APH_SPEC/APH_TESTS.n` | Type-surface tests (`nlang test`). Plain `.n`, deliberately — see Tests. |
 | `how/` | Worked examples served by `nlang how`, one JSON file per example. |
 
 Declaration order is load order, and a sibling file that is not declared in
@@ -107,6 +108,33 @@ directory; without that entry the files are simply never read.
 
 Keep `nlang_code` copied from the `.n.md` sources rather than paraphrased,
 so an example cannot drift from the type it documents.
+
+## Tests
+
+```sh
+nlang test     # 34 type-surface tests
+```
+
+Each test constructs an instance and asserts a single field. That shape is
+forced by the toolchain, not a style choice — see below.
+
+### Two behaviours that silently produce green, meaningless suites
+
+Both were found by mutation testing rather than assumed, and both are worth
+knowing before writing a test here.
+
+**Test bodies in literate `.n.md` files are never executed.** They are
+discovered and reported as passing; a file of them reports success with
+`assert_eq!(1, 2)` in every body. `APH_TESTS.n` is therefore the one plain
+`.n` file in this Snapp. If a `.n` and a `.n.md` of the same module name
+both exist, the `.n.md` wins and the real tests are silently ignored.
+
+**Only the last assertion in a test body is load-bearing.** A failing
+assertion is masked by any later passing one, so a test with five
+assertions really only checks the fifth. Hence one assertion per test:
+every assertion is the last one and therefore has teeth. Verified by
+mutating four independent assertions, each of which failed exactly one
+test.
 
 ## Round-trip verification
 
