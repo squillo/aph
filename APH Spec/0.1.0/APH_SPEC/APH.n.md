@@ -1,11 +1,20 @@
 ```nlang
 @name: "aph"
 @description: "APH (Agent per Human) Protocol Specification"
-@author: "APH Protocol Contributors"
-@license: "SEE LICENSE IN LICENSE"
+@author: "Scott Wyatt <scott@squillo.com>, APH Protocol Contributors"
+@copyright: "(2020-present) Scott Wyatt, Squillo Inc. - All Rights Reserved"
+@license: "Apache-2.0 (SEE LICENSE). N Lang is proprietary to Squillo Inc.; commercial licensing of the language only through Squillo Inc."
 ```
 
 # APH — Snapp Definition
+
+> **Copyright (2020-present) Scott Wyatt, Squillo Inc. — All Rights Reserved.**
+> N Lang is a proprietary language of Squillo Inc.; commercial use of the
+> language, compiler, runtime, and Snapp tooling is licensable only through
+> Squillo Inc. — <https://squillo.com/nlang>. The contents of this file are
+> published under the Apache License 2.0 (see `LICENSE` at the repository
+> root); that grant covers this file, not the N Lang language or toolchain.
+
 
 APH is an open protocol for cryptographically notarizing the actions an
 autonomous agent takes on behalf of a specific human. It produces a W3C

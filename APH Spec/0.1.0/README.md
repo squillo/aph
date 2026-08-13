@@ -7,9 +7,11 @@ the key discovery records.
 
 ## N Lang
 
-**N Lang is a programming language by [Squillo](https://squillo.com).** Its
-unit of distribution is a *Snapp* — a versioned, compiled bundle of nodes
-and types that other Snapps depend on. To learn the language, start here:
+**N Lang is a proprietary programming language by
+[Squillo Inc.](https://squillo.com)**, commercially licensable only through
+Squillo Inc. Its unit of distribution is a *Snapp* — a versioned, compiled
+bundle of nodes and types that other Snapps depend on. To learn the
+language, start here:
 
 > **<https://squillo.com/nlang>**
 
@@ -189,6 +191,21 @@ on the wire, since N Lang permits it as a prop name where Rust needs
 `r#type`. The snake_case interior of `vaultMutation` inside the camelCase
 envelope is the deployed wire shape, not an inconsistency to tidy.
 
-## License
+## Copyright and licensing
 
-Apache-2.0 — see [LICENSE](../../LICENSE).
+**Copyright (2020-present) Scott Wyatt, Squillo Inc. — All Rights Reserved.**
+
+Two separate things are licensed here, and conflating them is the mistake to
+avoid:
+
+- **These Snapp sources** — the `.n.md` files, the `how/` examples, and the
+  compiled bundle — are published under the Apache License 2.0, the same as
+  the rest of this repository. Implementers may read, copy, and build on
+  them freely. See [LICENSE](../../LICENSE).
+- **N Lang itself** — the language, compiler, runtime, and Snapp tooling —
+  is proprietary to Squillo Inc. and is **commercially licensable only
+  through Squillo Inc.** See <https://squillo.com/nlang>.
+
+In other words, the APH type definitions are open; the language they are
+written in is not. Reading these files, and compiling them with a licensed
+toolchain, is exactly what they are published for.

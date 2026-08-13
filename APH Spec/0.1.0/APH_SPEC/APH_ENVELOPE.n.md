@@ -2,8 +2,18 @@
 section: "APH Specification"
 name: "APH Notarization Envelope"
 version: "0_1_0"
+copyright: "(2020-present) Scott Wyatt, Squillo Inc. - All Rights Reserved"
+license: "Apache-2.0 (file contents). N Lang itself is proprietary to Squillo Inc. and is commercially licensable only through Squillo Inc."
 ---
 # APH Notarization Envelope
+
+> **Copyright (2020-present) Scott Wyatt, Squillo Inc. — All Rights Reserved.**
+> N Lang is a proprietary language of Squillo Inc.; commercial use of the
+> language, compiler, runtime, and Snapp tooling is licensable only through
+> Squillo Inc. — <https://squillo.com/nlang>. The contents of this file are
+> published under the Apache License 2.0 (see `LICENSE` at the repository
+> root); that grant covers this file, not the N Lang language or toolchain.
+
 
 The credential itself: a W3C Verifiable Credential 2.0-shaped document that
 binds one outbound agent action to the human authorization behind it (§7).
