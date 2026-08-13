@@ -231,7 +231,7 @@ attested release it reports running (§15.3). They are declared here rather
 than only in §15 because parsing is strict: a field a conformant notary may
 send must exist in the shape a conformant verifier parses. Carrying them
 proves nothing on its own — an attestation attests what was *published*,
-never what is *running* (§15.6).
+never what is *running* (§15.7).
 
 ```nlang
 mod blocks NotaryServiceRef {

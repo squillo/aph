@@ -370,7 +370,7 @@ pub struct NotaryServiceRef {
   pub attested_digest: std::option::Option<String>,
   /// Where the k-of-3 attestation for `attested_digest` may be fetched
   /// (spec §15.3). Carrying it proves nothing on its own — an attestation
-  /// attests what was PUBLISHED, never what is RUNNING (§15.6).
+  /// attests what was PUBLISHED, never what is RUNNING (§15.7).
   #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
   pub attestation_uri: std::option::Option<String>,
 }

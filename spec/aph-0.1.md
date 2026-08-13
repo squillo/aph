@@ -1145,7 +1145,16 @@ When multiple publication mechanisms are present on a single envelope, verifiers
 2. **DNS TXT (§8.4.5)** — if the DID method permits and the operator has published a TXT record, query DNS. This is faster than HTTPS in many environments and survives HTTP-origin outages.
 3. **`did:web` HTTPS (§8.4.4)** — if `did:web`, fetch `.well-known/did.json` as the final fallback.
 
-A verifier MAY pin a preferred mechanism per notary (typically via configuration or via prior successful resolution). A verifier MUST NOT silently fall back from a stronger anchor to a weaker one mid-resolution; failures escalate to envelope rejection.
+A verifier MAY pin a preferred mechanism per notary (typically via configuration or via prior successful resolution).
+
+**Absence is not failure, and the distinction is normative.** An ordered list and a no-downgrade rule only coexist if a verifier can tell the two apart:
+
+- **Not published** — no TXT record exists at `_aph._notary.<domain>`, or no `did.json` is served. That mechanism is simply not offered, and the verifier advances to the next one in the list.
+- **Published and failed** — the lookup errored, the record is malformed, the signature does not verify, the key is outside its validity window, or the algorithm is unsupported. The verifier **MUST reject the envelope** rather than advance.
+
+The second rule is what makes the ordering safe. Without it, an attacker who can make a stronger mechanism *fail* — a DNS outage they cause, a record they corrupt — thereby chooses which anchor the verifier trusts, and choosing the anchor is an identity decision rather than a reachability one. **A verifier MUST NOT silently fall back from a stronger anchor to a weaker one after a failure; failures escalate to envelope rejection.**
+
+Implementations whose resolution interface cannot distinguish absence from failure MUST document that limitation, because on such an interface the ordering above is a preference and not a control.
 
 #### 8.4.7 Key rotation + overlap
 
@@ -1377,15 +1386,51 @@ MUST reject an attestation carrying two signatures that verify against the
 same key — otherwise a single compromised holder satisfies the threshold by
 signing twice, and k-of-3 degrades to 1-of-3 without anyone noticing.
 
-The three authority public keys are published through the §8.4 mechanisms
+**The authority's identity is not yet assigned, and §15 cannot be
+implemented until it is.** A verifier resolves the three holder keys the way
+it resolves any other APH key material — but it must first know WHOSE keys to
+resolve, and that identifier is a constant of this specification, not a
+per-deployment configuration value. A mechanism whose trust root each
+verifier picks for itself has no trust root. The constant is `TBD` in this
+revision; §15.7 lists it as the first precondition.
+
+Once assigned, the three authority public keys are published through the §8.4 mechanisms
 like any other APH key material, and are subject to §8.4.7 rotation with
 overlap.
 
 ### 15.2 The subject
 
-An attestation is over a **content digest of a reproducible build** of a
-notary release — the artifact, not a version string. A version string is a
-claim about an artifact; a digest *is* the artifact.
+An attestation is over a **content digest of a published release artifact**
+— the artifact, not a version string. A version string is a claim about an
+artifact; a digest *is* the artifact.
+
+**The word this section deliberately does not use is "reproducible."** An
+earlier draft said "a content digest of a reproducible build," and that
+claims more than the mechanism delivers. Bit-for-bit reproducibility is a
+separate and much stronger property — a claim about the determinism of a
+toolchain — and APH does not require it, does not test it, and MUST NOT be
+read as implying it.
+
+The weaker property the digest does rest on is **publication closure**: the
+commit the artifact was built from must be buildable from what is published
+alone, so that the artifact corresponds to a fetchable state of the world
+rather than to one machine's disk. That is the bar an attestation can
+actually be held to today.
+
+The consequence is worth stating plainly, because it is the difference
+between what this mechanism proves and what a reader will assume it proves:
+
+- **What an attestation says.** *These holders vouch that this digest is the
+  release they published.*
+- **What it does NOT say.** *Anyone can rebuild the source and derive this
+  digest independently.*
+
+Without reproducibility a third party cannot re-derive the digest, so the
+attestation is a statement about the **holders' word**, cryptographically
+bound to an artifact, not an independently checkable derivation. That is
+still worth having — it makes substitution detectable and gives a verifier
+something to pin — but a design that presents it as independent verification
+is non-conformant with §15.6.
 
 ### 15.3 What a notary advertises
 
@@ -1405,7 +1450,7 @@ verifier that reads `attestedDigest` and concludes the notary runs that code
 has learned nothing an adversarial notary could not have written. The fields
 are useful only as a *pointer*: fetch the attestation at `attestationUri`,
 verify k-of-3 over the digest, and confirm the digest is one you accept.
-Even then the conclusion is bounded by §15.6 — that this code was published,
+Even then the conclusion is bounded by §15.7 — that this code was published,
 not that it is running.
 
 ### 15.4 Reuse, not invention
@@ -1450,7 +1495,33 @@ NOT by itself invalidate the envelope: the signatures verified in §8.3 are
 unaffected, and a verifier that does not require attestation remains
 conformant (§8.3.1 step 10).
 
-### 15.6 The limit (normative)
+### 15.6 What is not yet decided (and therefore blocks §15)
+
+§15 is specified but **not implementable**, and this section says why in
+terms a reader can check off rather than leaving the gap to be discovered
+during an implementation attempt. Four preconditions:
+
+1. **The authority identifier.** §15.1's holder keys have no DID. Until this
+   specification names one, step 2 of §15.5 has nothing to resolve.
+2. **The attestation format.** §15.4 says to reuse Sigstore, in-toto, or
+   SLSA provenance "where possible." Three choices are zero choices for an
+   implementer: two conformant verifiers would parse different documents and
+   neither would be wrong. One MUST be pinned, with its profile.
+3. **A transport for the attestation.** §15.5 step 3 fetches
+   `attestationUri` under §8.4.4's rules, but §8.4's ports exist to fetch
+   *key material* — nothing in this specification is contracted to fetch an
+   attestation document. Either §8.4.4's surface is widened or a fetch
+   mechanism is named here.
+4. **An error code.** §11 is a closed taxonomy of thirteen. A failed
+   attestation check maps to none of them, so a conformant implementation
+   cannot report it. Either a code is added at last position or §15 states
+   which existing code it reuses and why.
+
+Until all four are settled, an implementation MUST NOT advertise §15 support,
+and a verifier MUST NOT be configured to *require* an attestation it has no
+defined way to obtain or to reject.
+
+### 15.7 The limit (normative)
 
 **An attestation proves what code was published. It does not prove what code
 is running.**
