@@ -106,6 +106,8 @@ proptest! {
             id: std::string::String::from("did:web:notary.squillo.io"),
             name: notary_name.clone(),
             version: notary_version.clone(),
+            attested_digest: std::option::Option::None,
+            attestation_uri: std::option::Option::None,
           },
           decision_timestamp: std::string::String::from("2026-05-21T00:00:01Z"),
           decision_latency_ms: 1834,

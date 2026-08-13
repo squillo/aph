@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E010. Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E013. Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -78,6 +78,34 @@ pub enum AphError {
     /// The rejected algorithm identifier.
     alg: String,
   },
+
+  /// `APH_E011` — a signature made by the HUMAN's key did not verify:
+  /// the principal proof of a chain, or an embedded delegation mandate's
+  /// `principalSignature`. Deliberately distinct from `APH_E001` and
+  /// `APH_E006`, which are both NOTARY signatures — conflating them would
+  /// report a forged authorization as a notary misconfiguration.
+  #[error("APH_E011: principal signature invalid")]
+  PrincipalSignatureInvalid,
+
+  /// `APH_E012` — the verifier requires `PrincipalSigned` and the envelope
+  /// is `NotaryAttested`. Not a defect in the envelope: a refusal to accept
+  /// the weaker claim, which the spec forbids doing silently.
+  #[error("APH_E012: attestation mode refused: required `{required}`, envelope is `{actual}`")]
+  AttestationModeRefused {
+    /// The mode the verifier's policy demands.
+    required: String,
+    /// The mode the envelope actually declares.
+    actual: String,
+  },
+
+  /// `APH_E013` — the proof chain is malformed: wrong length, wrong
+  /// `proofPurpose` for a position, or a `previousProof` that is missing,
+  /// dangling, duplicated, or cyclic.
+  #[error("APH_E013: proof chain invalid: {reason}")]
+  ProofChainInvalid {
+    /// What specifically is wrong with the chain.
+    reason: String,
+  },
 }
 
 impl AphError {
@@ -96,6 +124,9 @@ impl AphError {
       Self::NotaryServiceUnreachable => "APH_E008",
       Self::EnvelopeBodyHashMismatch { .. } => "APH_E009",
       Self::UnsupportedAlgorithm { .. } => "APH_E010",
+      Self::PrincipalSignatureInvalid => "APH_E011",
+      Self::AttestationModeRefused { .. } => "APH_E012",
+      Self::ProofChainInvalid { .. } => "APH_E013",
     }
   }
 
@@ -112,6 +143,9 @@ impl AphError {
       Self::NotaryServiceUnreachable => "Check notary endpoint health + retry with backoff",
       Self::EnvelopeBodyHashMismatch { .. } => "Re-hash the body and compare against `bodySha256`",
       Self::UnsupportedAlgorithm { .. } => "Use one of `ES256` or `EdDSA`; reject `alg: none`",
+      Self::PrincipalSignatureInvalid => "Re-sign with the human's key; check it matches `humanPrincipalDid`",
+      Self::AttestationModeRefused { .. } => "Re-issue in `PrincipalSigned` mode, or relax the policy deliberately",
+      Self::ProofChainInvalid { .. } => "Emit principal proof then notary proof, linked by `previousProof`",
     }
   }
 
@@ -169,6 +203,25 @@ impl AphError {
   pub fn unsupported_algorithm(alg: impl std::convert::Into<String>) -> Self {
     Self::UnsupportedAlgorithm { alg: alg.into() }
   }
+
+  /// Builds an `APH_E012` recording both modes, so an operator can see what
+  /// was demanded and what arrived without re-parsing the envelope.
+  pub fn attestation_mode_refused(
+    required: impl std::convert::Into<String>,
+    actual: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::AttestationModeRefused {
+      required: required.into(),
+      actual: actual.into(),
+    }
+  }
+
+  /// Builds an `APH_E013` naming what is wrong with the chain.
+  pub fn proof_chain_invalid(reason: impl std::convert::Into<String>) -> Self {
+    Self::ProofChainInvalid {
+      reason: reason.into(),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -185,21 +238,60 @@ mod tests {
       super::AphError::NotaryServiceUnreachable,
       super::AphError::envelope_body_hash_mismatch("abc", "def"),
       super::AphError::unsupported_algorithm("HS256"),
+      super::AphError::PrincipalSignatureInvalid,
+      super::AphError::attestation_mode_refused("PrincipalSigned", "NotaryAttested"),
+      super::AphError::proof_chain_invalid("previousProof does not name a proof in this chain"),
     ]
   }
 
   #[test]
-  fn ten_codes_are_unique() {
-    // The spec (§11) fixes a CLOSED set of exactly ten codes, and other
-    // implementations branch on them. A duplicate would make two distinct
-    // failures indistinguishable to a remote verifier.
+  fn thirteen_codes_are_unique() {
+    // The spec (§11) fixes a CLOSED set of exactly thirteen codes, and
+    // other implementations branch on them. A duplicate would make two
+    // distinct failures indistinguishable to a remote verifier. The count
+    // is pinned so that adding a code without amending §11 fails here.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 10);
+    std::assert_eq!(errors.len(), 13);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();
     unique.dedup();
     std::assert_eq!(codes.len(), unique.len(), "error codes must be unique");
+  }
+
+  #[test]
+  fn the_three_signature_failures_have_three_distinct_codes() {
+    // A verifier reports WHY a credential failed, and the three signature
+    // failures mean entirely different things: APH_E001 is the notary's
+    // envelope proof, APH_E006 the notary's mandate signature, APH_E011 the
+    // HUMAN's own signature. Only the last means the authorization itself
+    // is forged or corrupt. Collapsing them would report a forged
+    // authorization as a notary misconfiguration, which is the wrong alarm.
+    std::assert_eq!(super::AphError::InvalidEnvelopeSignature.code(), "APH_E001");
+    std::assert_eq!(super::AphError::NotarySignatureInvalid.code(), "APH_E006");
+    std::assert_eq!(super::AphError::PrincipalSignatureInvalid.code(), "APH_E011");
+  }
+
+  #[test]
+  fn attestation_mode_refusal_names_both_modes() {
+    // Refusing a downgrade is a policy decision, not a malformed envelope,
+    // so the error has to say what was demanded AND what arrived — an
+    // operator reading a log must be able to tell a misconfigured verifier
+    // from a sender that never signed.
+    let err = super::AphError::attestation_mode_refused("PrincipalSigned", "NotaryAttested");
+    let text = std::string::ToString::to_string(&err);
+    std::assert!(text.contains("PrincipalSigned"), "missing required mode: {}", text);
+    std::assert!(text.contains("NotaryAttested"), "missing actual mode: {}", text);
+  }
+
+  #[test]
+  fn proof_chain_invalid_carries_the_reason() {
+    // A chain can be malformed in several distinct ways (length, purpose,
+    // dangling previousProof). One opaque code per family would leave an
+    // implementer guessing, so the reason travels with the error.
+    let err = super::AphError::proof_chain_invalid("previousProof is dangling");
+    std::assert_eq!(err.code(), "APH_E013");
+    std::assert!(std::string::ToString::to_string(&err).contains("dangling"));
   }
 
   #[test]

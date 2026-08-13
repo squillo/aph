@@ -4,6 +4,15 @@
 
 //! APH (Agent per Human) protocol v0.1 core types.
 //!
+//! **Trust model, stated up front.** The spec's 2026-08-13 revision makes
+//! the human principal the signer (proof chains, `attestationMode`,
+//! `DelegationMandate::principal_signature`). This crate still implements
+//! the pre-revision single-notary-proof shape, so a successful
+//! `verify_envelope` here means *a notary asserts this human authorized
+//! this* — NOT *this human authorized this*. Callers must not report the
+//! stronger claim. The revised fields are being implemented; the error
+//! codes they use (`APH_E011`..`APH_E013`) already exist in [`errors`].
+//!
 //! Standalone implementation of the APH protocol: party roles, mandate
 //! types, notarization flow state machines, the W3C VC 2.0-shaped
 //! `NotarizationEnvelope` on-wire credential, the agent-credential-access

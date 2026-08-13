@@ -47,8 +47,8 @@ The specification text is normative. Where this Snapp and
 | `APH_SPEC/mod.n.md` | Module index. Declaration order IS load order. |
 | `APH_SPEC/APH.n.md` | Snapp definition, protocol constants, contexts, the A2A extension URI. |
 | `APH_SPEC/APH_PROTOCOL.n.md` | Roles, closed vocabularies, both flow state machines, the error taxonomy, key discovery (§5, §8.4, §9, §11). |
+| `APH_SPEC/APH_MANDATES.n.md` | Delegation and Communication Mandates (§6). Loads before the envelope, which embeds one. |
 | `APH_SPEC/APH_ENVELOPE.n.md` | The notarization envelope and its subject objects (§7). |
-| `APH_SPEC/APH_MANDATES.n.md` | Delegation and Communication Mandates (§6). |
 | `APH_SPEC/APH_TESTS.n.md` | Type-surface tests (`nlang test`), one assertion each — see Tests. |
 | `how/` | Worked examples served by `nlang how`, one JSON file per example. |
 
@@ -78,10 +78,11 @@ protocol is searchable from the terminal alongside the language's own
 examples:
 
 ```sh
-nlang how --plugin aph --list        # all 15 examples, by category
+nlang how --plugin aph --list        # all 17 examples, by category
 nlang how notarization envelope      # search across every plugin
 nlang how delegation mandate scope
 nlang how did:key offline discovery
+nlang how attestation mode who proved it
 ```
 
 Each example carries the declaration, a note explaining the reasoning
@@ -114,7 +115,7 @@ so an example cannot drift from the type it documents.
 ## Tests
 
 ```sh
-nlang test     # 34 type-surface tests
+nlang test     # 41 type-surface tests
 ```
 
 Each test constructs an instance and asserts a single field.

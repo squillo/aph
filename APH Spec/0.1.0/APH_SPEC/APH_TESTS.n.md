@@ -189,25 +189,25 @@ mod * {
   // Standing authority; rate_limit_per_hour is optional and readable.
   #[test]
   fn delegation_human_principal_did() -> () {
-    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", notary_signature: "z-illustrative" }
+    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", principal_signature: "z-illustrative-human", notary_signature: "z-illustrative" }
     assert_eq!(d.human_principal_did, "did:key:zAlice")
   }
 
   #[test]
   fn delegation_agent_did() -> () {
-    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", notary_signature: "z-illustrative" }
+    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", principal_signature: "z-illustrative-human", notary_signature: "z-illustrative" }
     assert_eq!(d.agent_did, "did:web:agent.example")
   }
 
   #[test]
   fn delegation_rate_limit_per_hour() -> () {
-    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", notary_signature: "z-illustrative" }
+    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", principal_signature: "z-illustrative-human", notary_signature: "z-illustrative" }
     assert_eq!(d.rate_limit_per_hour, 12)
   }
 
   #[test]
   fn delegation_valid_until() -> () {
-    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", notary_signature: "z-illustrative" }
+    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", principal_signature: "z-illustrative-human", notary_signature: "z-illustrative" }
     assert_eq!(d.valid_until, "2026-05-22T00:00:00Z")
   }
 
@@ -265,6 +265,54 @@ mod * {
   fn txt_record_not_after_tag() -> () {
     let t: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", not_before: "2026-05-21T00:00:00Z", not_after: "2027-05-21T00:00:00Z" }
     assert_eq!(t.not_after, "2027-05-21T00:00:00Z")
+  }
+
+  // Who proved the authorization (spec §7.1.7). The value is the wire's
+  // bare string, not a tagged enum object, so it reads back as written.
+  #[test]
+  fn policy_attestation_mode() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", attestation_mode: "PrincipalSigned", delegation_mandate_id: "urn:uuid:00000000-0000-4000-8000-0000000000d1" }
+    assert_eq!(p.attestation_mode, "PrincipalSigned")
+  }
+
+  #[test]
+  fn policy_delegation_mandate_id() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", attestation_mode: "PrincipalSigned", delegation_mandate_id: "urn:uuid:00000000-0000-4000-8000-0000000000d1" }
+    assert_eq!(p.delegation_mandate_id, "urn:uuid:00000000-0000-4000-8000-0000000000d1")
+  }
+
+  // The human's own signature on the standing grant (spec §6.1) — the root
+  // of every credential issued under it, and required, not optional.
+  #[test]
+  fn delegation_principal_signature() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", principal_signature: "z-illustrative-human", notary_signature: "z-illustrative" }
+    assert_eq!(d.principal_signature, "z-illustrative-human")
+  }
+
+  #[test]
+  fn delegation_notary_signature_countersigns() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:00000000-0000-4000-8000-0000000000a1", human_principal_did: "did:key:zAlice", agent_did: "did:web:agent.example", rate_limit_per_hour: 12, valid_from: "2026-05-21T00:00:00Z", valid_until: "2026-05-22T00:00:00Z", principal_signature: "z-illustrative-human", notary_signature: "z-illustrative" }
+    assert_eq!(d.notary_signature, "z-illustrative")
+  }
+
+  // Chain linkage (spec §7.1.11): the notary proof names the principal
+  // proof's id, which is the binding a verifier checks — array order is not.
+  #[test]
+  fn chained_proof_id() -> () {
+    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.io#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
+    assert_eq!(pr.id, "urn:uuid:00000000-0000-4000-8000-0000000000f2")
+  }
+
+  #[test]
+  fn chained_proof_previous_proof() -> () {
+    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.io#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
+    assert_eq!(pr.previous_proof, "urn:uuid:00000000-0000-4000-8000-0000000000f1")
+  }
+
+  #[test]
+  fn notary_countersignature_uses_the_authentication_purpose() -> () {
+    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.io#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
+    assert_eq!(pr.proof_purpose, "authentication")
   }
 
   // The guard that makes every assertion above meaningful: a misspelled or

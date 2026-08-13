@@ -10,10 +10,14 @@ APH is a per-message attestation protocol. It binds a single outbound
 message — identified by its body hash, channel, recipient addressing, and
 agent identity — to a human principal whose key material is controllable
 and verifiable by recipients across vendor and trust boundaries. The
-protocol's central design assumption is that an envelope produced by a
-correctly operating Notary Service, carrying a valid signature from a
-known verifying key, demonstrates that the named human authorized the
-named message on the named channel within the named time window.
+protocol's central design assumption is that **a signature made by the
+human's own key** demonstrates that the named human authorized the named
+message on the named channel within the named time window — carried either
+as the principal proof of a `PrincipalSigned` envelope, or as the
+`principalSignature` on the Delegation Mandate embedded in a
+`NotaryAttested` one (§7.1.7.1). A notary signature alone demonstrates that
+a notary *asserts* this, which is a weaker claim and must never be reported
+as the stronger one.
 
 The protocol operates in an adversarial environment in which any of the
 sending agent, the transit network, intermediary relays, and the
@@ -67,12 +71,23 @@ Threat: an attacker synthesizes a `DelegationMandate` or
 `CommunicationMandate` without involving any Notary Service, then
 presents it alongside a self-prepared envelope.
 
-Mitigation: every envelope's `proof` block carries a detached JWS over
-the canonical mandate bytes, signed with a key bound (via the
-`verificationMethod` URI) to a DID controlled by the Notary Service. The
-recipient verifies the signature against the verifying key published in
-the Notary Service's DID document. Any envelope whose signature does not
-verify against a known Notary Service key MUST be rejected.
+Mitigation, in two layers. **The human's layer:** a `DelegationMandate`
+carries `principalSignature`, made by the human's own key over the
+canonical mandate minus both signature fields (§6.1). An attacker who does
+not hold the human's key cannot produce it, and a recipient checks it
+directly — against a `did:key` principal, with no lookup at all. **The
+notary's layer:** the envelope's proof (the single proof of a
+`NotaryAttested` envelope, or the countersigning second proof of a chain)
+is signed with a key bound via `verificationMethod` to a DID controlled by
+the Notary Service, and verified against the key published in that
+service's DID document or DNS TXT record (§8.4).
+
+Either layer failing is fatal: an envelope whose notary proof does not
+verify MUST be rejected (`APH_E001`), and an embedded mandate whose
+`principalSignature` does not verify MUST be rejected (`APH_E011`). Note
+the asymmetry that matters — **only the human's layer proves authorization**.
+A recipient that verifies the notary proof alone has confirmed provenance,
+not consent.
 
 ### 2.4 Channel impersonation
 
@@ -105,17 +120,54 @@ allows the application to pin the accepted algorithm set; libraries that
 default to a permissive accept-list MUST be configured restrictively
 before use.
 
+### 2.6 Attestation-mode downgrade
+
+Threat: an attacker presents a `NotaryAttested` envelope — or simply omits
+`attestationMode`, which means `NotaryAttested` (§7.1.7) — to a recipient
+whose policy expects the human's own signature, hoping the recipient
+verifies whatever proof it finds and reports the result as "the human
+authorized this." This is structurally identical to §2.5's algorithm
+downgrade and strictly more consequential: `alg: none` costs a signature
+check, this costs the entire authorization claim.
+
+Mitigation: a verifier that requires `PrincipalSigned` MUST read
+`attestationMode` FIRST and refuse anything else with `APH_E012`, before
+doing any verification work (§8.3.1 step 1a). It MUST NOT infer the mode
+from the shape of `proof`, and MUST NOT accept a chain whose principal
+proof fails on the strength of a valid notary countersignature. A verifier
+that accepts both modes MUST render them differently to a human: *"Alice
+signed this"* and *"Alice's notary says Alice approved this"* are different
+sentences, and collapsing them into one badge is the defect this section
+exists to prevent.
+
 ## 3. Out-of-scope threats (APH does NOT defend against)
 
 ### 3.1 Compromised Notary Service signing key
 
-If a Notary Service's signing key leaks, an attacker holding the key can
-issue arbitrary envelopes under the human principal's name. APH does not
-prevent this and does not specify a revocation mechanism in v0.1.
-Operators MUST run their key management with this property in mind: use
-hardware-backed key storage where available, restrict the signing
-service's attack surface, and plan for rotation. v0.2 will specify a
-status / revocation mechanism along the lines of W3C VC Status List 2021.
+A leaked notary key is serious but **bounded**, and the bound is the point
+of the trust model. The notary never holds the principal's key, so an
+attacker holding a leaked notary key **cannot forge an authorization**:
+
+- Against a `PrincipalSigned` envelope, they can produce a valid
+  countersignature over an envelope the human never signed — and a verifier
+  rejects it at the principal proof (`APH_E011`), which the attacker cannot
+  produce.
+- Against a `NotaryAttested` envelope carrying an embedded mandate, they
+  hit the same wall at the mandate's `principalSignature`.
+- Against a `NotaryAttested` envelope carrying **no** embedded mandate, they
+  can issue arbitrary envelopes under the human's name, because in that
+  shape nothing the human signed is present. **This is the residual risk,
+  and it is why §7.1.7.1 says to embed the mandate and why a recipient MAY
+  refuse an envelope that omits it.**
+
+What a leaked key always costs: availability (an attacker can flood), and
+metadata (envelopes reveal who messaged whom, when, on which channel).
+Operators MUST still run key management accordingly — hardware-backed
+storage where available, restricted signing-service attack surface, planned
+rotation (§8.4.7) — and v0.2 will specify a status / revocation mechanism
+along the lines of W3C VC Status List 2021. The design goal is not that a
+notary is never compromised; it is that a compromised notary cannot put
+words in a human's mouth.
 
 ### 3.2 Compromised Human Principal device
 

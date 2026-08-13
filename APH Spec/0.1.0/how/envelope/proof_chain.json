@@ -1,0 +1,13 @@
+{
+  "title": "Proof Chain \u2014 Principal Signs, Notary Countersigns",
+  "tags": [
+    "proof",
+    "chain",
+    "previous-proof",
+    "countersignature",
+    "w3c-vc"
+  ],
+  "nlang_code": "mod blocks EnvelopeProof {\n  props {\n    // Present when `proof` is a chain; a lone proof links to nothing.\n    #[optional(true)]\n    id: str,\n    // DataIntegrityProof or JsonWebSignature2020.\n    type: str,\n    #[optional(true)]\n    cryptosuite: str,\n    // DID URL of the key, including its fragment.\n    verification_method: str,\n    created: str,\n    // \"assertionMethod\" for a principal proof; \"authentication\" for a\n    // notary countersignature.\n    proof_purpose: str,\n    // The `id` of the proof this one countersigns. Present on the notary\n    // proof of a chain; absent on the principal proof, which is its head.\n    #[optional(true)]\n    previous_proof: str,\n    proof_value: str,\n  }\n}",
+  "note": "When `proof` is an array it is a W3C Verifiable Credentials 2.0 proof chain \u2014 a facility the data model already defines, not an APH invention \u2014 of exactly two: the principal proof (proof_purpose \"assertionMethod\", the human's key, the actual authorization) then the notary countersignature (proof_purpose \"authentication\", covering the COMPLETE principal proof). Each proof covers the document plus every proof BEFORE it and nothing after, so the principal's base is the envelope carrying its proof ALONE \u2014 a signer cannot sign bytes that do not exist yet. That fixes the issuance order: the notary prepares the envelope, the principal signs it, the notary countersigns. `previous_proof` is what makes the chain a chain: array order is a hint an intermediary can rearrange, so the notary proof names the principal proof's `id` and the verifier checks that binding. Verify in chain order, and reject any envelope whose declared `attestation_mode` disagrees with its proof structure \u2014 the label is not evidence.",
+  "book_ref": "APH Spec: \u00a77.1.11 EnvelopeProof, \u00a77.2.1 Canonicalization base per proof, \u00a78.3.1 Verifying a proof chain"
+}

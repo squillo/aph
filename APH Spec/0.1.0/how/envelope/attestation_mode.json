@@ -1,0 +1,13 @@
+{
+  "title": "Attestation Mode \u2014 Who Proved the Authorization",
+  "tags": [
+    "policy",
+    "attestation",
+    "trust-model",
+    "principal-signed",
+    "notary-attested"
+  ],
+  "nlang_code": "mod blocks PolicyDescriptor {\n  props {\n    decision: str,\n    matched_scope: str,\n    #[optional(true)]\n    delegation_mandate_id: str,\n    // \"PrincipalSigned\" | \"NotaryAttested\". Absent means NotaryAttested.\n    #[optional(true)]\n    attestation_mode: str,\n    // The full parent mandate, so the human's signature on it verifies\n    // without a fetch. SHOULD be present whenever\n    // `delegation_mandate_id` is.\n    #[optional(true)]\n    delegation_mandate: $::*::DelegationMandate,\n    act_chain: Directional<str>,\n  }\n}",
+  "note": "The most consequential field in the envelope. `PrincipalSigned` means the human's own key signed this envelope and `proof` is a two-element chain. `NotaryAttested` \u2014 which is also what an ABSENT field means \u2014 means the signature is a notary asserting that a human agreed, which is a strictly weaker claim. A verifier whose policy requires `PrincipalSigned` MUST refuse the weaker mode rather than silently accept it, for the same reason \u00a78.4.6 forbids downgrading key discovery: an attacker who can defeat the weak path will always present the weak path. `delegation_mandate` embeds the full parent grant because `delegation_mandate_id` is an id, and an id proves nothing \u2014 embedding makes the human's signature, the granted scope, and the window all checkable offline, provided the verifier also binds the mandate to THIS envelope by comparing `human_principal_did` and `agent_did` (\u00a77.1.7.1). The values are declared as the `Vocabulary::AttestationMode` enum; the prop stays `str` because the wire carries a bare string, not a tagged object.",
+  "book_ref": "APH Spec: \u00a77.1.7 PolicyDescriptor, \u00a77.1.7.1 Why the delegation is embedded, \u00a78.3.1 Verifying a proof chain"
+}

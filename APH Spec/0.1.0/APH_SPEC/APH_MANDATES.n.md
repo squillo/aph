@@ -19,9 +19,15 @@ The two documents that carry authority (§6). A Delegation Mandate is
 standing authority a human grants an agent; a Communication Mandate is
 single-use authority for one specific message.
 
-Both are signed by the notary, and in both cases `notarySignature` covers
-the JCS-canonical form of the document **minus that field** — a signature
-cannot cover itself.
+A Delegation Mandate is signed **by the human** and countersigned by the
+notary; a Communication Mandate is signed by the notary alone, because in the
+human-not-present flow the human is asleep and cannot sign each message. A signature never covers itself, but the
+two on a Delegation Mandate do not cover the same bytes:
+`principal_signature` covers the JCS-canonical form minus **both** signature
+fields, and `notary_signature` covers it minus **only itself**, with
+`principal_signature` present. That asymmetry is what makes the notary's
+signature a countersignature over what the human actually signed rather than
+a second, independent claim (§6.1).
 
 ## Delegation Mandate
 
@@ -56,7 +62,14 @@ mod blocks DelegationMandate {
     // RFC 3339 validity window.
     valid_from: str,
     valid_until: str,
-    // Notary signature over the canonical form minus this field.
+    // The HUMAN's own signature over the canonical form minus both
+    // signature fields (§6.1). This is the root of every credential
+    // issued under this mandate: without it, no party has proved the
+    // human granted anything.
+    principal_signature: str,
+    // The notary's countersignature over the canonical form minus this
+    // field — so it covers `principal_signature` and cannot be detached
+    // from what the human actually signed.
     notary_signature: str,
   }
 }

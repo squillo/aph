@@ -197,6 +197,8 @@ mod tests {
             id: ::std::string::String::from("did:web:notary.example"),
             name: ::std::string::String::from("Squillo Notary Service"),
             version: ::std::string::String::from("0.1.0"),
+            attested_digest: ::std::option::Option::None,
+            attestation_uri: ::std::option::Option::None,
           },
           decision_timestamp: ::std::string::String::from("2026-05-29T00:00:00Z"),
           decision_latency_ms: 0,

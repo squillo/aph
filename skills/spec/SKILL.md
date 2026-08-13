@@ -25,8 +25,8 @@ organizations via public key discovery.
 
 - `spec/aph-0.1.md` — the normative spec. Key sections: §1.1 mental model, §5 Roles + Operations, §6 Mandates, §7 The Notarization Envelope, §8 Signing + Verification, §8.4 Notary Key Material + Public-Key Discovery, §9 Flow State Machines, §10 Composition with Adjacent Protocols, §11 Error Taxonomy.
 - `spec/a2a-extension.md` — how agents advertise APH on an A2A AgentCard. Pins `APH_EXTENSION_URI = aph://extensions/notarization/v1` (exact byte equality, opaque, never dereferenced).
-- `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade), out-of-scope (compromised notary key/device, phishing, transport security).
-- `examples/` — 7 golden envelope JSON files, one per channel kind, plus `examples/README.md`. Their `proof.proofValue` strings are illustrative placeholders, NOT real signatures; `bodySha256` is the SHA-256 of the empty string. They exist for shape/round-trip validation only.
+- `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade, attestation-mode downgrade), out-of-scope (compromised notary key/device, phishing, transport security).
+- `examples/` — 8 golden envelope JSON files: one per channel kind, plus one exercising the §7.5 registered extensions. With `examples/README.md`. All 8 are `NotaryAttested` (they carry no `attestationMode`, and absent means `NotaryAttested`). Their `proof.proofValue` strings are illustrative placeholders, NOT real signatures; `bodySha256` is the SHA-256 of the empty string. They exist for shape/round-trip validation only.
 - `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), and `aph-ts` (wasm binding).
 
 ## Envelope wire shape (spec §7.1)
@@ -43,7 +43,7 @@ Top-level fields of a `NotarizationEnvelope` (all camelCase, strict parse):
 | `validFrom` / `validUntil` | RFC 3339; verifiers enforce `validFrom <= now <= validUntil` (±60s skew) |
 | `credentialSubject` | the notarized claim (below) |
 | `linkedMandate` | optional / nullable; carries `ap2IntentMandateUri` for AP2 cross-links (§7.1.10). The reference implementation additionally accepts optional `ap2SignedPayloadB64` and `vaultMutation` extension fields not yet in the spec text (see sharp edge 3) |
-| `proof` | single proof block in v0.1 (§7.1.11); a **proof chain array** in v0.2 (see Trust model below) |
+| `proof` | a single object, OR a **proof chain array** — see Trust model below (§7.1.11) |
 
 `credentialSubject` contains exactly six objects per spec v0.1 (§7.1.2–§7.1.9;
 the reference implementation also accepts an optional `appleAurAcceptance`
@@ -53,8 +53,8 @@ extension — see sharp edge 3):
 - `agent` — `{id (DID), agentCardUri?, displayName, version}`
 - `channel` — `{kind, recipientAddressing}` (addressing shape is channel-specific and OPAQUE — see §7.4)
 - `communication` — `{contentClass, bodySha256 (64 lowercase hex), bodySize, previewLines, preview (≤ 8192 bytes)}`
-- `policy` — `{decision, matchedScope, delegationMandateId?, actChain?}`
-- `notarization` — `{notaryService {id, name, version}, decisionTimestamp, decisionLatencyMs}`
+- `policy` — `{decision, matchedScope, attestationMode?, delegationMandate?, delegationMandateId?, actChain?}`. `attestationMode` is the trust-model field — read the Trust model section before describing any envelope. `delegationMandate` is the FULL embedded parent mandate (§7.1.7.1), not a reference
+- `notarization` — `{notaryService {id, name, version, attestedDigest?, attestationUri?}, decisionTimestamp, decisionLatencyMs}`. The two attestation fields are self-asserted (§15.3) — a pointer to fetch and check, never evidence on their own
 
 A complete worked example lives at spec §7.3.
 
@@ -85,7 +85,7 @@ A complete worked example lives at spec §7.3.
 
 ## Mandates (spec §6)
 
-- **DelegationMandate** (§6.1) — long-lived standing authority. Fields: `id` (urn:uuid), `humanPrincipalDid`, `agentDid`, `allowedChannels` (non-empty), `rateLimitPerHour?`, `validFrom` < `validUntil`, `notarySignature` (over the JCS form minus `notarySignature`). Revocable by the human at any time (§6.3.1 — conceptual model normative in v0.1; on-wire transport deferred to v0.2, so keep validity windows short).
+- **DelegationMandate** (§6.1) — long-lived standing authority. Fields: `id` (urn:uuid), `humanPrincipalDid`, `agentDid`, `allowedChannels` (non-empty), `rateLimitPerHour?`, `validFrom` < `validUntil`, `principalSignature` (the HUMAN's own, over the JCS form minus BOTH signature fields — required, and the root of every credential issued under the mandate), `notarySignature` (over the JCS form minus `notarySignature`, so it countersigns what the human signed). Revocable by the human at any time (§6.3.1 — conceptual model normative in v0.1; on-wire transport deferred to v0.2, so keep validity windows short).
 - **CommunicationMandate** (§6.2) — per-message, single-use. Fields: `id`, `delegationMandateId?` (null for one-shot AskEveryTime), `humanPrincipalDid`, `agentDid`, `channelKind`, `recipientAddressing`, `contentClass`, `bodySha256`, `bodySize`, `policyDecision`, `issuedAt` < `expiresAt` (5 min recommended), `notarySignature`. If `delegationMandateId` is set, the parent must exist, be unexpired, and list `channelKind` in `allowedChannels`.
 
 ## State machines (spec §9)
@@ -126,19 +126,14 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E009` | `EnvelopeBodyHashMismatch` | Recipient's SHA-256 of the body != `communication.bodySha256` |
 | `APH_E010` | `UnsupportedAlgorithm` | Algorithm outside {`ES256`, `EdDSA`}, or `alg: none` |
 
-## Trust model — WHO signs (v0.1 vs v0.2)
+## Trust model — WHO signs (the most important section here)
 
-This is the single most important thing to get right about APH, and v0.1 and
-v0.2 differ on it.
+**The principal signs; the notary countersigns.** Get this backwards and you
+will describe the protocol as something weaker than it is.
 
-**v0.1 — `NotaryAttested`.** `proof` is one object and its
-`verificationMethod` names the **Notary Service's** key. Mandates carry only
-`notarySignature`. There is no principal signature anywhere. So a v0.1
-verifier learns *"a notary asserts this human authorized this"* — NOT *"this
-human authorized this."* Never describe a v0.1 envelope as proof the human
-signed something; it is not.
+`policy.attestationMode` declares which of two shapes an envelope has.
 
-**v0.2 — `PrincipalSigned`.** `proof` becomes a W3C VC 2.0 **proof chain**:
+**`PrincipalSigned`** — `proof` is a W3C VC 2.0 **proof chain**:
 
 1. **Principal proof** — `proofPurpose: assertionMethod`,
    `verificationMethod` = the principal's DID URL. This IS the authorization.
@@ -146,9 +141,22 @@ signed something; it is not.
    the complete principal proof, so a notary cannot move a principal's
    signature onto a different envelope.
 
-`credentialSubject.policy.attestationMode` declares which mode an envelope
-is in. **A verifier requiring `PrincipalSigned` MUST refuse `NotaryAttested`
-— never silently accept the weaker claim.**
+Each proof in a chain carries an `id`, and the notary proof carries
+`previousProof` = the principal proof's `id`. **That linkage, not array
+position, is what a verifier checks** (§7.1.11, §8.3.1 step 1e) — order is
+rearrangeable by an intermediary; a signed reference is not.
+
+**`NotaryAttested`** — a single notary proof, used in the human-not-present
+flow where the human is asleep and cannot sign THIS message. Their
+authorization instead lives in the Delegation Mandate they signed earlier,
+which SHOULD travel embedded at `policy.delegationMandate` so a recipient can
+verify the human's `principalSignature` offline (§7.1.7.1). **Without the
+embedded mandate the human's authorization is not verifiable at all** — the
+credential is then the notary's assertion alone, and you should say so.
+
+`attestationMode` absent means `NotaryAttested`. **A verifier requiring
+`PrincipalSigned` MUST refuse `NotaryAttested` — never silently accept the
+weaker claim.**
 
 Two consequences worth carrying:
 
@@ -157,14 +165,14 @@ Two consequences worth carrying:
   principal proof verifies offline with no prior relationship. The
   trade-off: a `did:key` principal cannot rotate, because the key is the
   name. Rotatable principals use `did:web` or DNS TXT.
-- **A v0.2 notary cannot forge an authorization**, because it never holds
-  the principal's key. That is why a Notary Service is infrastructure anyone
+- **A notary cannot forge an authorization**, because it never holds the
+  principal's key. That is why a Notary Service is infrastructure anyone
   may host, and why the question about a notary is code attestation
-  (v0.2 §15, k-of-3 authority over reproducible builds) rather than key
+  (§15, k-of-3 authority over reproducible builds) rather than key
   custody. Note the stated limit: attestation proves what was *published*,
   never what is *running*.
 
-Canonicalization per proof (v0.2 §2.1): the principal proof covers the
+Canonicalization per proof (§7.2.1): the principal proof covers the
 envelope with EVERY `proofValue` emptied; the notary proof covers it with the
 principal `proofValue` present and its own emptied.
 
@@ -185,8 +193,24 @@ of the envelope with `proof.proofValue` stripped — the rest of the `proof` blo
 stays in place. Verification (§8.3): parse strictly, resolve the key from
 `proof.verificationMethod`, strip `proofValue`, canonicalize, verify signature,
 check time window, check algorithm allow-list, and (recommended) recompute the
-body hash. Note the §7.2 implementation note: whether `proofValue` is stripped
-entirely vs. set to empty string must match between signer and verifier.
+body hash. **Settled normatively in §7.2.1: set `proofValue` to the empty string, do
+NOT remove the member.** Earlier drafts called this implementation-dependent;
+they are wrong and should not be quoted. Removing vs emptying produces
+different JCS bytes, so the two conventions never verify each other.
+
+Per-proof bases, which are W3C proof-chain semantics — each proof covers the
+document plus every proof BEFORE it, never one after:
+
+| Signing | Base |
+|---|---|
+| lone notary proof | its own `proofValue` emptied |
+| principal proof (chain head) | `proof` carries that proof ALONE, its `proofValue` emptied — the notary proof is discarded when reconstructing |
+| notary countersignature | both proofs, principal's `proofValue` complete, its own emptied |
+
+This forces the issuance order: the notary prepares the envelope (including
+`notarization`), the principal signs it, then the notary countersigns.
+`decisionTimestamp <= principal.created <= notary.created`. Reverse it and
+the principal would be signing bytes that do not exist yet.
 
 ## Notary key discovery (spec §8.4, resolution order §8.4.6)
 
@@ -242,4 +266,4 @@ Read the actual spec files rather than trusting this summary for edge cases:
 `spec/aph-0.1.md` (wire shape §7, signing §8, key discovery §8.4, flows §9,
 errors §11), `spec/a2a-extension.md` (extension URI + AgentCard discovery flow),
 `spec/security-considerations.md` (what APH does and does not defend against),
-`examples/README.md` (what is fixed vs. varying across the 7 fixtures).
+`examples/README.md` (what is fixed vs. varying across the 8 fixtures).

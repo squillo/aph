@@ -14,20 +14,32 @@ This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, publ
 
 ---
 
-> ### ⚠ Superseded in part by v0.2 — read this first
+
+> ### Revision 2026-08-13 — the principal signs
 >
-> §1.1 and §3.1 below promise that the human principal may sign **directly**.
-> The v0.1 wire format cannot express that: `proof` is a single object whose
-> `verificationMethod` names the *Notary Service's* key, and the mandate
-> structs carry only `notarySignature`. **Every v0.1 credential is therefore
-> notary-attested**, meaning a verifier learns that *a notary asserts* the
-> human authorized an action — not that the human did.
+> This draft previously described a protocol in which the **Notary Service**
+> held the only signing key that mattered, while §1.1 and §3.1 promised that
+> the human principal could sign **directly**. The wire format could not
+> express that, so every credential was in truth notary-attested: a verifier
+> learned that *a notary asserts* the human authorized an action, never that
+> the human did.
 >
-> [**aph-0.2.md**](./aph-0.2.md) adds the principal proof, names the two
-> modes so a verifier can tell them apart, and makes a Notary Service
-> hostable by anyone because it can no longer forge an authorization. v0.1
-> envelopes remain valid and are not deprecated. See v0.2 Appendix "Errata to
-> v0.1" for the full list.
+> That is fixed in this revision, in place. APH is pre-production with no
+> external adopters, so there is one specification rather than a version
+> fork. The changes are §6.1 `principalSignature`, §7.1.7 `attestationMode`,
+> §7.1.7 `delegationMandate` embedding, §7.1.11 proof chains linked by
+> `previousProof`, §7.2.1 the canonicalization base per proof, §7.3.1 a
+> worked `PrincipalSigned` example, amended §8.3 verification, and new §15
+> Notary Code Attestation.
+>
+> **What did NOT change:** the eight published example envelopes in
+> `examples/` parse and verify exactly as before. `attestationMode` absent
+> means `NotaryAttested`, which is what they always were.
+>
+> **Consequence worth stating plainly:** a Notary Service can no longer forge
+> an authorization, because it never holds the principal's key. That is what
+> makes a notary ordinary infrastructure **anyone may host**, and it is why
+> §15 asks about its *code* rather than its *key custody*.
 
 ## 1. Abstract
 
@@ -93,7 +105,7 @@ The following terms are used throughout this specification:
 
 APH v0.1 is designed to meet the following goals:
 
-- **Human-attested.** Every notarized message binds to a verifiable signature derived from a key held by the human principal (directly via the principal's key, or transitively via the Notary Service's key after explicit human attestation).
+- **Human-attested.** Every notarized message binds to a verifiable signature derived from a key held by the human principal — directly via the principal's own proof on the envelope (§7.1.11), or via the principal's signature on the Delegation Mandate that authorized it (§6.1), which travels embedded in the envelope so a recipient can check it offline (§7.1.7.1). The Notary Service countersigns; it never substitutes for the principal.
 - **Local-first decision.** The `AlwaysAllow` / `AskEveryTime` / `NeverAllow` policy is evaluated on the human's device or under the human's direct control. Notarization does not require an authorization server.
 - **Recipient-verifiable across vendors.** A recipient running entirely different software from the sender MUST be able to verify the credential using only public standards (W3C VC 2.0, RFC 8785, RFC 7515, RFC 8032).
 - **Transport-agnostic.** APH envelopes ride on the channel's native metadata surface (email header, chat block metadata, message attachment). APH does not define a new transport.
@@ -111,7 +123,7 @@ APH v0.1 is explicitly NOT:
 - A chat or transport protocol. APH does not define how bytes move between endpoints.
 - An identity provider. APH consumes identity (DIDs, AgentCards) but does not issue or manage identifiers.
 - A content moderation system. APH attests that a human authorized a message; it does not evaluate the message's content.
-- A revocation list infrastructure. v0.1 omits mandate revocation; v0.2 will address it.
+- A revocation **transport**. Revocation itself is normative in v0.1 (§6.3.1): the issuing human may revoke a Delegation Mandate at any time, and the notary MUST stop issuing against it. What v0.1 omits is the on-wire mechanism by which a third-party recipient learns of a revocation; v0.2 will address that with a status credential.
 
 ---
 
@@ -119,14 +131,20 @@ APH v0.1 is explicitly NOT:
 
 APH defines five protocol roles and six operations. The Human Principal authorizes the Agent (sometimes ahead of time via a Delegation Mandate, sometimes per-message via an AskEveryTime prompt); the Notary Service issues a Notarization Envelope binding the human's attestation to a specific outbound payload; the Channel Adapter carries the envelope over its native transport; the Recipient Endpoint independently verifies the envelope.
 
-The Notary Service is a logical role; in v0.1 it is typically co-located on the same device as the Human Principal. Future profiles MAY define a remote escrow notary (multi-signature, off-device) but v0.1 assumes a local notary holding the human's signing key.
+The Notary Service is a logical role; in v0.1 it is typically co-located on the same device as the Human Principal. A notary holds ONLY its own keypair; the human principal's signing key never leaves the principal's control (§6.1, §7.1.11). That is what makes a notary hostable by anyone — a remote notary is not an escrow of the human's authority, and a compromised notary cannot forge one (§15).
 
 ```
-+----------------+     issue mandate       +----------------+
++----------------+   1. sign mandate       +----------------+
 | HumanPrincipal | ----------------------> | NotaryService  |
-+----------------+                         +-------+--------+
-                                                   |
-                                                   | sign envelope
+|                |    (principalSignature) |                |
+|                |                         |                |
+|                | <---------------------- |                |
+|                |   2. prepared envelope  |                |
+|                |                         |                |
+|                | ----------------------> |                |
+|                |   3. principal proof    +-------+--------+
++----------------+                                 |
+                                                   | 4. countersign
                                                    v
 +----------------+   draft message    +----------------+
 |  AgentSender   | -----------------> | ChannelAdapter |
@@ -140,7 +158,11 @@ The Notary Service is a logical role; in v0.1 it is typically co-located on the 
                                        +----------------+
 ```
 
-The Agent Sender drafts the outbound message and submits a notarization request to the Notary Service. The Notary Service consults the Human Principal's local policy and (if required by `AskEveryTime`) prompts the human. On a positive decision, the Notary Service signs the envelope and returns it to the Agent Sender, which hands it together with the original payload to the Channel Adapter. The Channel Adapter transmits both over the channel's native transport. The Recipient Endpoint verifies the envelope's signature, time window, and body hash against the received payload before accepting or displaying the message.
+The Agent Sender drafts the outbound message and submits a notarization request to the Notary Service. The Notary Service consults the Human Principal's local policy and (if required by `AskEveryTime`) prompts the human.
+
+On a positive decision the notary **prepares** the complete envelope, including its own `notarization` metadata (step 2). In `PrincipalSigned` mode the principal's key then signs that prepared envelope (step 3) and the notary countersigns the result (step 4) — the order §7.2.1 requires, because each signature can only cover bytes that already exist. In `NotaryAttested` mode steps 2 and 3 collapse: the human is not present to sign, their authority instead rides in the Delegation Mandate they signed at step 1, which SHOULD be embedded (§7.1.7.1), and the notary signs alone.
+
+Either way the notary returns the envelope to the Agent Sender, which hands it together with the original payload to the Channel Adapter. The Channel Adapter transmits both over the channel's native transport. The Recipient Endpoint verifies the envelope's proofs, time window, and body hash against the received payload before accepting or displaying the message.
 
 ---
 
@@ -162,7 +184,7 @@ A single piece of software MAY play more than one role. For example, a desktop c
 
 APH defines six operations. Each operation is performed by a specific role (or set of roles) as enumerated in §5.1.
 
-- **`IssueDelegationMandate`** — A Human Principal grants an Agent ongoing authority to send messages on specified channels within a bounded scope (recipient patterns, content classes, expiry). The mandate is signed by the Notary Service on behalf of the human and persisted for later reference.
+- **`IssueDelegationMandate`** — A Human Principal grants an Agent ongoing authority to send messages on specified channels within a bounded scope (recipient patterns, content classes, expiry). The mandate is signed by the human principal and countersigned by the Notary Service and persisted for later reference.
 - **`IssueCommunicationMandate`** — Either the Human Principal (via an AskEveryTime decision) or the Agent Sender (via reference to a valid Delegation Mandate) initiates a per-message authorization. The Notary Service produces the mandate.
 - **`Notarize`** — The Notary Service signs a `NotarizationEnvelope` carrying the mandate plus the bound outbound payload's metadata. Produces the on-wire artifact.
 - **`Transport`** — The Channel Adapter carries the envelope alongside the payload over the channel's native transport. The exact carriage mechanism (header, block metadata, attachment) is channel-specific.
@@ -190,7 +212,8 @@ Fields:
 | `rateLimitPerHour` | unsigned integer | no | Optional per-hour send rate cap. Omitted or `null` means unlimited. |
 | `validFrom` | RFC 3339 string | yes | "Valid from" timestamp. |
 | `validUntil` | RFC 3339 string | yes | "Valid until" timestamp. |
-| `notarySignature` | string | yes | Multibase- or base64url-encoded signature over the JCS-canonical form of this struct MINUS the `notarySignature` field. |
+| `principalSignature` | string | yes | **Multibase signature by the PRINCIPAL's own key** over the JCS-canonical form of this struct MINUS both signature fields. This is the human's actual grant of authority and the root of every credential issued under this mandate. |
+| `notarySignature` | string | yes | Multibase- or base64url-encoded signature over the JCS-canonical form of this struct MINUS the `notarySignature` field (with `principalSignature` PRESENT). The notary countersigns what the principal signed. |
 
 Worked-example JSON:
 
@@ -203,7 +226,8 @@ Worked-example JSON:
   "rateLimitPerHour": 30,
   "validFrom": "2026-05-21T00:00:00Z",
   "validUntil": "2026-06-21T00:00:00Z",
-  "notarySignature": "z3sQXc...base58btc-encoded-signature..."
+  "principalSignature": "z5Kd8y...base58btc-signature-by-the-HUMAN...",
+  "notarySignature": "z3sQXc...base58btc-countersignature-by-the-notary..."
 }
 ```
 
@@ -212,6 +236,7 @@ Validation rules:
 - `id` MUST be a globally unique `urn:uuid:` value.
 - `validFrom` MUST be lexicographically less than `validUntil`.
 - `allowedChannels` MUST contain at least one entry.
+- `principalSignature` MUST verify against the verification method resolved from `humanPrincipalDid`. This check comes FIRST: a countersignature over an unverifiable grant proves nothing.
 - `notarySignature` MUST verify against the issuing Notary Service's published verification method.
 - Implementations MUST reject mandates with unknown fields (strict deserialization).
 
@@ -270,7 +295,7 @@ Validation rules:
 
 ### 6.3 Mandate lifecycle
 
-A Delegation Mandate is issued by the Human Principal, signed by the Notary Service, and persisted to the human's local store. Its validity window is bounded by `validFrom` and `validUntil`. A Communication Mandate is issued at outbound-action time; it MAY reference a Delegation Mandate (the standing-authority path) or stand alone (the AskEveryTime path). Communication Mandates are single-use: one Communication Mandate per outbound action. Both mandate types are bound by the Notary Service signature.
+A Delegation Mandate is issued and signed by the Human Principal (`principalSignature`), countersigned by the Notary Service (`notarySignature`), and persisted to the human's local store. Its validity window is bounded by `validFrom` and `validUntil`. A Communication Mandate is issued at outbound-action time; it MAY reference a Delegation Mandate (the standing-authority path) or stand alone (the AskEveryTime path). Communication Mandates are single-use: one Communication Mandate per outbound action. A Communication Mandate carries the notary's signature alone; a Delegation Mandate carries the human's `principalSignature` with the notary's countersignature over it, so the standing grant is rooted in the human's key rather than the notary's (§6.1).
 
 #### 6.3.1 Revocation — conceptual model
 
@@ -295,7 +320,7 @@ A Delegation Mandate that has reached its `validUntil` cannot be "re-activated" 
 
 ## 7. The Notarization Envelope
 
-The `NotarizationEnvelope` is the canonical on-wire artifact. It is a W3C Verifiable Credential 2.0 of type `AgentSendAuthorizationCredential`, secured with either a Data Integrity Proof or a detached JWS. The envelope embeds the credential subject (which carries the equivalent of a Communication Mandate plus contextual metadata about the agent, channel, and decision) and a single `proof` block carrying the notary signature.
+The `NotarizationEnvelope` is the canonical on-wire artifact. It is a W3C Verifiable Credential 2.0 of type `AgentSendAuthorizationCredential`, secured with either a Data Integrity Proof or a detached JWS, carried as a single proof or as a two-element proof chain (§7.1.11). The envelope embeds the credential subject (which carries the equivalent of a Communication Mandate plus contextual metadata about the agent, channel, and decision) and a single `proof` block carrying the notary signature.
 
 ### 7.1 Top-level shape
 
@@ -311,12 +336,12 @@ The outermost object.
 | `@context` | array of strings | yes | JSON-LD context array. MUST begin with the W3C VC 2.0 context `"https://www.w3.org/ns/credentials/v2"` followed by `"https://w3id.org/aph/v1"`. |
 | `type` | array of strings | yes | JSON-LD type array. MUST include `"VerifiableCredential"` AND `"AgentSendAuthorizationCredential"`. |
 | `id` | string | yes | Envelope identifier in `urn:uuid:` form. |
-| `issuer` | string | yes | DID of the Notary Service issuing the credential. |
+| `issuer` | string | yes | DID of the party issuing the credential: the **human principal** in `PrincipalSigned` mode, the **Notary Service** in `NotaryAttested` mode (§7.1.7). A verifier MUST NOT infer the signer from this field — each proof's `verificationMethod` is authoritative, and `issuer` is metadata. |
 | `validFrom` | RFC 3339 string | yes | Envelope validity start. |
 | `validUntil` | RFC 3339 string | yes | Envelope validity end. |
 | `credentialSubject` | object | yes | The notarized claim (see §7.1.2). |
 | `linkedMandate` | object or null | no | Optional cross-protocol mandate link (see §7.1.10). Omit or set to `null` when absent. |
-| `proof` | object | yes | Cryptographic proof block (see §7.1.11). |
+| `proof` | object OR array of objects | yes | Cryptographic proof (see §7.1.11). A single object is a notary proof. An array is a two-element W3C proof chain: the principal's proof, then the notary's countersignature. |
 
 #### 7.1.2 `CredentialSubject`
 
@@ -382,7 +407,64 @@ Describes the policy decision context.
 | `decision` | string | yes | Policy outcome. Closed enum: `AlwaysAllow`, `AskEveryTime`, `NeverAllow`. |
 | `matchedScope` | string | yes | Scope of the matched policy rule (e.g., `per-channel`, `per-recipient`, `global`, `per-content-class`). |
 | `delegationMandateId` | string or null | no | Parent `DelegationMandate.id` if a standing authority matched; `null` otherwise. |
+| `attestationMode` | string | see below | Closed enum: `PrincipalSigned` \| `NotaryAttested`. REQUIRED when the envelope carries a principal proof (§7.1.11). **When absent, the envelope is `NotaryAttested`** — so envelopes written before this revision remain valid and unambiguous. |
+| `delegationMandate` | object or null | no | The **complete parent `DelegationMandate`**, embedded. See §7.1.7.1 — this is what lets a recipient verify the human's authorization offline in the human-not-present flow. |
 | `actChain` | array of strings | no | OAuth 2.0 Token Exchange (RFC 8693) `act` chain. Each element is a DID string identifying a delegated principal. Empty array if unused. |
+
+##### 7.1.7.1 Why the delegation is embedded
+
+In the human-not-present flow (§9.2) the human is asleep, so no principal
+proof can be made over *this message*. The human's authorization lives in
+the Delegation Mandate they signed earlier, and `delegationMandateId` names
+it — by **id only**.
+
+An id is not verifiable. A recipient holding only the envelope cannot fetch
+that mandate, cannot check its `principalSignature`, and therefore cannot
+confirm the human authorized anything at all. The chain of trust is asserted
+by the notary rather than proved.
+
+Embedding the mandate closes that, with no new resolution mechanism, no
+network round-trip, and no new type:
+
+1. Verify the envelope's notary proof — *this notary issued this message*.
+2. Verify the embedded mandate's `principalSignature` against the
+   principal's key (free for a `did:key` principal, §8.4.3) — *this human
+   granted this authority*.
+3. Confirm the mandate is **this** envelope's parent: its
+   `humanPrincipalDid` MUST equal `credentialSubject.humanPrincipal.id`,
+   its `agentDid` MUST equal `credentialSubject.agent.id`, and its `id` MUST
+   equal `policy.delegationMandateId` when that field is present. Without
+   these three equalities the embedded mandate proves only that *some* human
+   granted *some* agent *something*, and an attacker could staple any
+   validly-signed mandate to any envelope.
+4. Confirm `channel.kind` is in the mandate's `allowedChannels`, and that
+   the envelope's `validFrom` falls inside the mandate's window — *this
+   message is within what was granted*.
+
+All four checks are offline.
+
+**What "within scope" does and does not cover.** A Delegation Mandate
+constrains channel, rate, and time — nothing else. It cannot express a
+recipient allow-list or a content class, so step 4 is a channel-and-window
+check and MUST NOT be described as more. A deployment needing per-recipient
+or per-content-class limits enforces them at the notary, where the policy
+lives, and the envelope records the outcome in `policy.matchedScope`.
+
+**Privacy.** An embedded mandate discloses the human's entire standing grant
+— every allowed channel, the rate limit, the full window — to every
+recipient of a single message. That is why embedding is SHOULD and not MUST:
+a `PrincipalSigned` envelope needs no embedded mandate at all, and a
+principal who considers their grant sensitive should prefer that mode. A
+future selective-disclosure profile (§14) can redact mandate fields; this
+revision has no such mechanism, and a recipient sees the whole grant.
+
+**Bounds.** Mandates are small — nine fields — so the cost is bytes rather
+than a protocol round-trip. Because canonicalization happens *before*
+signature verification, a verifier MUST bound the work it does on
+unauthenticated input: reject an envelope larger than a configured maximum
+(RECOMMENDED: 64 KiB) before canonicalizing it, and reject an embedded
+mandate carrying unknown fields under the same strict-parse rule as the
+envelope itself (§7.1).
 
 #### 7.1.8 `NotarizationMetadata`
 
@@ -403,6 +485,10 @@ Identifies the notary service.
 | `id` | string | yes | DID of the notary service. |
 | `name` | string | yes | Human-readable notary name. |
 | `version` | string | yes | Notary software version string. |
+| `attestedDigest` | string | no | Content digest of the attested release this notary reports running (§15.3). Omitted when the notary makes no attestation claim. |
+| `attestationUri` | string | no | Where the k-of-3 attestation for that digest may be fetched (§15.3). |
+
+The two attestation fields are declared here, not only in §15, because §7.1 requires strict deserialization: a field a notary may send MUST appear in the shape a verifier parses, or conformant verifiers would reject conformant notaries.
 
 #### 7.1.10 `LinkedMandate`
 
@@ -416,15 +502,69 @@ Optional cross-protocol mandate link. Forward-extensible: new sister-protocol cr
 
 #### 7.1.11 `EnvelopeProof`
 
-The cryptographic proof block. v0.1 supports two proof types: `DataIntegrityProof` (W3C Verifiable Credential Data Integrity) and `JsonWebSignature2020` (detached JWS).
+The cryptographic proof block. Two proof types are supported:
+`DataIntegrityProof` (W3C Verifiable Credential Data Integrity) and
+`JsonWebSignature2020` (detached JWS).
+
+**`proof` MAY be a single object or an array of proof objects.** When it is
+an array, it is a W3C Verifiable Credentials 2.0 **proof chain** — a facility
+the data model already defines, not an APH invention — constrained to exactly
+two roles:
+
+| Position | `proofPurpose` | `verificationMethod` | Covers (§7.2.1) |
+|---|---|---|---|
+| 1 — **principal proof** | `assertionMethod` | the **principal's** DID URL — which MUST resolve to `credentialSubject.humanPrincipal.id` | the envelope carrying this proof ALONE, its own `proofValue` emptied |
+| 2 — **notary proof** | `authentication` | the **notary's** DID URL | the envelope carrying BOTH proofs, the principal's `proofValue` complete and its own emptied |
+
+The principal proof is the authorization; its absence means no party proved
+the human agreed. The notary proof is a **countersignature**: because it
+covers the principal proof, a notary cannot detach a principal's signature
+and re-attach it to a different envelope, nor substitute a different
+authorization beneath its own signature. It attests three things and no
+more — that policy was evaluated, when the decision occurred, and that the
+notary observed *this exact* principal proof.
+
+**Each proof in a chain MUST carry an `id`, and the notary proof MUST carry
+`previousProof` naming the principal proof's `id`.** Array position alone is
+not the linkage: W3C Data Integrity defines a proof chain by `previousProof`,
+and a verifier that trusted order alone would accept a chain whose proofs
+were reordered by an intermediary. A verifier MUST reject a chain whose
+`previousProof` does not resolve to a proof present in the same chain.
+
+Verifiers MUST verify in chain order. A notary proof that verifies over a
+principal proof that does not itself verify is worthless, and accepting it
+would be the defect the chain exists to prevent.
+
+**The label and the structure MUST agree, and a verifier MUST enforce it in
+both directions** (`APH_E013`):
+
+- `attestationMode: "PrincipalSigned"` MUST accompany a two-element chain
+  whose first proof's `verificationMethod` resolves to
+  `credentialSubject.humanPrincipal.id`. A verifier MUST reject the label on
+  any other structure — including a single proof, a chain whose head is the
+  notary's key, or a chain of any other length.
+- A two-element chain MUST carry `attestationMode: "PrincipalSigned"`. A
+  verifier MUST reject a chain labelled otherwise, or unlabelled.
+- A single-object `proof` is a notary proof, and the envelope is
+  `NotaryAttested` (§7.1.7).
+
+Without this rule `attestationMode` is a **self-asserted string**: a holder
+of a notary key could write `PrincipalSigned` above a single notary proof
+whose `proofPurpose` is `assertionMethod` — indistinguishable from a
+principal proof by purpose alone — and a verifier that trusted the label
+would report a forged authorization as the human's own signature. The
+binding to `humanPrincipal.id` is what closes it, because the notary does
+not hold that key.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | in a chain | Identifier for this proof, unique within the envelope (e.g. `urn:uuid:...`). Required when `proof` is an array; omitted for a single-object `proof`, which has nothing to link to. |
 | `type` | string | yes | Either `"DataIntegrityProof"` or `"JsonWebSignature2020"`. |
 | `cryptosuite` | string | no | Required when `type` is `"DataIntegrityProof"`. One of `"eddsa-jcs-2022"` (Ed25519) or `"ecdsa-jcs-2019"` (ES256/p256). Omitted for `JsonWebSignature2020`. |
 | `verificationMethod` | string | yes | DID URL referencing the verifying key. E.g., `did:key:z6Mk...#z6Mk...`. |
 | `created` | RFC 3339 string | yes | Proof creation timestamp. |
-| `proofPurpose` | string | yes | Always `"assertionMethod"` for APH. |
+| `proofPurpose` | string | yes | `"assertionMethod"` for a principal proof; `"authentication"` for a notary countersignature. A single-object `proof` uses `"assertionMethod"` for wire compatibility. |
+| `previousProof` | string | in the notary proof of a chain | The `id` of the proof this one countersigns. Present on the notary proof; absent on the principal proof, which is the head of the chain. |
 | `proofValue` | string | yes | Signature bytes. Multibase-encoded for `DataIntegrityProof`; compact detached-JWS string for `JsonWebSignature2020`. |
 
 ### 7.2 Canonical JSON form
@@ -441,11 +581,61 @@ The signing procedure is:
 The verification procedure is the inverse:
 
 1. Parse the received envelope.
-2. Take a working copy and strip `proof.proofValue` (leaving the rest of the `proof` block intact).
+2. Take a working copy and set `proof.proofValue` to the empty string, leaving the rest of the `proof` block intact and the member present (§7.2.1). When verifying the principal proof of a chain, first discard every other proof, so the working copy carries the principal proof alone.
 3. Apply JCS canonicalization to the working copy.
 4. Verify the original `proof.proofValue` against the canonical bytes using the public key resolved from `verificationMethod`.
 
-**Implementation note.** Whether to strip `proof.proofValue` entirely or to substitute an empty string is implementation-dependent and MUST be consistent between signer and verifier. Conformance test vectors will pin a single convention before v0.1.0 final. Implementations SHOULD treat this as a fixable interop bug if it surfaces.
+**Implementation note.** This question is now settled normatively in §7.2.1: the signer sets `proofValue` to the **empty string** and does NOT remove the member. Earlier drafts left it implementation-dependent; they should not be followed, because JCS over an object with the member absent and JCS over the same object with the member empty produce different bytes, and two implementations that chose differently would never verify each other's signatures. Implementations SHOULD treat this as a fixable interop bug if it surfaces.
+
+#### 7.2.1 Canonicalization base per proof (normative)
+
+Ambiguity in a canonicalization base is how interoperability dies, so each
+base is stated exactly:
+
+These are W3C Data Integrity proof-chain semantics: **each proof covers the
+document plus every proof that precedes it, and nothing that follows it.**
+A base that included a later proof would be unconstructible — a signer cannot
+sign bytes that do not exist yet.
+
+- **Principal proof (first in the chain).** JCS-canonicalize the envelope
+  with `proof` set to **that proof object alone** — the notary proof is NOT
+  yet present — and its own `proofValue` set to the empty string `""`.
+  A verifier reconstructs this base by discarding every proof except the
+  principal's and emptying its `proofValue`.
+- **Notary proof (second in the chain).** JCS-canonicalize the envelope with
+  `proof` as the two-element array, the principal proof's `proofValue`
+  **present and complete**, and the notary proof's own `proofValue` set to
+  `""`.
+- **Lone notary proof (no chain).** JCS-canonicalize the envelope with that
+  proof's `proofValue` set to `""`.
+- **Mandates.** `principalSignature` covers the form minus **both**
+  signature fields; `notarySignature` covers the form minus itself, with
+  `principalSignature` present.
+
+In every case the signer sets the field to the **empty string** rather than
+removing the member. This settles the question earlier drafts left open, in
+the direction the reference implementation has always taken. Removing a
+proof from the *array* is different from emptying a member, and both rules
+apply: the principal's base contains one proof object, not two with one
+blanked.
+
+**Issuance order follows from this, and is normative.** The principal signs
+the envelope the notary has already prepared:
+
+1. The Notary Service evaluates policy and **prepares the complete
+   envelope**, including `credentialSubject.notarization` — the decision
+   timestamp, the latency, its own identity.
+2. The **principal signs** that envelope, producing the first proof. Its
+   `created` MUST NOT precede `notarization.decisionTimestamp`.
+3. The **notary countersigns**, producing the second proof over everything
+   including the principal's. Its `created` MUST NOT precede the principal
+   proof's.
+
+A verifier SHOULD check that ordering and MUST NOT accept a chain whose
+notary proof is dated before the principal proof it claims to have observed.
+The order is not stylistic: reverse steps 1 and 2 and the principal would
+have to sign notary-produced fields that do not exist yet, which is exactly
+the circularity these bases are written to avoid.
 
 ### 7.3 Worked example
 
@@ -516,6 +706,126 @@ The following is a complete v0.1 Slack-reply envelope demonstrating a thread-rep
   }
 }
 ```
+
+#### 7.3.1 Worked example — `PrincipalSigned`
+
+The same send, in the mode where the **human's own key** signed the envelope.
+Three things differ from §7.3: `policy.attestationMode` declares the mode,
+`policy.delegationMandate` carries the parent grant so the human's signature
+on it verifies without a fetch, and `proof` is a two-element chain linked by
+`previousProof`.
+
+Signature values below are placeholders — this example is illustrative, not a
+test vector. Signed conformance vectors ship with the reference
+implementation.
+
+```json
+{
+  "aphVersion": "0.1",
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/aph/v1"
+  ],
+  "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+  "id": "urn:uuid:00000000-0000-4000-8000-000000000002",
+  "issuer": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+  "validFrom": "2026-05-21T00:00:00Z",
+  "validUntil": "2026-05-22T00:00:00Z",
+  "credentialSubject": {
+    "humanPrincipal": {
+      "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+      "displayName": "Scott Wyatt"
+    },
+    "agent": {
+      "id": "did:web:agent.squillo.io",
+      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "displayName": "Squillo Concierge",
+      "version": "1.0"
+    },
+    "channel": {
+      "kind": "slack",
+      "recipientAddressing": {
+        "teamId": "T01234567",
+        "channelId": "C01234567",
+        "parentTs": "1716249600.000100"
+      }
+    },
+    "communication": {
+      "contentClass": "Reply",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodySize": 1842,
+      "previewLines": 1,
+      "preview": "prod rollout finished at 14:02 UTC"
+    },
+    "policy": {
+      "decision": "AlwaysAllow",
+      "matchedScope": "per-channel",
+      "attestationMode": "PrincipalSigned",
+      "delegationMandateId": "urn:uuid:00000000-0000-4000-8000-0000000000d1",
+      "delegationMandate": {
+        "id": "urn:uuid:00000000-0000-4000-8000-0000000000d1",
+        "humanPrincipalDid": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+        "agentDid": "did:web:agent.squillo.io",
+        "allowedChannels": ["slack"],
+        "rateLimitPerHour": 20,
+        "validFrom": "2026-05-20T00:00:00Z",
+        "validUntil": "2026-05-22T00:00:00Z",
+        "principalSignature": "z<multibase-signature-by-the-human-over-this-mandate>",
+        "notarySignature": "z<multibase-countersignature-by-the-notary>"
+      },
+      "actChain": []
+    },
+    "notarization": {
+      "notaryService": {
+        "id": "did:web:notary.squillo.io",
+        "name": "Squillo Notary Service",
+        "version": "0.1.0"
+      },
+      "decisionTimestamp": "2026-05-21T00:00:00Z",
+      "decisionLatencyMs": 12
+    }
+  },
+  "linkedMandate": null,
+  "proof": [
+    {
+      "id": "urn:uuid:00000000-0000-4000-8000-0000000000f1",
+      "type": "DataIntegrityProof",
+      "cryptosuite": "eddsa-jcs-2022",
+      "verificationMethod": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy#z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+      "created": "2026-05-21T00:00:01Z",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z<multibase-signature-by-the-HUMAN-over-the-principal-base>"
+    },
+    {
+      "id": "urn:uuid:00000000-0000-4000-8000-0000000000f2",
+      "type": "DataIntegrityProof",
+      "cryptosuite": "eddsa-jcs-2022",
+      "verificationMethod": "did:web:notary.squillo.io#key-1",
+      "created": "2026-05-21T00:00:02Z",
+      "proofPurpose": "authentication",
+      "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000f1",
+      "proofValue": "z<multibase-countersignature-by-the-NOTARY-over-the-notary-base>"
+    }
+  ]
+}
+```
+
+Read the two proofs as two different claims. The first says *"I, this human,
+authorize this send"* — and because the principal is a `did:key`, a recipient
+verifies it with no lookup, no publication, and no prior relationship with
+anyone. The second says *"I, this notary, evaluated policy at this instant
+and observed exactly that authorization"* — and because it covers the
+complete principal proof, the notary cannot move the human's signature onto
+a different envelope.
+
+Note the `issuer` here is the **human**, not the notary. In `PrincipalSigned`
+mode the human is the issuing authority in substance as well as in prose;
+the notary is a witness.
+
+The three timestamps ascend, and that is required rather than incidental
+(§7.2.1): the notary decided at `:00`, the human signed the prepared
+envelope at `:01`, and the notary countersigned what the human signed at
+`:02`. Each signature covers only bytes that existed when it was made.
 
 ### 7.4 Per-channel recipient addressing shapes
 
@@ -597,7 +907,7 @@ APH v0.1 accepts two `proof` block formats:
 
 JCS canonicalization (RFC 8785) is applied to the envelope minus `proof.proofValue` before signing. The signature bytes are multibase-encoded (base58btc) and placed in `proof.proofValue`.
 
-**JsonWebSignature2020 (detached JWS).** Preferred for on-wire short-form carriage on channels with limited metadata capacity (email headers, chat block metadata fields). Uses RFC 7515 §A.5 detached JWS over the JCS-canonicalized envelope minus `proof.proofValue`. The JWS protected header MUST include:
+**JsonWebSignature2020 (detached JWS).** Preferred for on-wire short-form carriage on channels with limited metadata capacity (email headers, chat block metadata fields). Uses RFC 7515 §A.5 detached JWS over the JCS-canonicalized envelope with `proof.proofValue` set to the empty string — the §7.2.1 base, identical to the Data Integrity case. "Minus" is not "empty": earlier drafts said minus, and an implementation that removed the member would produce bytes no conformant verifier reproduces. The JWS protected header MUST include:
 
 - `alg`: `"ES256"` or `"EdDSA"`.
 - `kid`: the verification method DID URL.
@@ -614,8 +924,8 @@ A Recipient Endpoint MUST execute the following verification steps before accept
 
 1. **Parse the envelope.** Reject if any REQUIRED field is missing or if the parser encounters an unknown field at the envelope level (forward-compatibility behavior: fail fast on spec drift). Per-channel `recipientAddressing` sub-fields are opaque and not subject to strict deserialization.
 2. **Resolve the verification method.** Use the DID URL in `proof.verificationMethod` to obtain the notary public key. The resolver MUST support at least one of the publication mechanisms defined in §8.4 (`did:key` offline decode, `did:web` `.well-known/did.json`, or DNS TXT). Production verifiers SHOULD support all three. See §8.4 for the full resolution flow, key rotation rules, and trust models.
-3. **Strip the proof value.** Take a working copy of the envelope and remove `proof.proofValue`.
-4. **Canonicalize.** Apply JCS (RFC 8785) to the stripped working copy.
+3. **Build the base for THIS proof (§7.2.1).** Take a working copy of the envelope and set the proof's own `proofValue` to the empty string — do NOT remove the member. For a lone notary proof that is the whole rule. In a chain: for the **principal** proof, discard the notary proof so `proof` carries the principal's alone; for the **notary** proof, keep both with the principal's `proofValue` complete. Never include a proof that comes *after* the one being verified — it did not exist when that signature was made.
+4. **Canonicalize.** Apply JCS (RFC 8785) to the working copy.
 5. **Verify the signature.** Validate `proof.proofValue` against the canonical bytes using the public key from step 2 and the algorithm pinned by `proof.cryptosuite` or the JWS protected header `alg`.
 6. **Validate the time window.** Confirm `validFrom <= now <= validUntil` where `now` is the verifier's current wall clock. Allow a small clock-skew tolerance (RECOMMENDED: 60 seconds).
 7. **Validate the algorithm.** Confirm the algorithm is in the supported set (`ES256` or `EdDSA`). Reject `alg: none`. Reject any vendor-specific algorithm not explicitly opted into.
@@ -624,9 +934,66 @@ A Recipient Endpoint MUST execute the following verification steps before accept
 
 If any step fails, the verifier MUST reject the envelope and SHOULD emit the appropriate error code from §11.
 
+#### 8.3.1 Verifying a proof chain
+
+Insert after step 1 (strict parse):
+
+1a. **Read `attestationMode`** (§7.1.7; absent means `NotaryAttested`). A
+    verifier whose policy requires `PrincipalSigned` MUST refuse any other
+    value **now** with `APH_E012`, rather than discovering the weakness
+    after doing work.
+    There is no silent downgrade from a stronger attestation to a weaker
+    one, for the same reason §8.4.6 forbids downgrading key discovery: an
+    attacker who can defeat the weak path will always present the weak path.
+    The label is **not** evidence on its own: confirm it matches the proof
+    structure per §7.1.11 and reject a mismatch with `APH_E013` — a notary
+    key alone can write `PrincipalSigned` above a single notary proof.
+
+Steps 1b, 1c and 1e apply ONLY when the envelope is `PrincipalSigned`
+(equivalently: when `proof` is an array). A `NotaryAttested` envelope has no
+principal proof and no chain, so it skips to 1d.
+
+1b. **Resolve the principal's key.** For a `did:key` principal, decode it
+    from the identifier — offline, no network (§8.4.3). Otherwise resolve
+    per §8.4.
+
+1c. **Verify the principal proof** over the §7.2.1 principal base — the
+    envelope with the notary proof discarded and the principal's own
+    `proofValue` emptied. Its `verificationMethod` MUST resolve to
+    `credentialSubject.humanPrincipal.id`; a proof made by any other key is
+    not the principal's proof, whatever its `proofPurpose` says. Failure is
+    `APH_E011`. A verifier MUST NOT proceed to the notary proof on failure:
+    a countersignature cannot rescue an unauthorized envelope.
+
+1d. **If `NotaryAttested` and a `delegationMandate` is embedded**, verify its
+    `principalSignature` (failure is `APH_E011`) and confirm this envelope
+    falls within the granted scope and window (§7.1.7.1) — the mandate's
+    `humanPrincipalDid` MUST equal `credentialSubject.humanPrincipal.id`,
+    its `agentDid` MUST equal `credentialSubject.agent.id`, the envelope's
+    channel MUST be in `allowedChannels` (else `APH_E005`), and the
+    envelope's window MUST fall inside the mandate's (else `APH_E003`).
+    Without those bindings an attacker could staple any validly-signed
+    mandate to any envelope. Absent an embedded mandate, the human's
+    authorization is **not verifiable** by this recipient, and the recipient
+    SHOULD treat the credential as the notary's assertion alone.
+
+1e. **Check the chain linkage.** The notary proof's `previousProof` MUST
+    equal the principal proof's `id` (§7.1.11). Position in the array is a
+    hint; `previousProof` is the binding. Reject a chain whose linkage is
+    missing, dangling, or cyclic with `APH_E013`.
+
+Steps 2 through 9 then proceed for the **notary proof**, unchanged.
+
+Add after step 9:
+
+10. **Attestation policy (OPTIONAL).** A verifier MAY require that the notary
+    advertise a code attestation valid under §15 and refuse otherwise. This
+    is policy, not protocol: a verifier that does not check it remains
+    conformant.
+
 ### 8.4 Notary Key Material + Public-Key Discovery
 
-A Notary Service operates on a public/private keypair. The PRIVATE key MUST be held under the Notary Service operator's exclusive control and is used to sign every envelope's `proof.proofValue` and the `notarySignature` field of any Delegation or Communication Mandate the notary mints. The PUBLIC key MUST be discoverable by ANY third-party verifier WITHOUT a prior trust relationship with the Notary Service or its operator.
+A Notary Service operates on a public/private keypair. The PRIVATE key MUST be held under the Notary Service operator's exclusive control and is used to sign the NOTARY's proof on every envelope it notarizes — the single `proof` of a `NotaryAttested` envelope, or the second, countersigning proof of a `PrincipalSigned` chain — and the `notarySignature` field of any Delegation or Communication Mandate the notary mints. It never produces a `principalSignature` or a principal proof; those come from the human's key alone. The PUBLIC key MUST be discoverable by ANY third-party verifier WITHOUT a prior trust relationship with the Notary Service or its operator.
 
 Public-key discoverability is the property that makes APH function as a notarization protocol rather than as a closed signing system. A recipient that has never previously transacted with the notary MUST be able to resolve the public key, verify the signature, and accept the credential — analogous to how a TLS client can verify a server certificate against a publicly-anchored chain of trust without contacting the server's operator out-of-band.
 
@@ -904,7 +1271,7 @@ APH identifies both the human principal and the agent via DIDs. v0.1 implementat
 
 ## 11. Error Taxonomy
 
-APH defines a closed set of ten error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
+APH defines a closed set of thirteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
 
 | Code | Variant | Meaning | Suggested resolution |
 |---|---|---|---|
@@ -918,6 +1285,9 @@ APH defines a closed set of ten error codes for v0.1. Implementations MUST use t
 | `APH_E008` | `NotaryServiceUnreachable` | A remote notary service did not respond within the configured timeout. | Check the notary endpoint's health; retry with exponential backoff. |
 | `APH_E009` | `EnvelopeBodyHashMismatch` | The recipient computed a SHA-256 over the actual outbound body that did not match `communication.bodySha256`. | Re-hash the body and compare against the envelope; investigate transport corruption or tampering. |
 | `APH_E010` | `UnsupportedAlgorithm` | The envelope declared a signing algorithm not in the supported set, or `alg: none`. | Use one of `ES256` or `EdDSA`; reject `alg: none`. |
+| `APH_E011` | `PrincipalSignatureInvalid` | A signature made by the HUMAN's key did not verify: the principal proof of a chain (§8.3.1 step 1c), or an embedded Delegation Mandate's `principalSignature` (step 1d). Distinct from `APH_E001` and `APH_E006`, which are both notary signatures — a verifier that conflated them would report a forged authorization as a notary misconfiguration. | Confirm the principal's key resolved from `humanPrincipalDid` matches `verificationMethod`; re-sign with the human's key. |
+| `APH_E012` | `AttestationModeRefused` | The verifier's policy requires `PrincipalSigned` and the envelope is `NotaryAttested` (§8.3.1 step 1a). Not a defect in the envelope — a refusal to accept the weaker claim. | Re-issue in `PrincipalSigned` mode, or relax the verifier's policy deliberately and in the open. |
+| `APH_E013` | `ProofChainInvalid` | The proof chain is malformed: wrong length, wrong `proofPurpose` for a position, or a `previousProof` that is missing, dangling, duplicated, or cyclic (§7.1.11, §8.3.1 step 1e). | Emit exactly two proofs, principal first, with the notary proof's `previousProof` naming the principal proof's `id`. |
 
 ---
 
@@ -975,6 +1345,119 @@ The following references are informative:
 - RFC 9635 — Grant Negotiation and Authorization Protocol (GNAP).
 - C2PA 2.4 Specification — Content Provenance and Authenticity (informative — composable for media-bearing envelopes).
 - DIF DIDComm v2 — DID-to-DID messaging (informative — alternative transport).
+
+---
+
+## 15. Notary Code Attestation
+
+A Notary Service that cannot forge authorizations (§7.1.11) may be hosted by
+anyone. That raises a different question — **is this notary running the
+software the protocol published?** — and §15 answers it with a supply-chain
+attestation rather than a claim about key custody.
+
+### 15.1 The authority
+
+The APH protocol authority publishes attestations under a **k-of-3
+threshold**: three holder keys, of which any **two** valid signatures
+constitute a valid attestation. Two is deliberate: one lost key must not halt
+releases, and one compromised key must not be able to ship alone.
+
+The two signatures MUST be made by **two distinct holder keys**. A verifier
+MUST reject an attestation carrying two signatures that verify against the
+same key — otherwise a single compromised holder satisfies the threshold by
+signing twice, and k-of-3 degrades to 1-of-3 without anyone noticing.
+
+The three authority public keys are published through the §8.4 mechanisms
+like any other APH key material, and are subject to §8.4.7 rotation with
+overlap.
+
+### 15.2 The subject
+
+An attestation is over a **content digest of a reproducible build** of a
+notary release — the artifact, not a version string. A version string is a
+claim about an artifact; a digest *is* the artifact.
+
+### 15.3 What a notary advertises
+
+A notary MAY declare what it is running, in
+`credentialSubject.notarization.notaryService` (declared normatively in
+§7.1.9, because strict parsing means a field a notary may send must exist in
+the shape a verifier parses):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `attestedDigest` | string | no | Content digest of the attested release this notary **reports** running. |
+| `attestationUri` | string | no | Where the k-of-3 attestation for that digest may be fetched. |
+
+**Both fields are self-asserted.** They are a claim made by the same party
+whose honesty is in question, inside a document that party signed. A
+verifier that reads `attestedDigest` and concludes the notary runs that code
+has learned nothing an adversarial notary could not have written. The fields
+are useful only as a *pointer*: fetch the attestation at `attestationUri`,
+verify k-of-3 over the digest, and confirm the digest is one you accept.
+Even then the conclusion is bounded by §15.6 — that this code was published,
+not that it is running.
+
+### 15.4 Reuse, not invention
+
+Attestation format, transparency logging, and provenance vocabulary SHOULD
+reuse existing supply-chain standards — Sigstore, in-toto attestations, and
+SLSA provenance — rather than defining an APH-specific schema. APH's
+contribution is the k-of-3 authority and the binding into `notaryService`,
+not a new signature envelope.
+
+### 15.5 How a verifier checks one
+
+§8.3.1 step 10 lets a verifier require an attestation. This is what that
+check is, end to end:
+
+1. **Read the claim.** Take `attestedDigest` and `attestationUri` from
+   `credentialSubject.notarization.notaryService` (§7.1.9). Both are
+   self-asserted (§15.3); nothing is established yet.
+2. **Resolve the authority keys.** Obtain the three APH attestation-authority
+   public keys through the §8.4 mechanisms, exactly as a notary key is
+   obtained: `did:web` at the authority's domain, or a DNS TXT record, with
+   the §8.4.6 no-downgrade rule applying unchanged. A verifier that cannot
+   resolve all three MUST fail the check rather than proceed with fewer —
+   two-of-two is not two-of-three.
+3. **Fetch the attestation** at `attestationUri` under the same transport
+   rules §8.4.4 imposes on `did:web` resolution (HTTPS only, no cross-host
+   redirects, bounded size and time). A fetch failure is a failed check, not
+   a passed one.
+4. **Verify the threshold.** The attestation MUST carry at least two valid
+   signatures over the digest, made by **two distinct** authority keys
+   (§15.1). Reject two signatures from one key.
+5. **Bind it to the claim.** The digest the attestation covers MUST equal
+   `attestedDigest` byte-for-byte. An attestation over a different digest
+   proves something true about some other release.
+6. **Apply the verifier's own policy.** Is this digest one the verifier
+   accepts — a known release, not withdrawn, not older than a floor it has
+   set? The protocol does not answer this; it only makes the question
+   answerable.
+
+A failure at any step means the attestation requirement is unmet. It does
+NOT by itself invalidate the envelope: the signatures verified in §8.3 are
+unaffected, and a verifier that does not require attestation remains
+conformant (§8.3.1 step 10).
+
+### 15.6 The limit (normative)
+
+**An attestation proves what code was published. It does not prove what code
+is running.**
+
+Absent hardware-backed remote attestation, an operator can publish an
+attested digest and execute something else. §15 raises the cost of operating
+a malicious notary and narrows the population of plausible ones; it does not
+make a remote notary honest.
+
+Implementations MUST NOT present an attestation as a guarantee of honest
+execution, and any user-facing surface rendering an attestation badge MUST
+convey this limit. A design implying otherwise is non-conformant with this
+section.
+
+This is also why a principal proof matters more than any attestation: the
+principal proof is verified by mathematics and requires no assumption about
+what a remote process is executing.
 
 ---
 

@@ -4,10 +4,19 @@ Reference Rust implementation of the [APH (Agent per Human)](https://github.com/
 notarization protocol, v0.1.
 
 APH binds an agent's outbound action to a verifiable human authorization: a
-W3C Verifiable Credential 2.0-shaped `NotarizationEnvelope`, signed by a
-Notary Service whose public key any recipient can resolve from public
-infrastructure (`did:key`, `did:web`, or a DNS TXT record) with no prior
-trust relationship.
+W3C Verifiable Credential 2.0-shaped `NotarizationEnvelope`, whose signing
+keys any recipient can resolve from public infrastructure (`did:key`,
+`did:web`, or a DNS TXT record) with no prior trust relationship.
+
+> **Trust model note.** The specification's 2026-08-13 revision makes the
+> **human principal** the signer: the envelope carries the principal's own
+> proof, countersigned by the notary, and a `DelegationMandate` carries the
+> human's `principalSignature`. **This crate still implements the
+> pre-revision shape** — a single notary proof — so an envelope it verifies
+> proves *a notary asserts this human authorized this*, not *this human
+> authorized this*. Do not describe its output as the latter. Support for
+> proof chains, `attestationMode`, and `principalSignature` is in progress;
+> see the spec's §7.1.11 and `CHANGELOG.md`.
 
 This crate is the wire layer and is deliberately squillo-free — it depends
 only on `serde`, `serde_json`, `thiserror`, `chrono`, `p256`, and `base64`.

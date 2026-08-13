@@ -20,16 +20,21 @@ Per N_BOOK 1.1 "The Determinism Invariant": declaration order IS load order.
 
 Load order is dependency order. `APH` declares the Snapp itself and the
 protocol constants. `APH_PROTOCOL` declares the closed vocabularies and
-enumerations that later blocks reference by name. `APH_ENVELOPE` defines the
-credential, and `APH_MANDATES` the two documents that carry authority into
-it.
+enumerations that later blocks reference by name. `APH_MANDATES` declares the
+two documents that carry authority, and `APH_ENVELOPE` the credential that
+consumes them.
+
+Mandates load **before** the envelope because the envelope now embeds one:
+`PolicyDescriptor.delegation_mandate` is a `DelegationMandate`, so the
+mandate type must exist by the time the envelope is read. That ordering is
+the load order made visible — the dependency is real, not stylistic.
 
 ## Module Declarations
 
 ```nlang
 mod APH {};
 mod APH_PROTOCOL {};
-mod APH_ENVELOPE {};
 mod APH_MANDATES {};
+mod APH_ENVELOPE {};
 mod APH_TESTS {};
 ```

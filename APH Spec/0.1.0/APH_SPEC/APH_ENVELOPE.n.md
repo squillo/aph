@@ -165,6 +165,25 @@ the human approved this single send directly rather than in advance.
 which principal acted for whom when authority passed through more than one
 hop.
 
+`attestation_mode` names **who proved the authorization**, and is the single
+most consequential field in the envelope. `PrincipalSigned` means the human's
+own key signed this envelope, so `proof` is a two-element chain. Anything
+else — including an absent field, which means `NotaryAttested` — means the
+signature is the notary's assertion that a human agreed. A verifier whose
+policy requires `PrincipalSigned` MUST refuse the weaker mode rather than
+silently accept it (§8.3.1 step 1a). It is typed `str` and its values are declared as
+`Vocabulary::AttestationMode` in `APH_PROTOCOL`, the same split every other
+closed vocabulary here uses: the enum gives a consumer exhaustiveness, while
+the prop stays `str` because the wire carries a bare string rather than an
+internally tagged object.
+
+`delegation_mandate` is the complete parent mandate, embedded. It exists
+because `delegation_mandate_id` is an **id**, and an id proves nothing: a
+recipient holding only the envelope has no way to fetch the mandate, and no
+way to check the human's signature on it. Embedding it makes all three
+checks — the human's `principal_signature`, the granted scope, the validity
+window — offline and dependency-free (§7.1.7.1).
+
 ```nlang
 mod blocks PolicyDescriptor {
   props {
@@ -172,6 +191,14 @@ mod blocks PolicyDescriptor {
     matched_scope: str,
     #[optional(true)]
     delegation_mandate_id: str,
+    // "PrincipalSigned" | "NotaryAttested". Absent means NotaryAttested.
+    #[optional(true)]
+    attestation_mode: str,
+    // The full parent mandate, so the human's signature on it verifies
+    // without a fetch. SHOULD be present whenever
+    // `delegation_mandate_id` is.
+    #[optional(true)]
+    delegation_mandate: $::*::DelegationMandate,
     act_chain: Directional<str>,
   }
 }
@@ -199,12 +226,23 @@ mod blocks NotarizationMetadata {
 Identity of the notary (§7.1.9), used to resolve its verification key
 (§8.4).
 
+`attested_digest` and `attestation_uri` are how a notary declares which
+attested release it reports running (§15.3). They are declared here rather
+than only in §15 because parsing is strict: a field a conformant notary may
+send must exist in the shape a conformant verifier parses. Carrying them
+proves nothing on its own — an attestation attests what was *published*,
+never what is *running* (§15.6).
+
 ```nlang
 mod blocks NotaryServiceRef {
   props {
     id: str,
     name: str,
     version: str,
+    #[optional(true)]
+    attested_digest: str,
+    #[optional(true)]
+    attestation_uri: str,
   }
 }
 ```
@@ -235,16 +273,55 @@ mod blocks LinkedMandate {
 
 The signature block (§7.1.11, §8.2), either a W3C Data Integrity Proof or a
 detached JWS. `cryptosuite` is absent for the JWS form. `proof_purpose` is
-always `assertionMethod` for APH.
+`assertionMethod` for a principal proof and for a lone notary proof, and
+`authentication` for a notary countersignature in a chain — it is how a
+verifier tells the two roles apart, so it is not a constant.
 
 `proof_value` is a multibase base58btc signature over the canonical form of
-the envelope with `proofValue` itself set to the empty string — a signature
+the envelope, with `proofValue` emptied rather than removed — a signature
 cannot cover itself, and emptying rather than removing the member is the
-convention the reference implementation pins.
+convention §7.2.1 pins normatively.
+
+**Which values are emptied depends on which proof is being made**, and
+getting this backwards breaks the countersignature:
+
+| Signing | Base |
+|---|---|
+| a lone notary proof | its own `proofValue` emptied |
+| the principal proof of a chain | `proof` carries that proof ALONE, its `proofValue` emptied |
+| the notary countersignature | both proofs, the principal's `proofValue` PRESENT, its own emptied |
+
+These are W3C proof-chain semantics: a proof covers the document plus every
+proof BEFORE it and nothing after, because a signer cannot sign bytes that do
+not exist yet. The third row is the whole point of a chain — the notary signs
+over the principal's actual signature, so it cannot be detached and reused —
+and the second row is what makes the first signature constructible at all.
+
+It also fixes the issuance order: the notary prepares the envelope including
+`notarization`, the principal signs that, the notary countersigns. Reverse
+the middle two and the human would be signing a decision timestamp that has
+not happened yet.
+
+**`proof` on the wire is either one of these objects or an array of them.**
+As an array it is a W3C proof chain of exactly two: the principal's proof
+(`proof_purpose` `assertionMethod`, the human's key, the actual
+authorization) followed by the notary's countersignature (`proof_purpose`
+`authentication`, covering the complete principal proof, so it cannot be
+detached and re-attached to a different envelope). N Lang props are typed,
+so the union is documented here rather than expressed in the type; the type
+below describes one element, which is also the whole of a single-object
+`proof`.
+
+`previous_proof` is what makes the chain a chain. Array order is a hint an
+intermediary can rearrange; the notary proof naming the principal proof's
+`id` is the binding a verifier checks (§7.1.11).
 
 ```nlang
 mod blocks EnvelopeProof {
   props {
+    // Present when `proof` is a chain; a lone proof links to nothing.
+    #[optional(true)]
+    id: str,
     // DataIntegrityProof or JsonWebSignature2020.
     type: str,
     #[optional(true)]
@@ -252,7 +329,13 @@ mod blocks EnvelopeProof {
     // DID URL of the key, including its fragment.
     verification_method: str,
     created: str,
+    // "assertionMethod" for a principal proof; "authentication" for a
+    // notary countersignature.
     proof_purpose: str,
+    // The `id` of the proof this one countersigns. Present on the notary
+    // proof of a chain; absent on the principal proof, which is its head.
+    #[optional(true)]
+    previous_proof: str,
     proof_value: str,
   }
 }

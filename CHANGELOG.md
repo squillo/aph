@@ -5,29 +5,6 @@ All notable changes to APH (Agent per Human Notarization Protocol) will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0-draft] — 2026-08-13
-
-### Added
-
-- **`spec/aph-0.2.md`** — an amendment to v0.1, not a replacement. v0.1 sections it does not modify remain in force.
-- **The principal signs.** `proof` MAY be a W3C Verifiable Credentials 2.0 **proof chain**: a principal proof (`proofPurpose: assertionMethod`, the principal's own key — this IS the authorization) followed by a notary countersignature covering the complete principal proof, so a notary cannot move a principal's signature onto a different envelope.
-- **`credentialSubject.policy.attestationMode`** — closed enum, `PrincipalSigned` | `NotaryAttested`. A verifier requiring `PrincipalSigned` MUST refuse `NotaryAttested` rather than silently accept the weaker claim, mirroring the no-silent-downgrade rule §8.4.6 already applies to key discovery.
-- **`DelegationMandate.principalSignature`** — the principal's own signature over the standing grant, the highest-value document in the protocol.
-- **§15 Notary Code Attestation** — a k-of-3 authority over content digests of reproducible builds, reusing Sigstore / in-toto / SLSA vocabulary rather than defining an APH schema. Numbered §15 because v0.1 §12 is Security Considerations.
-- **Canonicalization pinned per proof** (§2.1): the principal proof covers the envelope with every `proofValue` emptied; the notary proof covers it with the principal `proofValue` present and its own emptied. This settles the strip-vs-empty question v0.1 §7.2 left open — normatively, as the empty string.
-
-### Changed
-
-- **A Notary Service is now hostable by anyone.** In `PrincipalSigned` mode a notary never holds the principal's key and therefore cannot forge an authorization; its compromise costs availability and metadata, not credentials. The question about a notary becomes supply-chain (does it run published code) rather than custodial (is it trusted with a key).
-- Envelopes carrying a principal proof set `aphVersion` to `"0.2"`. A v0.1 verifier MUST reject `"0.2"` rather than partially verify it.
-
-### Notes
-
-- **v0.1 envelopes remain valid and are not deprecated.** `NotaryAttested` is retained deliberately for devices where the principal has no separable key.
-- **A `did:key` principal needs no key lookup** — the public key is the identifier, so the principal proof verifies offline with no publication and no prior relationship. The trade-off, documented wherever `did:key` is recommended: such a principal cannot rotate, because the key is the name.
-- **Errata to v0.1** are listed in the v0.2 appendix. The most consequential: §1.1 and §3.1 promised a direct-principal-signature mode the v0.1 wire format could not express, so every v0.1 credential is notary-attested.
-- **Stated limit on attestation:** it proves what code was *published*, never what is *running*. Absent hardware-backed remote attestation it raises the cost of a malicious notary without making a remote one honest, and any surface rendering an attestation badge must convey that.
-
 ## [0.1.0-draft] — 2026-05-21
 
 ### Added
@@ -96,6 +73,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `interpreters/rust/aph-core/README.md` — crate-level documentation.
 - Root README gained a "Using the reference implementation (Rust)" section with worked code for verification, signature checking, and scope/consent enforcement, plus JavaScript/wasm and agent-plugin install instructions.
 - `aph-core` is publishable to crates.io (`aph-core = "0.1"`). `aph-cli` and `aph-conformance` remain unpublished; the manifests record why.
+
+### Added (revision 2026-08-13 — the principal signs; notary code attestation, within 0.1.0-draft)
+
+APH is pre-production with no external adopters, so this correction lands **in place** rather than forking a version — there is one specification, `spec/aph-0.1.md`. Earlier drafts of §1.1/§3.1 promised that the human principal could sign directly while the wire format could not express it, which made every credential notary-attested in truth: a verifier learned that *a notary asserts* the human authorized an action, never that the human did.
+
+- **§7.1.11 proof chains.** `proof` MAY be a single object or an array. As an array it is a W3C Verifiable Credentials 2.0 **proof chain** — a facility the data model already defines, not an APH invention — constrained to two roles: a principal proof carrying the authorization, then a notary countersignature covering the *complete* principal proof, so a notary cannot detach a principal's signature and re-attach it to a different envelope. Verifiers MUST verify in chain order.
+- **§6.1 `DelegationMandate.principalSignature`** — the human's own signature over the standing grant, and the root of every credential issued under it. `notarySignature` now countersigns what the principal signed.
+- **§7.1.7 `policy.attestationMode`** — closed enum, `PrincipalSigned` | `NotaryAttested`. **Absent means `NotaryAttested`**, so envelopes written before this revision remain valid and unambiguous. A verifier requiring `PrincipalSigned` MUST refuse `NotaryAttested` rather than silently accept the weaker claim, mirroring §8.4.6's no-downgrade rule for key discovery.
+- **§7.1.7 `policy.delegationMandate` + new §7.1.7.1** — the complete parent mandate, embedded. In the human-not-present flow the human is asleep and cannot sign *this* message; `delegationMandateId` names their grant by **id only**, and an id is not verifiable. Embedding the mandate lets a recipient check the human's `principalSignature`, the granted scope, and the window entirely offline — closing the one hole that otherwise left the human's authorization asserted rather than proved.
+- **New §7.2.1** — canonicalization base pinned per proof and per mandate signature, normatively, as the **empty string** rather than member removal. This settles the question earlier drafts left open, in the direction the reference implementation has always taken.
+- **New §15 Notary Code Attestation** — a k-of-3 authority (any two of three holder keys) over content digests of reproducible builds, reusing Sigstore / in-toto / SLSA vocabulary rather than defining an APH schema. §15.6 states the limit **normatively**: an attestation proves what code was *published*, never what is *running*; any surface rendering an attestation badge MUST convey that, and a design implying otherwise is non-conformant.
+- **§7.1.11 chain linkage.** Every proof in a chain carries an `id`; the notary proof carries `previousProof` naming the principal proof's `id`. Array position is a hint an intermediary can rearrange — the signed reference is the binding, and a verifier MUST reject a chain whose linkage is missing, dangling, or cyclic.
+- **§7.3.1 worked `PrincipalSigned` example** — the same Slack reply as §7.3, with the mode declared, the parent mandate embedded, and the two-proof chain shown end to end.
+- **§8.3.1** — amended verification: read the mode, resolve the principal key (free and offline for a `did:key` principal), verify the principal proof *before* the notary proof, and verify an embedded mandate when the envelope is notary-attested.
+
+- **§7.2.1 issuance order is normative.** Each proof covers the document plus every proof *before* it and nothing after — W3C Data Integrity proof-chain semantics. So the notary **prepares** the complete envelope (including `notarization`), the principal signs *that*, and the notary countersigns. `decisionTimestamp <= principalProof.created <= notaryProof.created`. An earlier draft of this revision defined the principal's base as the whole envelope with every `proofValue` blanked, which is unconstructible: it would require the human to sign over the notary's proof object and decision timestamp, neither of which exists when the human signs.
+- **§7.1.11 binds the label to the structure, both ways.** `attestationMode: PrincipalSigned` MUST accompany a two-element chain whose head verifies under a key resolving to `credentialSubject.humanPrincipal.id`; a chain MUST carry that label; a mismatch is rejected with `APH_E013`. Without this the mode is a self-asserted string — a notary key alone could write `PrincipalSigned` above a single notary proof whose `proofPurpose` is `assertionMethod`, indistinguishable by purpose from a principal proof.
+- **§11 gains three error codes** (`APH_E011` principal signature invalid, `APH_E012` attestation mode refused, `APH_E013` proof chain invalid), so the closed taxonomy covers the rejections §8.3.1 now requires. `APH_E011` is deliberately distinct from `APH_E001` and `APH_E006`, which are both *notary* signatures: only `APH_E011` means the authorization itself is forged.
+- **§15.5 defines how a verifier checks an attestation** — resolve all three authority keys through §8.4, fetch under the §8.4.4 transport rules, require two signatures from two *distinct* keys, bind the digest byte-for-byte, then apply local policy. §8.3.1 step 10 previously referenced a check the document never specified.
+- **§7.1.9 declares `attestedDigest` and `attestationUri`**, which §15.3 lets a notary send. Parsing is strict, so a field a conformant notary may emit has to exist in the shape a conformant verifier parses.
+
+### Changed (revision 2026-08-13)
+
+- **A Notary Service is now hostable by anyone.** It never holds the principal's key, so it cannot forge an authorization; its compromise costs availability and metadata, not credentials. The question about a notary becomes supply-chain (does it run published code) rather than custodial (is it trusted with a key) — which is what §15 exists to answer.
+- **§3.1 prose reconciled** with the wire format, so the specification no longer promises a mode it cannot express.
+- **§4, §5.2, §6.3, §8.2, §8.3, §8.4 and the security companion** were rewritten wherever they still taught the notary as the root signer — including §4's architecture diagram, which now shows the prepare / sign / countersign order, and `spec/security-considerations.md` §3.1, which previously said a leaked notary key lets an attacker "issue arbitrary envelopes under the human principal's name". It no longer can, except in the one shape where nothing the human signed is present: `NotaryAttested` with no embedded mandate. That residual risk is now stated where the claim used to be.
+- **`spec/security-considerations.md` gains §2.6 attestation-mode downgrade**, the structural twin of §2.5's algorithm downgrade and strictly more consequential: `alg: none` costs a signature check, this costs the whole authorization claim.
+- **`CONTRIBUTING.md` records the pre-production exception** that permits an in-place correction, and states when it expires — the first external adopter.
+
+### Notes (revision 2026-08-13)
+
+- **A `did:key` principal needs no key lookup** — the public key *is* the identifier, so the principal proof verifies offline with no publication and no prior relationship. Trade-off, stated wherever `did:key` is recommended: such a principal **cannot rotate**, because the key is the name. Rotatable identities use `did:web` or DNS TXT, which carry `kid`.
+- The eight published example envelopes remain valid: they omit `attestationMode` and are therefore `NotaryAttested` by definition. A `PrincipalSigned` example lands with the implementation.
+- Implementation of the new fields is pending; the reference implementation currently ships the pre-revision shape.
+- The N Lang **APH Spec Snapp** (`APH Spec/0.1.0/`) tracks the revision: `PolicyDescriptor` gains `attestation_mode` and the embedded `delegation_mandate`, `DelegationMandate` gains a required `principal_signature`, `EnvelopeProof` gains `id` and `previous_proof`, and mandates now load before the envelope that embeds them. Two new `nlang how` cards — *Attestation Mode* and *Proof Chain* — teach the corrected model, and each card's code is extracted from the type source so it cannot drift.
+
+### Fixed (revision 2026-08-13)
+
+- **§6.1's worked example omitted `principalSignature`**, which its own field table marks required. The example and the validation rules now carry it, with the principal check ordered before the countersignature.
+- **The embedded mandate was never bound to the envelope carrying it.** §7.1.7.1 and §8.3.1 step 1d now require `humanPrincipalDid`, `agentDid` and `id` to match the envelope's own values; without those equalities any validly-signed mandate could be stapled to any envelope.
+- **§7.1.7.1 states what "within scope" does not cover** (a mandate constrains channel, rate and time — not recipients, not content class), what embedding discloses (the human's entire standing grant, to every recipient), and that a verifier must bound work on unauthenticated input (RECOMMENDED 64 KiB) because canonicalization precedes signature verification.
+- **§15.1 requires the two threshold signatures to come from two distinct holder keys** — otherwise one compromised holder signs twice and k-of-3 silently degrades to 1-of-3.
+- Stale canonicalization language ("strip", "minus `proof.proofValue`") removed from §8.2 and §8.3, which contradicted §7.2.1 and would have failed every signature a conformant signer produced.
 
 ### Notes
 

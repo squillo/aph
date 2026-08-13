@@ -31,6 +31,14 @@ are suitable for round-trip parsing by any APH implementation.
 - `proof.type`: `"DataIntegrityProof"`
 - `proof.cryptosuite`: `"eddsa-jcs-2022"`
 - `proof.proofValue`: an opaque illustrative multibase string (NOT a real signature)
+- **Attestation mode: `NotaryAttested`.** None of these carry
+  `policy.attestationMode`, and an absent field means `NotaryAttested`
+  (spec §7.1.7). Read them as *a notary asserts this human authorized this*
+  — the notary's key signed them, not the human's. For the stronger
+  `PrincipalSigned` shape, where the human's own key signs and the notary
+  countersigns in a proof chain, see spec §7.3.1. No
+  `PrincipalSigned` example is published yet — one will land here once the
+  reference implementation can produce a real signature for it.
 
 ## What varies
 

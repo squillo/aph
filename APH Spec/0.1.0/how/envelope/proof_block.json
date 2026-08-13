@@ -5,9 +5,10 @@
     "signature",
     "cryptosuite",
     "data-integrity",
-    "jws"
+    "jws",
+    "chain"
   ],
-  "nlang_code": "mod blocks EnvelopeProof {\n  props {\n    type: str,\n    #[optional(true)]\n    cryptosuite: str,\n    verification_method: str,\n    created: str,\n    proof_purpose: str,\n    proof_value: str,\n  }\n}",
-  "note": "Either a W3C Data Integrity Proof or a detached JWS; `cryptosuite` is absent for the JWS form. `proof_purpose` is always \"assertionMethod\". `proof_value` is a multibase base58btc signature over the canonical envelope with proofValue itself set to the empty string \u2014 a signature cannot cover itself, and emptying rather than removing the member is the convention the reference implementation pins.",
-  "book_ref": "APH Spec: \u00a77.1.11 EnvelopeProof, \u00a78.2 Proof block formats"
+  "nlang_code": "mod blocks EnvelopeProof {\n  props {\n    // Present when `proof` is a chain; a lone proof links to nothing.\n    #[optional(true)]\n    id: str,\n    // DataIntegrityProof or JsonWebSignature2020.\n    type: str,\n    #[optional(true)]\n    cryptosuite: str,\n    // DID URL of the key, including its fragment.\n    verification_method: str,\n    created: str,\n    // \"assertionMethod\" for a principal proof; \"authentication\" for a\n    // notary countersignature.\n    proof_purpose: str,\n    // The `id` of the proof this one countersigns. Present on the notary\n    // proof of a chain; absent on the principal proof, which is its head.\n    #[optional(true)]\n    previous_proof: str,\n    proof_value: str,\n  }\n}",
+  "note": "Either a W3C Data Integrity Proof or a detached JWS; `cryptosuite` is absent for the JWS form. `proof_value` is a multibase base58btc signature over the canonical envelope with `proofValue` emptied rather than removed \u2014 a signature cannot cover itself, and WHICH values are emptied depends on which proof is being made (\u00a77.2.1). On the wire `proof` is either one of these objects or an array of them; in the array form every proof carries an `id`, and the notary proof \u2014 but not the principal proof, which is the chain head \u2014 carries `previous_proof`. See the Proof Chain card.",
+  "book_ref": "APH Spec: \u00a77.1.11 EnvelopeProof, \u00a77.2.1 Canonicalization base, \u00a78.2 Proof block formats"
 }

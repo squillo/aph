@@ -224,6 +224,18 @@ pub struct NotaryServiceRef {
   pub name: String,
   /// Notary implementation version.
   pub version: String,
+  /// Content digest of the attested release this notary reports running
+  /// (spec §7.1.9, §15.3). Declared here because parsing is strict: a
+  /// field a conformant notary may send must exist in the shape a
+  /// conformant verifier parses. `#[serde(default)]` keeps every envelope
+  /// written before this field byte-identical.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub attested_digest: std::option::Option<String>,
+  /// Where the k-of-3 attestation for `attested_digest` may be fetched
+  /// (spec §15.3). Carrying it proves nothing on its own — an attestation
+  /// attests what was PUBLISHED, never what is RUNNING (§15.6).
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub attestation_uri: std::option::Option<String>,
 }
 
 /// Cross-protocol links carried alongside the send authorization.
@@ -368,11 +380,40 @@ mod tests {
     }
   }
 
+  #[test]
+  fn attestation_fields_are_omitted_when_absent_and_accepted_when_present() {
+    // The two §15.3 attestation fields were added to a struct that parses
+    // with `deny_unknown_fields` and whose output is signed. Two things must
+    // both hold: a notary that makes no attestation claim serializes
+    // byte-identically to before the fields existed (or every signature over
+    // an existing envelope breaks), and a notary that does make one is not
+    // rejected as carrying unknown fields (or conformant verifiers would
+    // refuse conformant notaries).
+    let bare = sample_notary_service();
+    let json = serde_json::to_string(&bare).unwrap();
+    std::assert!(
+      !json.contains("attestedDigest") && !json.contains("attestationUri"),
+      "absent attestation fields must not appear on the wire: {}",
+      json
+    );
+
+    let with_claim: super::NotaryServiceRef = serde_json::from_str(
+      r#"{"id":"did:web:notary.squillo.io","name":"Squillo Notary Service","version":"0.1.0","attestedDigest":"sha256:abc","attestationUri":"https://notary.squillo.io/.well-known/aph-attestation.json"}"#,
+    )
+    .expect("a notary advertising an attestation must parse");
+    std::assert_eq!(
+      with_claim.attested_digest.as_deref(),
+      std::option::Option::Some("sha256:abc")
+    );
+  }
+
   fn sample_notary_service() -> super::NotaryServiceRef {
     super::NotaryServiceRef {
       id: "did:web:notary.squillo.io".to_string(),
       name: "Squillo Notary Service".to_string(),
       version: "0.1.0".to_string(),
+      attested_digest: std::option::Option::None,
+      attestation_uri: std::option::Option::None,
     }
   }
 

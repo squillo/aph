@@ -3,11 +3,11 @@
   "tags": [
     "mandate",
     "delegation",
-    "scope",
     "standing-authority",
-    "revocation"
+    "scope",
+    "principal-signature"
   ],
-  "nlang_code": "mod blocks DelegationMandate {\n  props {\n    id: str,\n    human_principal_did: str,\n    agent_did: str,\n    allowed_channels: Directional<str>,\n    #[optional(true)]\n    rate_limit_per_hour: u32,\n    valid_from: str,\n    valid_until: str,\n    notary_signature: str,\n  }\n}",
-  "note": "Standing authority a human grants an agent: which channels, for how long, at what rate. Issued once and referenced by many Communication Mandates. `allowed_channels` is the scope check producing APH_E005. `valid_until` matters more than it looks: expiry is the primary revocation mechanism in v0.1 because on-wire revocation transport is deferred to v0.2, which is why short windows are recommended.",
-  "book_ref": "APH Spec: \u00a76.1 DelegationMandate"
+  "nlang_code": "mod blocks DelegationMandate {\n  props {\n    // `urn:uuid:` mandate identifier.\n    id: str,\n    // DID of the human granting authority.\n    human_principal_did: str,\n    // DID of the agent receiving it.\n    agent_did: str,\n    // Channel kinds this mandate permits. Non-empty.\n    allowed_channels: Directional<str>,\n    // Sends per hour; absent means unlimited.\n    #[optional(true)]\n    rate_limit_per_hour: u32,\n    // RFC 3339 validity window.\n    valid_from: str,\n    valid_until: str,\n    // The HUMAN's own signature over the canonical form minus both\n    // signature fields (\u00a76.1). This is the root of every credential\n    // issued under this mandate: without it, no party has proved the\n    // human granted anything.\n    principal_signature: str,\n    // The notary's countersignature over the canonical form minus this\n    // field \u2014 so it covers `principal_signature` and cannot be detached\n    // from what the human actually signed.\n    notary_signature: str,\n  }\n}",
+  "note": "Standing authority a human grants an agent: which channels, for how long, at what rate. Issued once and referenced by many Communication Mandates. `principal_signature` is the human's OWN signature and the root of every credential issued under this mandate \u2014 without it no party has proved the human granted anything, and the notary's countersignature would be vouching for nothing. `allowed_channels` is the scope check producing APH_E005. `valid_until` matters more than it looks: expiry is the primary revocation mechanism in v0.1 because on-wire revocation transport is deferred to v0.2, which is why short windows are recommended.",
+  "book_ref": "APH Spec: \u00a76.1 DelegationMandate, \u00a77.1.7.1 Why the delegation is embedded"
 }

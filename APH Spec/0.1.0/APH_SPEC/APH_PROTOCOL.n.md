@@ -104,6 +104,22 @@ apply different policy to an unsolicited `New` message than to a `Reply`.
   }
 ```
 
+### Attestation mode
+
+Who proved the authorization (§7.1.7) — the most consequential distinction
+in the protocol. `PrincipalSigned` means the human's own key signed the
+envelope; `NotaryAttested` means a notary asserts the human agreed, which is
+strictly weaker. An ABSENT `attestationMode` on the wire means
+`NotaryAttested`, so a verifier requiring the stronger mode must check for
+it explicitly rather than assume.
+
+```nlang
+  enum AttestationMode {
+    PrincipalSigned,
+    NotaryAttested,
+  }
+```
+
 ### Policy decision
 
 What the human decided (§7.1.7). `NeverAllow` is recorded as a decision but
