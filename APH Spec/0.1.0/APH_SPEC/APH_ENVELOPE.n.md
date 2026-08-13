@@ -288,12 +288,14 @@ getting this backwards breaks the countersignature:
 | Signing | Base |
 |---|---|
 | a lone notary proof | its own `proofValue` emptied |
-| the principal proof of a chain | `proof` carries that proof ALONE, its `proofValue` emptied |
+| the principal proof of a chain | `proof` is a ONE-ELEMENT ARRAY holding that proof, its `proofValue` emptied |
 | the notary countersignature | both proofs, the principal's `proofValue` PRESENT, its own emptied |
 
 These are W3C proof-chain semantics: a proof covers the document plus every
 proof BEFORE it and nothing after, because a signer cannot sign bytes that do
-not exist yet. The third row is the whole point of a chain — the notary signs
+not exist yet. The array form in row two is normative rather than cosmetic:
+`[{…}]` and `{…}` canonicalize to different bytes, so a chain stripped of its
+notary proof cannot be re-presented as a valid lone-proof envelope. The third row is the whole point of a chain — the notary signs
 over the principal's actual signature, so it cannot be detached and reused —
 and the second row is what makes the first signature constructible at all.
 

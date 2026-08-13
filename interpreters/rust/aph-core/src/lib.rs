@@ -4,14 +4,25 @@
 
 //! APH (Agent per Human) protocol v0.1 core types.
 //!
-//! **Trust model, stated up front.** The spec's 2026-08-13 revision makes
-//! the human principal the signer (proof chains, `attestationMode`,
-//! `DelegationMandate::principal_signature`). This crate still implements
-//! the pre-revision single-notary-proof shape, so a successful
-//! `verify_envelope` here means *a notary asserts this human authorized
-//! this* — NOT *this human authorized this*. Callers must not report the
-//! stronger claim. The revised fields are being implemented; the error
-//! codes they use (`APH_E011`..`APH_E013`) already exist in [`errors`].
+//! **Trust model, stated up front.** The human principal signs; the notary
+//! countersigns. An envelope is in one of two modes, and which one decides
+//! what a successful verification actually proves:
+//!
+//! - `PrincipalSigned` — `proof` is a two-element chain whose head was made
+//!   by the human's own key. Verifying it proves *this human authorized
+//!   this*.
+//! - `NotaryAttested` — a single notary proof, and what an ABSENT
+//!   `attestationMode` means. Verifying it proves only *a notary asserts
+//!   this human authorized this*, which is strictly weaker. The human's own
+//!   authorization, if present at all, lives in the `principalSignature` of
+//!   the Delegation Mandate embedded at `policy.delegation_mandate`.
+//!
+//! **Callers must never report the weaker claim as the stronger one.** Use
+//! [`verification::require_mode`] to refuse a downgrade rather than
+//! inspecting the shape by hand, and [`verification::verify_proof_structure`]
+//! to learn which mode an envelope is really in — the declared label is
+//! bound to the proof structure precisely so a notary key alone cannot
+//! forge the stronger claim (spec §7.1.11).
 //!
 //! Standalone implementation of the APH protocol: party roles, mandate
 //! types, notarization flow state machines, the W3C VC 2.0-shaped
@@ -50,6 +61,7 @@ pub mod human_present_flow;
 pub mod roles;
 pub mod sd_jwt_profile;
 pub mod vault_mutation;
+pub mod verification;
 
 #[cfg(test)]
 mod prop_tests;
@@ -63,9 +75,9 @@ pub use aph_config::{
 pub use communication_mandate::CommunicationMandate;
 pub use delegation_mandate::DelegationMandate;
 pub use envelope::{
-  AgentRef, ChannelDescriptor, CommunicationDescriptor, CredentialSubject, EnvelopeProof,
-  HumanPrincipalRef, LinkedMandate, NotarizationEnvelope, NotarizationMetadata, NotaryServiceRef,
-  PolicyDescriptor,
+  AgentRef, AttestationMode, ChannelDescriptor, CommunicationDescriptor, CredentialSubject,
+  EnvelopeProof, EnvelopeProofs, HumanPrincipalRef, LinkedMandate, NotarizationEnvelope,
+  NotarizationMetadata, NotaryServiceRef, PolicyDescriptor,
 };
 pub use errors::AphError;
 pub use human_not_present_flow::{
@@ -83,8 +95,13 @@ pub use vault_mutation::{VaultMutationKind, VaultMutationMandate};
 pub use crate::discovery::{DidUrl, KeyAlgorithm, NotaryPublicKey};
 pub use crate::crypto::did_key::{DecodedDidKey, decode as decode_did_key, encode_ed25519 as did_key_from_ed25519};
 pub use crate::crypto::eddsa_jcs::{
-  sign_envelope, signing_input, verify_envelope, verify_envelope_did_key,
+  countersign_as_notary, sign_as_principal, sign_envelope, signing_input, verify_envelope,
+  verify_envelope_did_key, verify_proof,
 };
 pub use crate::crypto::jcs::canonicalize_rfc8785;
 pub use crate::crypto::jws_detached::{create_detached_jws, verify_detached_jws};
 pub use crate::crypto::signing::{sign_mandate, verify_mandate};
+pub use crate::crypto::proof_base::{ProofRole, mandate_signing_base, signing_base};
+pub use crate::verification::{
+  require_mode, verify_embedded_mandate_binding, verify_proof_structure, verify_timestamp_order,
+};

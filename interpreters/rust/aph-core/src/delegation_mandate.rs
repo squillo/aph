@@ -3,8 +3,14 @@
 //! `CommunicationMandate`s.
 
 /// Standing authority a human grants an agent: which channels, for how
-/// long, at what rate. Signed by the notary (`notarySignature` covers the
-/// canonical form minus that field).
+/// long, at what rate.
+///
+/// Carries TWO signatures (spec §6.1). `principalSignature` is the human's
+/// own — the actual grant of authority, and the root of every credential
+/// issued under this mandate. `notarySignature` is the notary's
+/// countersignature over what the principal signed. The order matters when
+/// verifying: a countersignature over an unverifiable grant proves nothing,
+/// so `principalSignature` is checked FIRST.
 #[derive(
   std::fmt::Debug,
   std::clone::Clone,
@@ -30,8 +36,18 @@ pub struct DelegationMandate {
   pub valid_from: String,
   /// RFC 3339 "valid until" timestamp.
   pub valid_until: String,
+  /// Multibase signature by the PRINCIPAL's OWN key over the canonical JCS
+  /// form of this struct MINUS BOTH signature fields (§6.1, §7.2.1).
+  ///
+  /// REQUIRED, not optional: this is the human's actual grant of authority.
+  /// Were it omissible, a notary could mint a standing delegation the human
+  /// never signed and every envelope issued under it would trace back to
+  /// nothing but the notary's own assertion.
+  pub principal_signature: String,
   /// Notary service signature over the canonical JCS form of this struct
-  /// MINUS the `notary_signature` field (deterministic dehydration).
+  /// MINUS the `notary_signature` field, with `principal_signature` PRESENT
+  /// (deterministic dehydration). The notary countersigns what the principal
+  /// signed.
   pub notary_signature: String,
 }
 
@@ -67,6 +83,7 @@ mod tests {
       rate_limit_per_hour: std::option::Option::Some(60),
       valid_from: String::from("2026-05-21T00:00:00Z"),
       valid_until: String::from("2026-05-22T00:00:00Z"),
+      principal_signature: String::from("z-illustrative-principal-signature"),
       notary_signature: String::from("z3WgvA9JHkbV3qLZHcM4FxBp4xHfQVnVnPKKDdyazQwQGdGzxsRdmZW"),
     }
   }
@@ -96,7 +113,31 @@ mod tests {
     std::assert!(json.contains("\"rateLimitPerHour\""));
     std::assert!(json.contains("\"validFrom\""));
     std::assert!(json.contains("\"validUntil\""));
+    std::assert!(json.contains("\"principalSignature\""));
     std::assert!(json.contains("\"notarySignature\""));
+  }
+
+  #[test]
+  fn principal_signature_is_required_on_the_wire() {
+    // §6.1 makes principalSignature REQUIRED — it is the human's grant of
+    // authority. A mandate that parsed without it would be a standing
+    // delegation resting on the notary's word alone, which is exactly the
+    // trust gap the 2026-08-13 revision closes. Optionality here would make
+    // the strong shape unenforceable, because every producer could skip it.
+    let json = r#"{
+      "id": "urn:uuid:1",
+      "humanPrincipalDid": "did:key:h",
+      "agentDid": "did:web:a",
+      "allowedChannels": ["slack"],
+      "validFrom": "2026-05-21T00:00:00Z",
+      "validUntil": "2026-05-22T00:00:00Z",
+      "notarySignature": "zsig"
+    }"#;
+    let result: std::result::Result<super::DelegationMandate, _> = serde_json::from_str(json);
+    std::assert!(
+      result.is_err(),
+      "a mandate missing principalSignature must be rejected"
+    );
   }
 
   #[test]
@@ -111,6 +152,7 @@ mod tests {
       "allowedChannels": ["slack"],
       "validFrom": "2026-05-21T00:00:00Z",
       "validUntil": "2026-05-22T00:00:00Z",
+      "principalSignature": "zprincipal",
       "notarySignature": "zsig"
     }"#;
     let m: super::DelegationMandate = serde_json::from_str(json).unwrap();
@@ -182,6 +224,7 @@ mod tests {
       "allowedChannels": ["slack"],
       "validFrom": "2026-05-21T00:00:00Z",
       "validUntil": "2026-05-22T00:00:00Z",
+      "principalSignature": "zprincipal",
       "notarySignature": "zsig",
       "extraneousField": "should-fail"
     }"#;

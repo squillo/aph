@@ -16,8 +16,16 @@ fn main() {
   let raw = include_str!("../tests/golden/slack_reply_envelope.json");
   let envelope: aph_core::NotarizationEnvelope = serde_json::from_str(raw).unwrap();
 
-  // Step 1: strip the signature slot, because the signature cannot cover
-  // itself (spec §7.2).
+  // Step 1: empty the signature slot, because the signature cannot cover
+  // itself (spec §7.2). "Empty" is not "remove": §7.2.1 settles this
+  // normatively, because JCS over an object with the member absent and JCS
+  // over the same object with the member empty produce different bytes.
+  //
+  // This fixture carries a LONE notary proof, so `proof` is an object and
+  // this one line is the whole canonicalization base. A two-element chain
+  // has two different bases (§7.2.1): the principal's is the envelope with
+  // `proof` a ONE-ELEMENT ARRAY holding its proof alone, and the notary's
+  // keeps both proofs with the principal's `proofValue` complete.
   let mut unsigned = serde_json::to_value(&envelope).unwrap();
   unsigned["proof"]["proofValue"] = serde_json::json!("");
 

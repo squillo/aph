@@ -98,6 +98,50 @@ fn every_repo_example_strict_parses_and_round_trips() {
 }
 
 #[test]
+fn every_repo_example_verifies_as_notary_attested() {
+  // These are the documents the spec hands to third-party implementers, and
+  // every one of them carries a single proof object with no
+  // `attestationMode`. Adding the §7.1.11 chain shape must not change what
+  // they mean: each must still pass the structural rules, and each must
+  // resolve to `NotaryAttested` — the claim a notary alone can make. If a
+  // future change made absence resolve to `PrincipalSigned`, this whole
+  // corpus would start asserting a human signature nobody produced, and
+  // nothing else in the suite would notice.
+  for path in example_json_files() {
+    let json = std::fs::read_to_string(&path)
+      .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
+    let parsed: aph_core::envelope::NotarizationEnvelope = serde_json::from_str(&json)
+      .unwrap_or_else(|e| std::panic!("{:?} failed strict parse: {}", path, e));
+    let mode = aph_core::verification::verify_proof_structure(&parsed)
+      .unwrap_or_else(|e| std::panic!("{:?} failed §7.1.11 structure: {}", path, e));
+    std::assert_eq!(
+      mode,
+      aph_core::envelope::AttestationMode::NotaryAttested,
+      "{:?} must verify as NotaryAttested",
+      path
+    );
+  }
+}
+
+#[test]
+fn no_repo_example_carries_an_embedded_delegation_mandate_it_cannot_bind() {
+  // `verify_embedded_mandate_binding` is a no-op when no mandate is
+  // embedded, so running it over the corpus proves the published examples
+  // are internally consistent: any example that later grows a
+  // `delegationMandate` member must name this envelope's own human, agent
+  // and mandate id, or it would be teaching implementers the exact staple
+  // §7.1.7.1 exists to forbid.
+  for path in example_json_files() {
+    let json = std::fs::read_to_string(&path)
+      .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
+    let parsed: aph_core::envelope::NotarizationEnvelope = serde_json::from_str(&json)
+      .unwrap_or_else(|e| std::panic!("{:?} failed strict parse: {}", path, e));
+    aph_core::verification::verify_embedded_mandate_binding(&parsed)
+      .unwrap_or_else(|e| std::panic!("{:?} embedded mandate does not bind: {}", path, e));
+  }
+}
+
+#[test]
 fn every_repo_example_is_w3c_vc_2_shaped() {
   // Checks the published examples independently of the in-source
   // fixtures: the documents implementers copy must themselves be valid

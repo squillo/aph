@@ -12,9 +12,19 @@
 //!
 //! `did:key` needs no fetching at all, so it is complete in
 //! [`crate::crypto::did_key`] rather than here.
+//!
+//! The modules divide as follows. [`dns_txt`] and [`did_document`] parse the
+//! two fetched wire forms; [`publish`] renders those same two forms, so the
+//! pair is round-trip testable without a network; [`ports`] declares the two
+//! narrow one-method ports an adapter implements to do the fetching; and
+//! [`composer`] dispatches across mechanisms in the §8.4.6 preference order
+//! with no silent downgrade from a stronger mechanism to a weaker one.
 
+pub mod composer;
 pub mod did_document;
 pub mod dns_txt;
+pub mod ports;
+pub mod publish;
 
 /// Signing algorithm a discovered key is pinned to.
 ///

@@ -513,7 +513,7 @@ two roles:
 
 | Position | `proofPurpose` | `verificationMethod` | Covers (§7.2.1) |
 |---|---|---|---|
-| 1 — **principal proof** | `assertionMethod` | the **principal's** DID URL — which MUST resolve to `credentialSubject.humanPrincipal.id` | the envelope carrying this proof ALONE, its own `proofValue` emptied |
+| 1 — **principal proof** | `assertionMethod` | the **principal's** DID URL — which MUST resolve to `credentialSubject.humanPrincipal.id` | the envelope with `proof` a ONE-ELEMENT ARRAY holding this proof, its `proofValue` emptied (§7.2.1) |
 | 2 — **notary proof** | `authentication` | the **notary's** DID URL | the envelope carrying BOTH proofs, the principal's `proofValue` complete and its own emptied |
 
 The principal proof is the authorization; its absence means no party proved
@@ -581,7 +581,7 @@ The signing procedure is:
 The verification procedure is the inverse:
 
 1. Parse the received envelope.
-2. Take a working copy and set `proof.proofValue` to the empty string, leaving the rest of the `proof` block intact and the member present (§7.2.1). When verifying the principal proof of a chain, first discard every other proof, so the working copy carries the principal proof alone.
+2. Take a working copy and set `proof.proofValue` to the empty string, leaving the rest of the `proof` block intact and the member present (§7.2.1). When verifying the principal proof of a chain, first discard every other proof, so the working copy carries the principal proof alone — as a one-element array, not as a bare object (§7.2.1).
 3. Apply JCS canonicalization to the working copy.
 4. Verify the original `proof.proofValue` against the canonical bytes using the public key resolved from `verificationMethod`.
 
@@ -598,10 +598,20 @@ A base that included a later proof would be unconstructible — a signer cannot
 sign bytes that do not exist yet.
 
 - **Principal proof (first in the chain).** JCS-canonicalize the envelope
-  with `proof` set to **that proof object alone** — the notary proof is NOT
-  yet present — and its own `proofValue` set to the empty string `""`.
-  A verifier reconstructs this base by discarding every proof except the
-  principal's and emptying its `proofValue`.
+  with `proof` set to a **one-element ARRAY** holding that proof alone — the
+  notary proof is NOT yet present — and its own `proofValue` set to the
+  empty string `""`. A verifier reconstructs this base by discarding every
+  proof except the principal's, keeping the array form, and emptying its
+  `proofValue`.
+
+  The array form is normative and load-bearing: `"proof": [{…}]` and
+  `"proof": {…}` canonicalize to different bytes, which **domain-separates**
+  a principal proof from a lone notary proof. Were the object form used
+  here, an intermediary could strip the notary proof from a `PrincipalSigned`
+  envelope and re-present the result as a valid single-proof envelope — the
+  signature would still verify, and the recipient would read the human's own
+  proof as a notary attestation. With the array form the stripped envelope is
+  a one-element chain, which §7.1.11 rejects.
 - **Notary proof (second in the chain).** JCS-canonicalize the envelope with
   `proof` as the two-element array, the principal proof's `proofValue`
   **present and complete**, and the notary proof's own `proofValue` set to
@@ -924,7 +934,7 @@ A Recipient Endpoint MUST execute the following verification steps before accept
 
 1. **Parse the envelope.** Reject if any REQUIRED field is missing or if the parser encounters an unknown field at the envelope level (forward-compatibility behavior: fail fast on spec drift). Per-channel `recipientAddressing` sub-fields are opaque and not subject to strict deserialization.
 2. **Resolve the verification method.** Use the DID URL in `proof.verificationMethod` to obtain the notary public key. The resolver MUST support at least one of the publication mechanisms defined in §8.4 (`did:key` offline decode, `did:web` `.well-known/did.json`, or DNS TXT). Production verifiers SHOULD support all three. See §8.4 for the full resolution flow, key rotation rules, and trust models.
-3. **Build the base for THIS proof (§7.2.1).** Take a working copy of the envelope and set the proof's own `proofValue` to the empty string — do NOT remove the member. For a lone notary proof that is the whole rule. In a chain: for the **principal** proof, discard the notary proof so `proof` carries the principal's alone; for the **notary** proof, keep both with the principal's `proofValue` complete. Never include a proof that comes *after* the one being verified — it did not exist when that signature was made.
+3. **Build the base for THIS proof (§7.2.1).** Take a working copy of the envelope and set the proof's own `proofValue` to the empty string — do NOT remove the member. For a lone notary proof that is the whole rule. In a chain: for the **principal** proof, discard the notary proof so `proof` is a ONE-ELEMENT ARRAY holding the principal's alone (§7.2.1 — the array form is normative; collapsing it to an object changes the bytes); for the **notary** proof, keep both with the principal's `proofValue` complete. Never include a proof that comes *after* the one being verified — it did not exist when that signature was made.
 4. **Canonicalize.** Apply JCS (RFC 8785) to the working copy.
 5. **Verify the signature.** Validate `proof.proofValue` against the canonical bytes using the public key from step 2 and the algorithm pinned by `proof.cryptosuite` or the JWS protected header `alg`.
 6. **Validate the time window.** Confirm `validFrom <= now <= validUntil` where `now` is the verifier's current wall clock. Allow a small clock-skew tolerance (RECOMMENDED: 60 seconds).

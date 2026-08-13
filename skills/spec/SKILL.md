@@ -204,7 +204,7 @@ document plus every proof BEFORE it, never one after:
 | Signing | Base |
 |---|---|
 | lone notary proof | its own `proofValue` emptied |
-| principal proof (chain head) | `proof` carries that proof ALONE, its `proofValue` emptied — the notary proof is discarded when reconstructing |
+| principal proof (chain head) | `proof` is a ONE-ELEMENT ARRAY holding that proof, its `proofValue` emptied — discard the notary proof, keep the array form. `[{…}]` and `{…}` are different bytes, which is what stops a stripped chain from re-presenting as a valid lone proof |
 | notary countersignature | both proofs, principal's `proofValue` complete, its own emptied |
 
 This forces the issuance order: the notary prepares the envelope (including

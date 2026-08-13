@@ -130,11 +130,47 @@ fn cmd_inspect(source: std::option::Option<&str>) -> i32 {
     "appleAurAcceptance:  {}",
     if subject.apple_aur_acceptance.is_some() { "present" } else { "absent" }
   ));
-  outln(&format!("proof:               present ({})", env.proof.r#type));
+  // `attestationMode` decides what the credential CLAIMS: PrincipalSigned
+  // means the human's own key signed, NotaryAttested means a notary asserts
+  // they authorized it. Absent means NotaryAttested (spec §7.1.7), so the
+  // resolved value is printed rather than the raw field — an operator must
+  // never read a blank line as "the strong one".
   outln(&format!(
-    "proof cryptosuite:   {}",
-    env.proof.cryptosuite.as_deref().unwrap_or("(none)")
+    "attestationMode:     {}{}",
+    subject.policy.effective_attestation_mode(),
+    if subject.policy.attestation_mode.is_none() { " (absent; defaulted)" } else { "" }
   ));
+  outln(&format!(
+    "delegationMandate:   {}",
+    if subject.policy.delegation_mandate.is_some() { "embedded" } else { "(none)" }
+  ));
+  let proofs = env.proof.all();
+  outln(&format!(
+    "proof:               {} ({} proof{})",
+    if env.proof.is_chain() { "chain" } else { "single" },
+    proofs.len(),
+    if proofs.len() == 1 { "" } else { "s" }
+  ));
+  for (position, proof) in proofs.iter().enumerate() {
+    outln(&format!(
+      "  [{}] {} / {} / {}",
+      position + 1,
+      proof.r#type,
+      proof.cryptosuite.as_deref().unwrap_or("(none)"),
+      proof.proof_purpose
+    ));
+  }
+  // The structural rules of §7.1.11 — reported, not enforced, because
+  // `inspect` describes an envelope rather than accepting it. `validate` is
+  // the subcommand whose exit code is a verdict.
+  match aph_core::verification::verify_proof_structure(&env) {
+    std::result::Result::Ok(mode) => {
+      outln(&format!("proof structure:     ok ({})", mode))
+    }
+    std::result::Result::Err(e) => {
+      outln(&format!("proof structure:     REJECTED [{}] {}", e.code(), e))
+    }
+  }
   0
 }
 

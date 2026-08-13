@@ -41,6 +41,26 @@ fn envelope_proof_is_send_sync_clone_debug() {
 }
 
 #[test]
+fn envelope_proofs_union_is_send_sync_clone_debug() {
+  // Test: EnvelopeProofs is the object-or-array union now sitting on
+  // `NotarizationEnvelope.proof` (spec §7.1.11), so the envelope's own
+  // bounds hold only if this type carries them too.
+  // Justification: the envelope crosses `.await` boundaries in adapters; a
+  // field type that lost Send would take the whole credential with it.
+  assert_full_traits::<aph_core::envelope::EnvelopeProofs>();
+}
+
+#[test]
+fn attestation_mode_is_send_sync_clone_debug() {
+  // Test: AttestationMode travels inside `PolicyDescriptor` and is returned
+  // by `verify_proof_structure`, so verification results cross the same
+  // actor and stream boundaries the wire types do.
+  // Justification: a verifier's reply channel carries
+  // `Result<AttestationMode, AphError>`.
+  assert_full_traits::<aph_core::envelope::AttestationMode>();
+}
+
+#[test]
 fn credential_subject_is_send_sync_clone_debug() {
   // Test: CredentialSubject must satisfy the full trait bound set.
   // Justification: 6 nested sub-structs (human / agent / channel /

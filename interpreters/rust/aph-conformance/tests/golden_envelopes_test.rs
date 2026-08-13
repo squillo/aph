@@ -95,8 +95,12 @@ fn third_envelope_is_foreign_did_web_issuer_es256() {
     "envelope #3 must be issued by a did:web foreign notary, got: {}",
     parsed.issuer
   );
+  let notary_proof = parsed
+    .proof
+    .notary()
+    .expect("envelope #3 must carry a notary proof");
   std::assert_eq!(
-    parsed.proof.cryptosuite.as_deref(),
+    notary_proof.cryptosuite.as_deref(),
     std::option::Option::Some("ecdsa-jcs-2019"),
     "envelope #3 must be pinned to the ES256 cryptosuite"
   );
@@ -224,10 +228,43 @@ fn every_envelope_is_w3c_vc_2_shaped() {
       "envelope #{} type must include AgentSendAuthorizationCredential",
       idx + 1
     );
+    let notary_proof = parsed
+      .proof
+      .notary()
+      .unwrap_or_else(|| std::panic!("envelope #{} must carry a notary proof", idx + 1));
     std::assert_eq!(
-      parsed.proof.proof_purpose,
+      notary_proof.proof_purpose,
       "assertionMethod",
       "envelope #{} proof.proofPurpose must be assertionMethod",
+      idx + 1
+    );
+  }
+}
+
+#[test]
+fn every_golden_envelope_is_a_single_proof_notary_attested_credential() {
+  // The whole frozen corpus predates `attestationMode` and the §7.1.11 proof
+  // chain: every fixture carries ONE proof object and no mode field. Two
+  // things must hold for those envelopes to keep meaning what they meant.
+  // The untagged `proof` union must still read a JSON object as the single
+  // form — if it ever parsed as a chain, or failed, the corpus would stop
+  // loading. And the absent label must resolve to the WEAKER claim: these
+  // fixtures were signed by a notary alone, so reporting them as
+  // `PrincipalSigned` would assert a human signature that does not exist.
+  for (idx, json) in aph_conformance::golden_envelopes().iter().enumerate() {
+    let parsed: aph_core::NotarizationEnvelope = serde_json::from_str(json)
+      .unwrap_or_else(|e| std::panic!("envelope #{} failed to parse: {}", idx + 1, e));
+    std::assert!(
+      !parsed.proof.is_chain(),
+      "envelope #{} must carry the single-object proof form",
+      idx + 1
+    );
+    let mode = aph_core::verification::verify_proof_structure(&parsed)
+      .unwrap_or_else(|e| std::panic!("envelope #{} failed §7.1.11: {}", idx + 1, e));
+    std::assert_eq!(
+      mode,
+      aph_core::envelope::AttestationMode::NotaryAttested,
+      "envelope #{} must verify as NotaryAttested",
       idx + 1
     );
   }

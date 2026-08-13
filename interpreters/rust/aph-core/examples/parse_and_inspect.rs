@@ -26,9 +26,27 @@ fn main() {
   println!("body sha256 {}", subject.communication.body_sha256);
   println!("decision    {} (scope: {})", subject.policy.decision, subject.policy.matched_scope);
   println!("notary      {}", subject.notarization.notary_service.name);
-  println!("proof       {} / {}",
-    envelope.proof.r#type,
-    envelope.proof.cryptosuite.as_deref().unwrap_or("(none)"));
+
+  // `proof` is either one object or a two-element chain (spec §7.1.11), and
+  // `attestationMode` says which. ABSENT means NotaryAttested — the weaker
+  // claim — which is what this fixture and every published example carry.
+  println!("attestation {}", subject.policy.effective_attestation_mode());
+  for (position, proof) in envelope.proof.all().iter().enumerate() {
+    println!("proof {}     {} / {} / {}",
+      position + 1,
+      proof.r#type,
+      proof.cryptosuite.as_deref().unwrap_or("(none)"),
+      proof.proof_purpose);
+  }
+
+  // Structure before signatures: this is §8.3.1 steps 1a/1e, and it is what
+  // stops `attestationMode` being a self-asserted string. It checks nothing
+  // cryptographic — a sound structure still says only that the envelope is
+  // shaped like what it claims to be.
+  match aph_core::verification::verify_proof_structure(&envelope) {
+    Ok(mode) => println!("structure   ok, mode is {}", mode),
+    Err(e) => println!("structure   REJECTED: {} [{}]", e, e.code()),
+  }
 
   // The addressing blob is deliberately opaque (spec §7.4): APH does not
   // model per-channel shapes, so new channels need no changes here.

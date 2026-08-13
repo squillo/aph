@@ -11,7 +11,10 @@
 //! + explicit `#[serde(rename = "type")]` for defense in depth).
 //!
 //! This module is shape-only — `proof.proof_value` is a String; no
-//! cryptographic validation occurs in this module.
+//! cryptographic validation occurs in this module. The STRUCTURAL rules of
+//! spec §7.1.11 (chain length, proof purposes, `previousProof` linkage,
+//! label/structure agreement) live in [`crate::verification`]; signature
+//! checking lives in [`crate::crypto`].
 
 /// Top-level APH envelope. JSON-LD compatible W3C VC 2.0 credential.
 #[derive(
@@ -46,8 +49,120 @@ pub struct NotarizationEnvelope {
   /// Optional link to an AP2 IntentMandate (for cross-protocol mandates).
   #[serde(default)]
   pub linked_mandate: std::option::Option<LinkedMandate>,
-  /// Cryptographic proof block (Data Integrity Proof or JWS detached).
-  pub proof: EnvelopeProof,
+  /// Cryptographic proof: a single notary proof, or a two-element proof
+  /// chain (spec §7.1.11). See [`EnvelopeProofs`].
+  pub proof: EnvelopeProofs,
+}
+
+/// One proof, or a two-element chain (spec §7.1.11).
+///
+/// Untagged because the wire carries either a JSON object or a JSON array
+/// under the same `proof` key; the shape IS the discriminator.
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(untagged)]
+pub enum EnvelopeProofs {
+  /// A single notary proof. The envelope is `NotaryAttested` (§7.1.11).
+  Single(EnvelopeProof),
+  /// An ordered proof chain: principal proof, then notary countersignature.
+  Chain(std::vec::Vec<EnvelopeProof>),
+}
+
+impl EnvelopeProofs {
+  /// Every proof, in wire order.
+  pub fn all(&self) -> &[EnvelopeProof] {
+    match self {
+      // `from_ref` gives the single form the same slice shape as the chain
+      // form, so callers that iterate never branch on the variant.
+      Self::Single(proof) => std::slice::from_ref(proof),
+      Self::Chain(proofs) => proofs.as_slice(),
+    }
+  }
+
+  /// The principal proof — the head of a well-formed two-element chain.
+  /// `None` for a single proof or a chain of any other length.
+  ///
+  /// A chain of any other length is malformed under §7.1.11, so refusing to
+  /// name a "principal proof" inside one is deliberate: a caller that got a
+  /// proof back from a three-element array would be reading a structure the
+  /// spec rejects as though it were valid.
+  pub fn principal(&self) -> std::option::Option<&EnvelopeProof> {
+    match self {
+      Self::Single(_) => std::option::Option::None,
+      Self::Chain(proofs) => {
+        if proofs.len() == 2 {
+          proofs.first()
+        } else {
+          std::option::Option::None
+        }
+      }
+    }
+  }
+
+  /// The notary proof: the lone proof, or the tail of a two-element chain.
+  pub fn notary(&self) -> std::option::Option<&EnvelopeProof> {
+    match self {
+      Self::Single(proof) => std::option::Option::Some(proof),
+      Self::Chain(proofs) => {
+        if proofs.len() == 2 {
+          proofs.get(1)
+        } else {
+          std::option::Option::None
+        }
+      }
+    }
+  }
+
+  /// True when this is the array form, whatever its length.
+  pub fn is_chain(&self) -> bool {
+    std::matches!(self, Self::Chain(_))
+  }
+}
+
+/// Which of the two attestation modes an envelope declares (spec §7.1.7).
+///
+/// The wire spells these exactly as written, so no serde rename is needed.
+/// ABSENT means `NotaryAttested` — see [`PolicyDescriptor::effective_attestation_mode`].
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::marker::Copy,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+pub enum AttestationMode {
+  /// The human's own key signed this envelope; `proof` is a chain.
+  PrincipalSigned,
+  /// A notary asserts the human authorized this. Strictly weaker.
+  NotaryAttested,
+}
+
+impl AttestationMode {
+  /// The exact wire spelling, for error messages and logs.
+  ///
+  /// Returned as `&'static str` rather than via `Display` so an error
+  /// constructor can name a mode without allocating, and so the string an
+  /// operator reads in a log is byte-identical to the one on the wire.
+  pub fn label(&self) -> &'static str {
+    match self {
+      Self::PrincipalSigned => "PrincipalSigned",
+      Self::NotaryAttested => "NotaryAttested",
+    }
+  }
+}
+
+impl std::fmt::Display for AttestationMode {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::write!(f, "{}", self.label())
+  }
 }
 
 /// The notarized claim: who authorized what, on which channel, under
@@ -185,6 +300,28 @@ pub struct PolicyDescriptor {
   /// principal chain. Each element is a DID string.
   #[serde(default)]
   pub act_chain: Vec<String>,
+  /// Who proved the authorization (§7.1.7). ABSENT means `NotaryAttested`.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub attestation_mode: std::option::Option<AttestationMode>,
+  /// The complete parent mandate, embedded so the human's signature on it
+  /// verifies offline (§7.1.7.1).
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub delegation_mandate: std::option::Option<crate::delegation_mandate::DelegationMandate>,
+}
+
+impl PolicyDescriptor {
+  /// The declared mode, resolving ABSENT to `NotaryAttested` per §7.1.7.
+  ///
+  /// Absence is not "unknown": §7.1.7 fixes it as `NotaryAttested` so that
+  /// every envelope written before `attestationMode` existed keeps a single,
+  /// unambiguous meaning — the weaker one. Defaulting the other way would
+  /// silently promote every legacy envelope to a claim no one made.
+  pub fn effective_attestation_mode(&self) -> AttestationMode {
+    match self.attestation_mode {
+      std::option::Option::Some(mode) => mode,
+      std::option::Option::None => AttestationMode::NotaryAttested,
+    }
+  }
 }
 
 /// Which notary made the decision, when, and how long it took.
@@ -293,10 +430,19 @@ pub struct EnvelopeProof {
   pub verification_method: String,
   /// RFC 3339.
   pub created: String,
-  /// Always `"assertionMethod"` for APH.
+  /// `"assertionMethod"` for a principal proof or a lone notary proof;
+  /// `"authentication"` for the notary countersignature of a chain (§7.1.11).
   pub proof_purpose: String,
   /// Multibase or base64url-encoded signature bytes.
   pub proof_value: String,
+  /// Identifier for this proof, unique within the envelope. REQUIRED when
+  /// `proof` is a chain, absent for a lone proof, which links to nothing.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub id: std::option::Option<String>,
+  /// The `id` of the proof this one countersigns. Present on the notary
+  /// proof of a chain; absent on the principal proof, its head.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub previous_proof: std::option::Option<String>,
 }
 
 /// Last-position sibling struct. Carries Apple Foundation Models AUR
@@ -377,6 +523,8 @@ mod tests {
       matched_scope: "per-channel".to_string(),
       delegation_mandate_id: std::option::Option::None,
       act_chain: std::vec::Vec::new(),
+      attestation_mode: std::option::Option::None,
+      delegation_mandate: std::option::Option::None,
     }
   }
 
@@ -459,6 +607,8 @@ mod tests {
       proof_value:
         "z3WgvA9JHkbV3qLZHcM4FxBp4xHfQVnVnPKKDdyazQwQGdGzxsRdmZWBxXwQvN6P2sLZbLP4HnRy9LcZdpFLLM6h"
           .to_string(),
+      id: std::option::Option::None,
+      previous_proof: std::option::Option::None,
     }
   }
 
@@ -479,7 +629,41 @@ mod tests {
       valid_until: "2026-05-22T00:00:00Z".to_string(),
       credential_subject: sample_credential_subject(),
       linked_mandate: std::option::Option::None,
-      proof: sample_proof(),
+      proof: super::EnvelopeProofs::Single(sample_proof()),
+    }
+  }
+
+  fn sample_principal_proof() -> super::EnvelopeProof {
+    super::EnvelopeProof {
+      r#type: "DataIntegrityProof".to_string(),
+      cryptosuite: std::option::Option::Some("eddsa-jcs-2022".to_string()),
+      // The human principal's own DID URL — the same DID
+      // `sample_human_principal()` carries, which is what §7.1.11 binds.
+      verification_method:
+        "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy#z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy"
+          .to_string(),
+      created: "2026-05-21T00:00:02Z".to_string(),
+      proof_purpose: "assertionMethod".to_string(),
+      proof_value: "z-illustrative-principal-proof-value".to_string(),
+      id: std::option::Option::Some("urn:uuid:00000000-0000-4000-8000-0000000000a1".to_string()),
+      previous_proof: std::option::Option::None,
+    }
+  }
+
+  fn sample_notary_countersignature() -> super::EnvelopeProof {
+    super::EnvelopeProof {
+      r#type: "DataIntegrityProof".to_string(),
+      cryptosuite: std::option::Option::Some("eddsa-jcs-2022".to_string()),
+      verification_method:
+        "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV"
+          .to_string(),
+      created: "2026-05-21T00:00:03Z".to_string(),
+      proof_purpose: "authentication".to_string(),
+      proof_value: "z-illustrative-notary-countersignature".to_string(),
+      id: std::option::Option::Some("urn:uuid:00000000-0000-4000-8000-0000000000b1".to_string()),
+      previous_proof: std::option::Option::Some(
+        "urn:uuid:00000000-0000-4000-8000-0000000000a1".to_string(),
+      ),
     }
   }
 
@@ -841,6 +1025,8 @@ mod tests {
       serde_json::from_str(&s).expect("must deserialize with optionals omitted");
     std::assert!(v.delegation_mandate_id.is_none());
     std::assert!(v.act_chain.is_empty());
+    std::assert!(v.attestation_mode.is_none());
+    std::assert!(v.delegation_mandate.is_none());
   }
 
   #[test]
@@ -985,5 +1171,215 @@ mod tests {
       v.apple_aur_acceptance.is_none(),
       "apple_aur_acceptance must be None when absent from legacy wire payload"
     );
+  }
+
+  // -------- Test 8: proof-chain wire forms (§7.1.11) --------
+
+  #[test]
+  fn envelope_proofs_round_trips_the_single_object_wire_form() {
+    // `proof` is untagged: the JSON SHAPE is the only discriminator between
+    // a lone notary proof and a chain. If the object form ever deserialized
+    // into `Chain` (or failed), every one of the eight published envelopes
+    // — all of which carry a single object — would stop parsing.
+    let single = super::EnvelopeProofs::Single(sample_proof());
+    let s = serde_json::to_string(&single).unwrap();
+    std::assert!(
+      s.starts_with('{'),
+      "the single form must serialize as a JSON OBJECT, not an array: {}",
+      s
+    );
+    let back: super::EnvelopeProofs = serde_json::from_str(&s).unwrap();
+    std::assert_eq!(single, back);
+  }
+
+  #[test]
+  fn envelope_proofs_round_trips_the_array_wire_form() {
+    // The other half of the untagged discrimination. §7.2.1 makes the array
+    // form load-bearing: `[{…}]` and `{…}` canonicalize to different bytes,
+    // which is what domain-separates a principal proof from a lone notary
+    // proof. Collapsing the array to an object on re-serialization would
+    // silently forge that domain separation away.
+    let chain = super::EnvelopeProofs::Chain(std::vec![
+      sample_principal_proof(),
+      sample_notary_countersignature(),
+    ]);
+    let s = serde_json::to_string(&chain).unwrap();
+    std::assert!(
+      s.starts_with('['),
+      "the chain form must serialize as a JSON ARRAY: {}",
+      s
+    );
+    let back: super::EnvelopeProofs = serde_json::from_str(&s).unwrap();
+    std::assert_eq!(chain, back);
+  }
+
+  #[test]
+  fn envelope_with_absent_additive_fields_emits_none_of_their_keys() {
+    // `attestationMode`, `id` and `previousProof` were added to structs
+    // whose serialized bytes are what signatures cover. An envelope that
+    // sets none of them MUST serialize byte-identically to one written
+    // before the fields existed, or every already-issued signature breaks.
+    let json = serde_json::to_string(&sample_envelope()).unwrap();
+    std::assert!(
+      !json.contains("attestationMode"),
+      "absent attestationMode must not appear on the wire: {}",
+      json
+    );
+    std::assert!(
+      !json.contains("delegationMandate\""),
+      "absent embedded delegationMandate must not appear on the wire: {}",
+      json
+    );
+    std::assert!(
+      !json.contains("previousProof"),
+      "absent previousProof must not appear on the wire: {}",
+      json
+    );
+    std::assert!(
+      !json.contains("\"id\":null"),
+      "absent proof id must be omitted, never emitted as null: {}",
+      json
+    );
+  }
+
+  #[test]
+  fn all_returns_every_proof_for_both_wire_forms() {
+    // `all()` is what lets a caller iterate proofs without branching on the
+    // variant. If the single form returned an empty slice, a verifier
+    // looping over `all()` would verify NOTHING and report success.
+    std::assert_eq!(
+      super::EnvelopeProofs::Single(sample_proof()).all().len(),
+      1
+    );
+    std::assert_eq!(
+      super::EnvelopeProofs::Chain(std::vec![
+        sample_principal_proof(),
+        sample_notary_countersignature(),
+      ])
+      .all()
+      .len(),
+      2
+    );
+  }
+
+  #[test]
+  fn principal_is_none_for_a_single_proof() {
+    // A lone proof is the NOTARY's (§7.1.11). Reporting it as the principal
+    // proof would let a caller present a notary attestation as the human's
+    // own signature — the exact confusion `attestationMode` exists to stop.
+    std::assert!(
+      super::EnvelopeProofs::Single(sample_proof())
+        .principal()
+        .is_none()
+    );
+  }
+
+  #[test]
+  fn notary_is_the_lone_proof_and_the_tail_of_a_chain() {
+    // Both wire forms carry a notary proof, and it is the proof steps 2-9 of
+    // §8.3 verify. A caller must be able to reach it identically either way.
+    let single = super::EnvelopeProofs::Single(sample_proof());
+    std::assert_eq!(
+      single.notary().map(|p| p.proof_purpose.as_str()),
+      std::option::Option::Some("assertionMethod")
+    );
+    let chain = super::EnvelopeProofs::Chain(std::vec![
+      sample_principal_proof(),
+      sample_notary_countersignature(),
+    ]);
+    std::assert_eq!(
+      chain.notary().map(|p| p.proof_purpose.as_str()),
+      std::option::Option::Some("authentication")
+    );
+  }
+
+  #[test]
+  fn accessors_refuse_to_name_proofs_inside_a_malformed_chain() {
+    // §7.1.11 fixes chain length at exactly two. A three-element array is
+    // rejected there, but these accessors are called by code that has not
+    // run that check yet, so they must not hand back a "principal proof" or
+    // "notary proof" from a structure the spec refuses — a caller would
+    // verify one signature out of three and believe the chain sound.
+    let over_long = super::EnvelopeProofs::Chain(std::vec![
+      sample_principal_proof(),
+      sample_notary_countersignature(),
+      sample_notary_countersignature(),
+    ]);
+    std::assert!(over_long.principal().is_none());
+    std::assert!(over_long.notary().is_none());
+  }
+
+  #[test]
+  fn is_chain_reports_the_array_form_at_any_length() {
+    // The distinction is the WIRE form, not validity: a one-element array is
+    // still a chain (an invalid one). If `is_chain()` reported false for it,
+    // §7.2.1's stripped-notary-proof attack would slip past — the whole
+    // point is that a one-element array is recognised and then rejected.
+    std::assert!(
+      super::EnvelopeProofs::Chain(std::vec![sample_principal_proof()]).is_chain()
+    );
+    std::assert!(!super::EnvelopeProofs::Single(sample_proof()).is_chain());
+  }
+
+  #[test]
+  fn absent_attestation_mode_resolves_to_notary_attested() {
+    // §7.1.7 fixes ABSENT as `NotaryAttested`, the WEAKER claim. All eight
+    // published envelopes omit the field; defaulting the other way would
+    // silently promote every one of them to asserting the human personally
+    // signed, which no party ever claimed.
+    std::assert_eq!(
+      sample_policy().effective_attestation_mode(),
+      super::AttestationMode::NotaryAttested
+    );
+  }
+
+  #[test]
+  fn declared_attestation_mode_is_returned_verbatim() {
+    // The default must apply only to absence. If it overrode a present
+    // value, a `PrincipalSigned` envelope would be downgraded to the notary's
+    // assertion and the human's signature would go unchecked.
+    let mut policy = sample_policy();
+    policy.attestation_mode = std::option::Option::Some(super::AttestationMode::PrincipalSigned);
+    std::assert_eq!(
+      policy.effective_attestation_mode(),
+      super::AttestationMode::PrincipalSigned
+    );
+  }
+
+  #[test]
+  fn attestation_mode_wire_spelling_matches_the_closed_enum() {
+    // §7.1.7 fixes a CLOSED enum with these exact spellings, and other
+    // implementations compare the string. A serde rename or a variant
+    // rename would make our envelopes unreadable to them, and `label()` is
+    // what error messages show an operator, so both must agree.
+    std::assert_eq!(
+      serde_json::to_string(&super::AttestationMode::PrincipalSigned).unwrap(),
+      "\"PrincipalSigned\""
+    );
+    std::assert_eq!(
+      serde_json::to_string(&super::AttestationMode::NotaryAttested).unwrap(),
+      "\"NotaryAttested\""
+    );
+    std::assert_eq!(super::AttestationMode::PrincipalSigned.label(), "PrincipalSigned");
+    std::assert_eq!(super::AttestationMode::NotaryAttested.label(), "NotaryAttested");
+  }
+
+  #[test]
+  fn envelope_parses_a_chain_and_the_principal_signed_label_from_the_wire() {
+    // End-to-end wire acceptance of the §7.1.11 shape: a verifier written
+    // against this crate must be able to receive a real `PrincipalSigned`
+    // envelope. Both additive fields sit under `deny_unknown_fields`, so
+    // without the declarations a conformant producer would be rejected.
+    let mut envelope = sample_envelope();
+    envelope.credential_subject.policy.attestation_mode =
+      std::option::Option::Some(super::AttestationMode::PrincipalSigned);
+    envelope.proof = super::EnvelopeProofs::Chain(std::vec![
+      sample_principal_proof(),
+      sample_notary_countersignature(),
+    ]);
+    let s = serde_json::to_string(&envelope).unwrap();
+    let back: super::NotarizationEnvelope =
+      serde_json::from_str(&s).expect("a PrincipalSigned chain envelope must parse");
+    std::assert_eq!(envelope, back);
   }
 }

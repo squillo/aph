@@ -113,6 +113,12 @@ pub struct CredentialAccessNotarizationEnvelope {
   #[serde(default)]
   pub linked_mandate: ::std::option::Option<crate::envelope::LinkedMandate>,
   /// Cryptographic proof block (reuses the canonical APH proof shape).
+  ///
+  /// Deliberately a SINGLE [`crate::envelope::EnvelopeProof`], not the
+  /// [`crate::envelope::EnvelopeProofs`] object-or-array union: §7.1.11's
+  /// proof-chain rules govern `NotarizationEnvelope` only, and this variant
+  /// is a spec v0.2 candidate. Widening it here would invent wire shapes no
+  /// normative text defines.
   pub proof: crate::envelope::EnvelopeProof,
 }
 
@@ -191,6 +197,8 @@ mod tests {
           matched_scope: ::std::string::String::from("per-credential"),
           delegation_mandate_id: ::std::option::Option::None,
           act_chain: ::std::vec::Vec::new(),
+          attestation_mode: ::std::option::Option::None,
+          delegation_mandate: ::std::option::Option::None,
         },
         notarization: crate::envelope::NotarizationMetadata {
           notary_service: crate::envelope::NotaryServiceRef {
@@ -214,6 +222,8 @@ mod tests {
         created: ::std::string::String::from("2026-05-29T00:00:00Z"),
         proof_purpose: ::std::string::String::from("assertionMethod"),
         proof_value: ::std::string::String::from("placeholder"),
+        id: ::std::option::Option::None,
+        previous_proof: ::std::option::Option::None,
       },
     }
   }

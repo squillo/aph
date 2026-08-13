@@ -7,7 +7,8 @@
 //!
 //! Coverage:
 //! - serde round-trip on `NotarizationEnvelope`, `DelegationMandate`,
-//!   `CommunicationMandate` (proptest-driven).
+//!   `CommunicationMandate` (proptest-driven), in both the single-proof and
+//!   the §7.1.11 two-element-chain wire forms.
 //! - serde round-trip on `AphPartyRole` + `AphOperation` (table-driven).
 //! - golden-vector parse for the 7 channel-specific envelopes shipped in
 //!   `tests/golden/`.
@@ -28,6 +29,82 @@ const FIXED_BODY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934
 
 const FIXED_VALID_FROM: &str = "2026-05-21T00:00:00Z";
 const FIXED_VALID_UNTIL: &str = "2026-05-22T00:00:00Z";
+
+/// A minimal, fixed `NotaryAttested` envelope for tests that vary only the
+/// `proof` member. Declared outside `proptest!` because the macro body is
+/// the only place a bare `use` is permitted in this crate; building the
+/// fixture here keeps the generated-input tests readable.
+fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
+  crate::envelope::NotarizationEnvelope {
+    aph_version: std::string::String::from("0.1"),
+    context: std::vec![
+      std::string::String::from("https://www.w3.org/ns/credentials/v2"),
+      std::string::String::from("https://w3id.org/aph/v1"),
+    ],
+    r#type: std::vec![
+      std::string::String::from("VerifiableCredential"),
+      std::string::String::from("AgentSendAuthorizationCredential"),
+    ],
+    id: std::string::String::from("urn:uuid:00000000-0000-4000-8000-000000000001"),
+    issuer: std::string::String::from("did:key:zNotary"),
+    valid_from: std::string::String::from(FIXED_VALID_FROM),
+    valid_until: std::string::String::from(FIXED_VALID_UNTIL),
+    credential_subject: crate::envelope::CredentialSubject {
+      human_principal: crate::envelope::HumanPrincipalRef {
+        id: std::string::String::from("did:key:zHuman"),
+        display_name: std::string::String::from("Human"),
+      },
+      agent: crate::envelope::AgentRef {
+        id: std::string::String::from("did:web:agent.squillo.io"),
+        agent_card_uri: std::option::Option::None,
+        display_name: std::string::String::from("Agent"),
+        version: std::string::String::from("1.0"),
+      },
+      channel: crate::envelope::ChannelDescriptor {
+        kind: std::string::String::from("slack"),
+        recipient_addressing: serde_json::json!({"opaque": "addressing"}),
+      },
+      communication: crate::envelope::CommunicationDescriptor {
+        content_class: std::string::String::from("Reply"),
+        body_sha256: std::string::String::from(FIXED_BODY_SHA256),
+        body_size: 1842,
+        preview_lines: 3,
+        preview: std::string::String::from("preview"),
+      },
+      policy: crate::envelope::PolicyDescriptor {
+        decision: std::string::String::from("AskEveryTime"),
+        matched_scope: std::string::String::from("per-channel"),
+        delegation_mandate_id: std::option::Option::None,
+        act_chain: std::vec::Vec::new(),
+        attestation_mode: std::option::Option::None,
+        delegation_mandate: std::option::Option::None,
+      },
+      notarization: crate::envelope::NotarizationMetadata {
+        notary_service: crate::envelope::NotaryServiceRef {
+          id: std::string::String::from("did:web:notary.squillo.io"),
+          name: std::string::String::from("Squillo Notary Service"),
+          version: std::string::String::from("0.1.0"),
+          attested_digest: std::option::Option::None,
+          attestation_uri: std::option::Option::None,
+        },
+        decision_timestamp: std::string::String::from("2026-05-21T00:00:01Z"),
+        decision_latency_ms: 1834,
+      },
+      apple_aur_acceptance: std::option::Option::None,
+    },
+    linked_mandate: std::option::Option::None,
+    proof: crate::envelope::EnvelopeProofs::Single(crate::envelope::EnvelopeProof {
+      r#type: std::string::String::from("DataIntegrityProof"),
+      cryptosuite: std::option::Option::Some(std::string::String::from("eddsa-jcs-2022")),
+      verification_method: std::string::String::from("did:key:zNotary#zNotary"),
+      created: std::string::String::from("2026-05-21T00:00:01Z"),
+      proof_purpose: std::string::String::from("assertionMethod"),
+      proof_value: std::string::String::from("zProofValueOpaque"),
+      id: std::option::Option::None,
+      previous_proof: std::option::Option::None,
+    }),
+  }
+}
 
 // ============================================================
 // Proptest round-trip tests.
@@ -100,6 +177,8 @@ proptest! {
           matched_scope: matched_scope.clone(),
           delegation_mandate_id: std::option::Option::None,
           act_chain: std::vec::Vec::new(),
+          attestation_mode: std::option::Option::None,
+          delegation_mandate: std::option::Option::None,
         },
         notarization: crate::envelope::NotarizationMetadata {
           notary_service: crate::envelope::NotaryServiceRef {
@@ -115,7 +194,7 @@ proptest! {
         apple_aur_acceptance: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,
-      proof: crate::envelope::EnvelopeProof {
+      proof: crate::envelope::EnvelopeProofs::Single(crate::envelope::EnvelopeProof {
         r#type: std::string::String::from("DataIntegrityProof"),
         cryptosuite: std::option::Option::Some(std::string::String::from("eddsa-jcs-2022")),
         verification_method: std::string::String::from(
@@ -124,13 +203,69 @@ proptest! {
         created: std::string::String::from("2026-05-21T00:00:01Z"),
         proof_purpose: std::string::String::from("assertionMethod"),
         proof_value: std::string::String::from("zProofValueOpaque"),
-      },
+        id: std::option::Option::None,
+        previous_proof: std::option::Option::None,
+      }),
     };
 
     let json = serde_json::to_string(&envelope).expect("serialize");
     let parsed: crate::envelope::NotarizationEnvelope =
       serde_json::from_str(&json).expect("deserialize");
     prop_assert_eq!(&envelope, &parsed);
+  }
+
+  /// A `PrincipalSigned` envelope — the two-element proof chain of §7.1.11 —
+  /// round-trips with its linkage and label intact.
+  #[test]
+  // The untagged `proof` union means the JSON SHAPE is the only
+  // discriminator between a lone notary proof and a chain. Sweeping
+  // generated proof ids proves the array form is re-read as an array for
+  // arbitrary identifier content: were it ever collapsed to an object, the
+  // §7.2.1 domain separation between a principal proof and a lone notary
+  // proof would silently disappear.
+  fn envelope_proof_chain_serde_roundtrip(
+    principal_id_tail in "[a-z]{1,20}",
+    notary_id_tail in "[a-z]{1,20}",
+    human_did_tail in "[a-z]{1,20}",
+  ) {
+    let human_did = std::format!("did:key:{}", human_did_tail);
+    let principal_proof_id = std::format!("urn:uuid:{}", principal_id_tail);
+    let mut envelope = minimal_envelope();
+    envelope.credential_subject.human_principal.id = human_did.clone();
+    envelope.credential_subject.policy.attestation_mode =
+      std::option::Option::Some(crate::envelope::AttestationMode::PrincipalSigned);
+    envelope.proof = crate::envelope::EnvelopeProofs::Chain(std::vec![
+      crate::envelope::EnvelopeProof {
+        r#type: std::string::String::from("DataIntegrityProof"),
+        cryptosuite: std::option::Option::Some(std::string::String::from("eddsa-jcs-2022")),
+        verification_method: std::format!("{}#{}", human_did, human_did_tail),
+        created: std::string::String::from("2026-05-21T00:00:02Z"),
+        proof_purpose: std::string::String::from("assertionMethod"),
+        proof_value: std::string::String::from("z-illustrative-principal-proof"),
+        id: std::option::Option::Some(principal_proof_id.clone()),
+        previous_proof: std::option::Option::None,
+      },
+      crate::envelope::EnvelopeProof {
+        r#type: std::string::String::from("DataIntegrityProof"),
+        cryptosuite: std::option::Option::Some(std::string::String::from("eddsa-jcs-2022")),
+        verification_method: std::string::String::from("did:key:zNotary#zNotary"),
+        created: std::string::String::from("2026-05-21T00:00:03Z"),
+        proof_purpose: std::string::String::from("authentication"),
+        proof_value: std::string::String::from("z-illustrative-countersignature"),
+        id: std::option::Option::Some(std::format!("urn:uuid:n-{}", notary_id_tail)),
+        previous_proof: std::option::Option::Some(principal_proof_id),
+      },
+    ]);
+
+    let json = serde_json::to_string(&envelope).expect("serialize");
+    let parsed: crate::envelope::NotarizationEnvelope =
+      serde_json::from_str(&json).expect("deserialize");
+    prop_assert_eq!(&envelope, &parsed);
+    prop_assert!(parsed.proof.is_chain());
+    prop_assert_eq!(
+      crate::verification::verify_proof_structure(&parsed).expect("well-formed chain"),
+      crate::envelope::AttestationMode::PrincipalSigned
+    );
   }
 
   /// `DelegationMandate` round-trips through serde_json with proptest-generated
@@ -154,6 +289,7 @@ proptest! {
       rate_limit_per_hour: std::option::Option::None,
       valid_from: std::string::String::from(FIXED_VALID_FROM),
       valid_until: std::string::String::from(FIXED_VALID_UNTIL),
+      principal_signature: std::format!("zprincipal-{}", signature),
       notary_signature: signature.clone(),
     };
     let json = serde_json::to_string(&mandate).expect("serialize");

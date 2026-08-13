@@ -18,6 +18,12 @@ fn main() {
     rate_limit_per_hour: Some(12),
     valid_from: String::from("2026-05-21T00:00:00Z"),
     valid_until: String::from("2026-05-22T00:00:00Z"),
+    // Two signatures, and the order matters (spec §6.1). The PRINCIPAL's is
+    // the actual grant of authority — the human's own key, the root of every
+    // credential issued under this mandate. The notary only countersigns it,
+    // and a countersignature over an unverifiable grant proves nothing, so a
+    // verifier checks the principal's first.
+    principal_signature: String::from("z-illustrative-principal-signature"),
     notary_signature: String::from("z-illustrative-not-a-real-signature"),
   };
 
