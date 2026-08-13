@@ -1,0 +1,22 @@
+{
+  "name": "aph",
+  "displayName": "APH Protocol",
+  "version": "0.1.0",
+  "description": "Work with the APH agent-communication notarization protocol — envelopes, mandates, conformance.",
+  "author": {
+    "name": "APH Protocol Contributors"
+  },
+  "homepage": "https://github.com/squillo/aph",
+  "repository": "https://github.com/squillo/aph",
+  "license": "Apache-2.0",
+  "keywords": [
+    "aph",
+    "agent-per-human",
+    "notarization",
+    "verifiable-credentials",
+    "delegation-mandate",
+    "agent-protocol",
+    "a2a",
+    "did"
+  ]
+}

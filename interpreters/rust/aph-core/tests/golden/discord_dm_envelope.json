@@ -1,0 +1,61 @@
+{
+  "aphVersion": "0.1",
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/aph/v1"
+  ],
+  "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+  "id": "urn:uuid:00000000-0000-4000-8000-000000000003",
+  "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+  "validFrom": "2026-05-21T00:00:00Z",
+  "validUntil": "2026-05-22T00:00:00Z",
+  "credentialSubject": {
+    "humanPrincipal": {
+      "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+      "displayName": "Scott Wyatt"
+    },
+    "agent": {
+      "id": "did:web:agent.squillo.io",
+      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "displayName": "Squillo Concierge",
+      "version": "1.0"
+    },
+    "channel": {
+      "kind": "discord",
+      "recipientAddressing": {
+        "userId": "123456789012345678"
+      }
+    },
+    "communication": {
+      "contentClass": "DM",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodySize": 1267,
+      "previewLines": 2,
+      "preview": "Hey — got your message. Pinging back: yes, the patch landed in main earlier today."
+    },
+    "policy": {
+      "decision": "AskEveryTime",
+      "matchedScope": "per-recipient",
+      "delegationMandateId": null,
+      "actChain": []
+    },
+    "notarization": {
+      "notaryService": {
+        "id": "did:web:notary.squillo.io",
+        "name": "Squillo Notary Service",
+        "version": "0.1.0"
+      },
+      "decisionTimestamp": "2026-05-21T00:00:01Z",
+      "decisionLatencyMs": 1834
+    }
+  },
+  "linkedMandate": null,
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "verificationMethod": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+    "created": "2026-05-21T00:00:01Z",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3WgvA9JHkbV3qLZHcM4FxBp4xHfQVnVnPKKDdyazQwQGdGzxsRdmZWBxXwQvN6P2sLZbLP4HnRy9LcZdpFLLM6h"
+  }
+}

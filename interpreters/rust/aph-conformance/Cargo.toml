@@ -1,0 +1,14 @@
+[package]
+name = "aph-conformance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Golden-envelope and contract conformance suite for the APH protocol reference implementation"
+publish = false
+
+[dependencies]
+aph-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

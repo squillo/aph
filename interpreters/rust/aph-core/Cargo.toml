@@ -1,0 +1,28 @@
+[package]
+name = "aph-core"
+description = "APH (Agent per Human) protocol v0.1 — envelope wire types, mandates, notarization flow state machines, and signing helpers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage = "https://github.com/squillo/aph"
+documentation = "https://docs.rs/aph-core"
+readme = "README.md"
+keywords = ["aph", "verifiable-credentials", "notarization", "agent", "did"]
+categories = ["cryptography", "encoding", "authentication"]
+# Edition 2024 sets the real floor; stated explicitly so consumers get a
+# clear error rather than a cascade of syntax failures.
+rust-version = "1.85"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+p256 = { workspace = true }
+base64 = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+serde_json = { workspace = true }

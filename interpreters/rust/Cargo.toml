@@ -1,0 +1,26 @@
+[workspace]
+resolver = "3"
+members = ["aph-core", "aph-conformance", "aph-cli", "aph-ts"]
+# aph-ts targets wasm32; it is built explicitly (wasm-pack / --target wasm32-unknown-unknown)
+# and excluded from default host builds and tests.
+default-members = ["aph-core", "aph-conformance", "aph-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["APH Protocol Contributors"]
+repository = "https://github.com/squillo/aph"
+
+[workspace.dependencies]
+aph-core = { path = "aph-core" }
+aph-conformance = { path = "aph-conformance" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+base64 = "0.22"
+proptest = "1.5"
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"

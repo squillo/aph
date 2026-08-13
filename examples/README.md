@@ -1,9 +1,9 @@
 # APH Envelope Examples
 
-This directory contains 7 example APH `NotarizationEnvelope` JSON files,
-one per supported channel kind. They illustrate the wire shape of v0.1
-envelopes and are suitable for round-trip parsing by any APH
-implementation.
+This directory contains 8 example APH `NotarizationEnvelope` JSON files:
+one per supported channel kind, plus one exercising the §7.5 registered
+optional extensions. They illustrate the wire shape of v0.1 envelopes and
+are suitable for round-trip parsing by any APH implementation.
 
 ## Files
 
@@ -14,8 +14,11 @@ implementation.
 - `whatsapp_envelope.json` — WhatsApp message
 - `google_chat_envelope.json` — Google Chat space message
 - `imessage_envelope.json` — Apple iMessage
+- `slack_new_with_extensions_envelope.json` — Slack post carrying all three
+  spec §7.5 registered optional extensions (`appleAurAcceptance`,
+  `linkedMandate.ap2SignedPayloadB64`, `linkedMandate.vaultMutation`)
 
-## What's the same across all 7
+## What's the same across all files
 
 - `aphVersion`: `"0.1"`
 - `@context`: W3C VC 2.0 + APH v1
@@ -31,7 +34,7 @@ implementation.
 
 ## What varies
 
-- `id`: unique per file (`urn:uuid:00000000-0000-4000-8000-00000000000{1..7}`)
+- `id`: unique per file (`urn:uuid:00000000-0000-4000-8000-00000000000{1..8}`)
 - `credentialSubject.channel.kind`: one of `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`
 - `credentialSubject.channel.recipientAddressing`: channel-shaped opaque blob (see each file)
 - `credentialSubject.policy.matchedScope`: `per-channel` for channel-broadcast media (Slack, Email, Teams, Google Chat); `per-recipient` for direct-addressed media (Discord, WhatsApp, iMessage)

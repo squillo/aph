@@ -22,6 +22,10 @@ jobs:
             jq empty "$f"
             count=$((count + 1))
           done
+          if [ "$count" -lt 7 ]; then
+            echo "Expected at least 7 example JSON files, found $count." >&2
+            exit 1
+          fi
           echo "Validated $count JSON example files."
 
   sanitization-check:
@@ -32,13 +36,18 @@ jobs:
         uses: actions/checkout@v4
       - name: Grep for forbidden strings
         run: |
-          set -e
           forbidden='Claude|Anthropic|Co-Authored-By|Generated with|@AI|claude\.ai|noreply@anthropic\.com|crates/|PRDs/|_recon/|MEMORY\.md'
-          if grep -rE "$forbidden" \
+          rc=0
+          grep -rE "$forbidden" \
               --exclude-dir=.git \
               --exclude-dir=.github \
-              .; then
+              --exclude-dir=target \
+              . || rc=$?
+          if [ "$rc" -eq 0 ]; then
             echo "Sanitization FAILED - forbidden marker(s) detected above." >&2
             exit 1
+          elif [ "$rc" -ne 1 ]; then
+            echo "Sanitization check errored (grep exit $rc); refusing to pass." >&2
+            exit "$rc"
           fi
           echo "Sanitization clean."

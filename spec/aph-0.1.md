@@ -35,9 +35,11 @@ The notarization step matters precisely because it produces a third-party-verifi
 
 ### 1.1.1 Concrete example — two agents negotiating
 
-Alice's agent and Bob's agent are negotiating a meeting time over a shared channel. Both agents are acting with autonomy within bounded parameters their humans set in advance.
+Alice's agent and Bob's agent are negotiating a meeting time. Both agents are acting with autonomy within bounded parameters their humans set in advance.
 
-1. Alice opens her agent and grants it a Delegation Mandate scoped to channel `a2a`, content class `Reply` and `New`, valid for 30 days, with `rateLimitPerHour = 12`. Squillo's notary signs the mandate and persists it to Alice's local store.
+The negotiation rides A2A, and APH is transport-independent: each A2A message carries its APH envelope as extension metadata under the URI-namespaced key `aph://extensions/notarization/v1`, declared as an `AgentExtension` in each AgentCard (§10.1). The envelope's `channel` block always describes the end-delivery medium — one of the closed §7.1.5 kinds — never the agent-to-agent rail, mirroring how DKIM signs the message independently of the SMTP hops that relay it.
+
+1. Alice opens her agent and grants it a Delegation Mandate scoped to channel `email` — the medium the confirmed meeting invite will ultimately land on — content class `Reply` and `New`, valid for 30 days, with `rateLimitPerHour = 12`. Squillo's notary signs the mandate and persists it to Alice's local store.
 2. Alice's agent drafts the first message: "How about 3 pm Tuesday?" The agent sends it under an APH envelope notarized by Squillo's notary on Alice's behalf, with `credentialSubject.policy.delegationMandateId` pointing at the just-issued mandate.
 3. Bob's agent receives the envelope. Bob's agent has never previously transacted with Squillo. It resolves Squillo's notary public key via `did:web:notary.squillo.io` (fetching `https://notary.squillo.io/.well-known/did.json`) OR via the `_aph._notary.squillo.io` DNS TXT record. Both publication mechanisms are anchored in public infrastructure Bob does not need a Squillo account to read.
 4. Bob's agent verifies the envelope signature, validates the time window, confirms the body hash matches the received payload, confirms the scope permits this channel + content class, and accepts the message.
@@ -210,7 +212,7 @@ Fields:
 | `delegationMandateId` | string | no | Parent `DelegationMandate.id`, or `null` for one-shot AskEveryTime flow. |
 | `humanPrincipalDid` | string | yes | DID of the human principal (restated for tamper-detect). |
 | `agentDid` | string | yes | DID of the agent sender (restated). |
-| `channelKind` | string | yes | Channel kind (`slack`, `email`, `discord`, `teams`, `whatsapp`, `googleChat`, `imessage`). |
+| `channelKind` | string | yes | Channel kind (`slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`). |
 | `recipientAddressing` | JSON object | yes | Channel-shaped addressing payload (opaque to APH core; see §6.4). |
 | `contentClass` | string | yes | Content classification (`Reply`, `New`, `Mention`, `DM`, `Channel`, etc.). |
 | `bodySha256` | string | yes | SHA-256 hex digest of the outbound message body bytes (64 lowercase hex chars). |
@@ -313,6 +315,7 @@ The notarized claim. Wraps the human principal, agent, channel, communication de
 | `communication` | object | yes | See §7.1.6. |
 | `policy` | object | yes | See §7.1.7. |
 | `notarization` | object | yes | See §7.1.8. |
+| `appleAurAcceptance` | object | no | Registered optional extension; omitted when absent. See §7.5.1. |
 
 #### 7.1.3 `HumanPrincipalRef`
 
@@ -340,7 +343,7 @@ Identifies the channel transport and recipient addressing.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `kind` | string | yes | One of the closed channel-kind enum values: `slack`, `email`, `discord`, `teams`, `whatsapp`, `googleChat`, `imessage`. New channel kinds are additive in 0.x minor versions. |
+| `kind` | string | yes | One of the closed channel-kind enum values: `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`. New channel kinds are additive in 0.x minor versions. *(Erratum 2026-08-12: earlier drafts spelled this value `googleChat`; every published example and signed fixture emits `google_chat`, so the snake_case form is normative.)* |
 | `recipientAddressing` | JSON object | yes | Channel-shaped opaque addressing payload. The exact field set is channel-specific; see §7.4 for per-channel shapes. |
 
 #### 7.1.6 `CommunicationDescriptor`
@@ -393,6 +396,8 @@ Optional cross-protocol mandate link. Forward-extensible: new sister-protocol cr
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `ap2IntentMandateUri` | string or null | no | Optional URI pointing at an AP2 `IntentMandate` for cross-linked payment authorization. v0.1 reserves this field; producers MAY emit it; verifiers MUST tolerate `null`. |
+| `ap2SignedPayloadB64` | string or null | no | Registered optional extension. See §7.5.2. |
+| `vaultMutation` | object | no | Registered optional extension; omitted when absent. See §7.5.3. |
 
 #### 7.1.11 `EnvelopeProof`
 
@@ -506,10 +511,46 @@ The `channel.recipientAddressing` field is a JSON object whose exact shape is de
 - **`discord`** — either `userId` (DM) or `channelId` (channel post).
 - **`teams`** — `tenantId`, `teamId`, `channelId`.
 - **`whatsapp`** — `phoneE164` (E.164-formatted phone number).
-- **`googleChat`** — `spaceId`.
+- **`google_chat`** — `spaceId`.
 - **`imessage`** — either `appleId` or `phoneE164`.
 
 Recipient endpoints SHOULD treat unknown `recipientAddressing` fields as opaque and MUST NOT fail verification on their presence (the strict-deserialization rule applies to the envelope-level fields, not to channel-shaped subordinate payloads).
+
+### 7.5 Registered optional extensions
+
+The envelope-level strict-deserialization rule (§7.1) rejects arbitrary unknown fields, so extensibility flows through a small set of REGISTERED extension fields: OPTIONAL, omitted-when-absent fields whose names and wire shapes are pinned by this section. Producers MAY emit them. Verifiers MUST accept envelopes carrying them and MUST NOT fail verification on their presence; a verifier that does not implement an extension's semantics treats its payload as opaque (but still signature-covered — extension fields participate in canonicalization like any other field, §7.2). An envelope carrying no extension fields is byte-identical to a pre-extension envelope, so extension-unaware fixtures and signatures remain valid.
+
+Extensions are vendor-originated but protocol-registered: each entry records its origin. Promoting an extension to a core field, or retiring one, is a minor-version event (Appendix A).
+
+v0.1 registers three extensions.
+
+#### 7.5.1 `credentialSubject.appleAurAcceptance` (object, omitted when absent)
+
+Origin: Apple on-device foundation-model integration (vendor extension). Attests that the human principal accepted Apple's Acceptable Use Requirements (AUR) on the notarizing device before the agent produced this communication with an on-device model.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `userId` | string | yes | User-scoped DID for whom acceptance was recorded. |
+| `deviceId` | string | yes | Device-scoped opaque identifier; acceptance is recorded per `(userId, deviceId)` pair. |
+| `aurVersionHash` | string | yes | SHA-256 hex of the accepted AUR snapshot text. |
+| `acceptedAt` | string | yes | RFC 3339 acceptance timestamp. |
+| `documentKind` | string | yes | `"foundation_models_framework_aur"`; discriminator kept open for future legal documents. |
+
+#### 7.5.2 `linkedMandate.ap2SignedPayloadB64` (string or null)
+
+Origin: AP2 cross-linking (§10.2). Base64 of an AP2-signed payload for commerce-impacting actions, so send-consent (APH) and payment authorization (AP2) travel together while remaining separately signed. Producers emitting a `linkedMandate` object MAY include it; verifiers MUST tolerate `null`.
+
+#### 7.5.3 `linkedMandate.vaultMutation` (object, omitted when absent)
+
+Origin: cross-vault permission federation (vendor extension). Binds the envelope to a vault-mutation mandate when the notarized action changes vault state.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kind` | object | yes | Internally tagged discriminator object: `{"kind": "<variant>", ...variant fields}` where `<variant>` is one of `WriteInto` (`dest_vault_id`), `ShareFrom` (`src_vault_id`), `CrossVaultPromote` (`artifact_id`), `Redelegate` (`downstream_grantee_id`), `Revoke` (no fields), `BridgeStageTransition` (`from_stage`, `to_stage`), `Custom` (`snapp_id`, `mutation_slug`). |
+| `grant_scope_id` | string | yes | Identifier of the grant scope the mutation executes under. |
+| `ap2_signed_payload_b64` | string | no | Omitted when absent. AP2-signed payload for commerce-impacting mutations. |
+
+Interior key-casing note: the `vaultMutation` object's interior keys are `snake_case` (`grant_scope_id`, `dest_vault_id`, …), not the envelope's `camelCase`. This mirrors the originating implementation byte-for-byte and is pinned deliberately: re-canonicalizing an already-signed envelope MUST NOT change its bytes.
 
 ---
 

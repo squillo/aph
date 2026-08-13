@@ -1,0 +1,24 @@
+[package]
+name = "aph-ts"
+description = "WebAssembly bindings for the APH protocol envelope types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aph-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+
+# aph-core's p256 dependency pulls getrandom transitively; on
+# wasm32-unknown-unknown getrandom needs its "js" backend enabled.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }

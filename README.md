@@ -33,12 +33,12 @@ In one sentence: **A2A is the road network, AP2 is the toll booth, APH is the dr
 
 Alice's agent and Bob's agent are negotiating a meeting time over a public channel. Both agents act with autonomy within bounded parameters their humans set in advance. Each outbound message carries an APH envelope:
 
-- Alice's agent emits a message proposing 3 pm Tuesday. The envelope is notarized by Squillo's notary on Alice's behalf, with `channel = a2a`, `contentClass = Reply`, `policy.matchedScope = per-channel`, and a `DelegationMandate` reference showing Alice pre-authorized her agent to schedule meetings on this channel for the next 30 days.
+- Alice's agent emits an A2A message proposing 3 pm Tuesday, carrying its APH envelope as extension metadata under the `aph://extensions/notarization/v1` key (APH is transport-independent — the agent-to-agent rail is never the envelope's channel). The envelope is notarized by Squillo's notary on Alice's behalf, with `channel = email` (the medium the confirmed invite will land on), `contentClass = Reply`, `policy.matchedScope = per-channel`, and a `DelegationMandate` reference showing Alice pre-authorized her agent to schedule meetings for the next 30 days.
 - Bob's agent verifies the APH envelope by resolving Squillo's notary public key (via `did:web` `.well-known/did.json` or via the `_aph._notary.squillo.io` DNS TXT record — both anchored in public infrastructure Bob doesn't need a Squillo account to read), then checks the signature, the time window, the scope, and the body hash.
 - Bob's agent replies with a counter-proposal under its own APH envelope, notarized by Bob's organization's notary, which Alice's agent verifies the same way.
 - Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a license its human issued ahead of time and can revoke at any time.
 
-If Alice decides she no longer wants her agent scheduling on her behalf, she revokes the DelegationMandate; subsequent envelopes from her agent referencing that mandate will fail verification on Bob's side.
+If Alice decides she no longer wants her agent scheduling on her behalf, she revokes the DelegationMandate: her notary stops issuing new CommunicationMandates against it immediately, and envelopes referencing it will fail verification on Bob's side once the on-wire revocation transport lands (v0.2). In v0.1 the spec compensates by recommending short validity windows, so the revocation gap stays small.
 
 ## What problem APH solves
 
@@ -52,7 +52,7 @@ A Notary Service is meaningful only if a **third party can independently verify*
 
 ## Status
 
-**v0.1.0-draft** — protocol design phase. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference implementation is under development in a separate workspace. JSON Schema files and conformance test vectors are deferred to v0.2.
+**v0.1.0-draft** — protocol design phase. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes). JSON Schema files and signed conformance test vectors are deferred to v0.2.
 
 ## Relationship to other protocols
 
@@ -139,6 +139,8 @@ The envelope ships on the wire in two simultaneous encodings:
 aph/
   spec/
     aph-0.1.md          Specification text (v0.1 draft)
+    a2a-extension.md    A2A AgentCard extension descriptor
+    security-considerations.md   Threat model / security companion
   examples/
     slack_reply_envelope.json
     email_reply_envelope.json
@@ -147,9 +149,19 @@ aph/
     whatsapp_envelope.json
     google_chat_envelope.json
     imessage_envelope.json
+  interpreters/
+    rust/               Reference Rust implementation (cargo workspace)
+      aph-core/         Wire types, mandates, flow state machines, signing helpers
+      aph-conformance/  Golden-envelope + contract conformance suite, channel binding specs
+      aph-cli/          `aph` binary: validate / inspect / golden (conformance fixtures)
+      aph-ts/           wasm binding (parse/serialize for JS hosts)
+  .claude-plugin/       Agent-plugin + marketplace manifests
+  skills/               Agent skill: the protocol crash course (/aph:spec)
+  commands/             Agent commands: /aph:validate, /aph:conformance
   .github/
     workflows/
-      ci.yml            JSON validity checks for examples
+      validate-examples.yml   JSON validity + sanitization checks
+      rust-interpreter.yml    cargo test for interpreters/rust
   README.md
   LICENSE
   CONTRIBUTING.md
@@ -158,7 +170,16 @@ aph/
 
 ## Install
 
-APH is currently a specification — there is no library to install yet. A reference Rust implementation is under development; this repository carries the spec text and example envelopes only.
+The reference Rust implementation lives in `interpreters/rust/`:
+
+```sh
+cd interpreters/rust
+cargo test                                   # conformance + unit suites
+cargo run -p aph-cli -- validate <file.json> # strict-parse an envelope
+cargo run -p aph-cli -- inspect  <file.json> # human-readable summary
+```
+
+The repository also ships as an installable plugin for agentic coding tools (manifests under `.claude-plugin/`, with `skills/` and `commands/` at the repo root), giving an agent a working knowledge of the protocol plus envelope validation and conformance commands.
 
 ## Contributing
 

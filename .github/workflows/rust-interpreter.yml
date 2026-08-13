@@ -1,0 +1,35 @@
+name: Rust interpreter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "interpreters/rust/**"
+      - "examples/**"
+      - "spec/**"
+      - ".github/workflows/rust-interpreter.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "interpreters/rust/**"
+      - "examples/**"
+      - "spec/**"
+      - ".github/workflows/rust-interpreter.yml"
+
+jobs:
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Run tests
+        working-directory: interpreters/rust
+        run: cargo test
+      - name: Type-check wasm binding
+        working-directory: interpreters/rust
+        run: cargo check -p aph-ts --target wasm32-unknown-unknown

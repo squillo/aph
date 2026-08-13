@@ -1,0 +1,16 @@
+{
+  "name": "aph-protocol",
+  "owner": {
+    "name": "APH Protocol Contributors"
+  },
+  "plugins": [
+    {
+      "name": "aph",
+      "source": {
+        "source": "github",
+        "repo": "squillo/aph"
+      },
+      "description": "Work with the APH agent-communication notarization protocol — envelopes, mandates, conformance."
+    }
+  ]
+}
