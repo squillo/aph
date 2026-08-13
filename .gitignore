@@ -1,8 +1,9 @@
 interpreters/rust/target/
 
-# N Lang Snapp build output — regenerate with `nlang export`. The compiler
-# writes to build/ despite the config naming .n/build, so both are listed.
-interpreters/nlang/dist/
-interpreters/nlang/build/
-interpreters/nlang/.n/build/
-interpreters/nlang/.n/wal/
+# N Lang Snapp intermediate build output — regenerate with `nlang export`.
+# The compiler writes to build/ despite the config naming .n/build, so both
+# are listed. The exported bundle under snapp/ IS tracked: it is the
+# artifact other Snapps consume.
+APH Spec/0.1.0/build/
+APH Spec/0.1.0/.n/build/
+APH Spec/0.1.0/.n/wal/

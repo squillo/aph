@@ -2,7 +2,7 @@
   "name": "aph",
   "version": "0.1.0-alpha.1",
   "edition": "2026",
-  "description": "APH (Agent per Human) protocol v0.1 \u2014 N Lang type definitions for the notarization envelope and mandates",
+  "description": "APH (Agent per Human) Protocol Specification: notarization envelope, mandates, and key discovery",
   "author": "APH Protocol Contributors",
   "authors": [],
   "license": "Apache-2.0",
@@ -25,10 +25,10 @@
   "features": {},
   "channel": null,
   "lens_gate": null,
-  "src_dir": "./src",
+  "src_dir": "../",
   "dep_dir": "./deps",
   "build_dir": "./build",
-  "out_dir": "./dist",
+  "out_dir": "../../snapp",
   "wal_dir": "./.n/wal",
   "allowed_file_types": [
     "n.md",
@@ -78,5 +78,5 @@
   "lint_allow": [],
   "lint_deny": [],
   "lint_warn": [],
-  "lib": "./src/lib.n"
+  "lib": null
 }
