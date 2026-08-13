@@ -150,11 +150,29 @@ pub fn parse_txt_record(
 /// When `kid` is given, only a record with that exact `kid` is accepted —
 /// this is what makes key rotation unambiguous while both keys are
 /// published side by side.
+///
+/// **The return type carries the absence/failure distinction §8.4.6 makes
+/// normative** (BOOK 15/140: a resolution chain needs a word for absent, and
+/// the error type is part of that contract):
+///
+/// - `Ok(Some(key))` — a matching, currently-valid key.
+/// - `Ok(None)` — **not published**: no APH candidate exists in these
+///   records at all. In an ordered chain the caller advances to the next
+///   mechanism; nothing was offered here, so nothing failed.
+/// - `Err(APH_E003)` — **published and failed**: a matching key exists but
+///   its window has closed. The caller MUST reject, never advance — a
+///   verifier that advanced past this would let whoever can expire or
+///   corrupt a record choose the trust anchor.
+///
+/// An earlier revision returned `Err(NotaryServiceUnreachable)` for the
+/// absent case, which was a mislabel twice over: the service was perfectly
+/// reachable, and spelling absence as an error made it indistinguishable
+/// from failure at every call site.
 pub fn select_key(
   records: &[String],
   kid: std::option::Option<&str>,
   now_rfc3339: &str,
-) -> std::result::Result<super::NotaryPublicKey, crate::errors::AphError> {
+) -> std::result::Result<std::option::Option<super::NotaryPublicKey>, crate::errors::AphError> {
   let mut saw_candidate = false;
   for raw in records {
     let record = match parse_txt_record(raw) {
@@ -171,17 +189,19 @@ pub fn select_key(
     }
     saw_candidate = true;
     if record.is_valid_at(now_rfc3339) {
-      return std::result::Result::Ok(record.public_key());
+      return std::result::Result::Ok(std::option::Option::Some(record.public_key()));
     }
   }
-  // Distinguish "the key exists but its window has closed" from "no such
-  // key was published" — the operator's next step differs.
+  // "The key exists but its window has closed" is a failure the caller must
+  // stop on; "no such key was published" is an absence the caller may
+  // advance past. The operator's next step differs, and so does the
+  // verifier's (§8.4.6).
   if saw_candidate {
     std::result::Result::Err(crate::errors::AphError::mandate_expired(
       "notary key outside its notBefore/notAfter window",
     ))
   } else {
-    std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable)
+    std::result::Result::Ok(std::option::Option::None)
   }
 }
 
@@ -267,7 +287,9 @@ mod tests {
     let old = "v=APHv1; alg=ed25519; kid=k1; k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw";
     let new = "v=APHv1; alg=ed25519; kid=k2; k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     let records = std::vec![String::from(old), String::from(new)];
-    let picked = super::select_key(&records, Some("k2"), "2026-06-01T00:00:00Z").unwrap();
+    let picked = super::select_key(&records, Some("k2"), "2026-06-01T00:00:00Z")
+      .unwrap()
+      .expect("k2 is published and valid");
     std::assert_eq!(picked.kid.as_deref(), Some("k2"));
   }
 
@@ -280,13 +302,22 @@ mod tests {
       String::from("garbage"),
       String::from(SPEC_EXAMPLE),
     ];
-    std::assert!(super::select_key(&records, None, "2026-06-01T00:00:00Z").is_ok());
+    std::assert!(
+      super::select_key(&records, None, "2026-06-01T00:00:00Z")
+        .unwrap()
+        .is_some()
+    );
   }
 
   #[test]
-  fn expired_key_is_distinguished_from_absent_key() {
-    // The operator's remedy differs: republish versus rotate. Collapsing
-    // both into one error would hide which happened.
+  fn expired_key_is_a_failure_and_absent_key_is_not() {
+    // BOOK 15/140 / spec §8.4.6: "published and failed" (expired) must stop
+    // an ordered chain — advancing past it lets whoever can expire a record
+    // choose the trust anchor — while "not published" (absent) merely means
+    // this mechanism was never offered, and the chain may advance. The two
+    // therefore have DIFFERENT TYPES here, not different codes: an earlier
+    // revision spelled absence `Err(NotaryServiceUnreachable)`, which made
+    // it indistinguishable from failure at every call site.
     let expired = "v=APHv1; alg=ed25519; k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw; \
                    notAfter=2026-01-01T00:00:00Z";
     let records = std::vec![String::from(expired)];
@@ -294,17 +325,36 @@ mod tests {
       super::select_key(&records, None, "2026-06-01T00:00:00Z").unwrap_err().code(),
       "APH_E003"
     );
-    std::assert_eq!(
-      super::select_key(&[], None, "2026-06-01T00:00:00Z").unwrap_err().code(),
-      "APH_E008"
+    std::assert!(
+      super::select_key(&[], None, "2026-06-01T00:00:00Z")
+        .unwrap()
+        .is_none(),
+      "an empty record set is absence, not an error"
+    );
+    // Records exist at the name but none is an APH record: still absence —
+    // the notary published nothing HERE, whatever else the domain hosts.
+    let unrelated = std::vec![String::from("v=spf1 include:example.com ~all")];
+    std::assert!(
+      super::select_key(&unrelated, None, "2026-06-01T00:00:00Z")
+        .unwrap()
+        .is_none()
     );
   }
 
   #[test]
   fn a_requested_kid_never_falls_back_to_an_unlabelled_record() {
     // If the proof names a specific key, an unlabelled record is not a
-    // substitute — silently accepting one would defeat rotation.
+    // substitute — silently accepting one would defeat rotation. The
+    // outcome is ABSENCE, not failure: the named key is simply not
+    // published via this mechanism, and an ordered chain may look for it
+    // at the next one. (Forged absence buys an attacker nothing here:
+    // advancing leads to did:web, which is anchored in a TLS certificate
+    // for the same domain — a bar DNS forgery does not clear.)
     let records = std::vec![String::from(SPEC_EXAMPLE)];
-    std::assert!(super::select_key(&records, Some("k9"), "2026-06-01T00:00:00Z").is_err());
+    std::assert!(
+      super::select_key(&records, Some("k9"), "2026-06-01T00:00:00Z")
+        .unwrap()
+        .is_none()
+    );
   }
 }

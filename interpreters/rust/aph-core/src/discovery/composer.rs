@@ -56,11 +56,12 @@ impl DiscoveryMechanism {
   /// and 3).
   ///
   /// `did:key` names [`Self::DidKey`]; `did:web` names [`Self::DidWeb`].
-  /// [`Self::DnsTxt`] is deliberately never returned: no DID method selects
-  /// it, so treating it as "what a `did:web` DID names" would make it an
-  /// implicit second attempt for every `did:web` notary — exactly the
-  /// silent fallback §8.4.6 forbids. A verifier that knows a notary
-  /// publishes TXT records says so with [`MechanismSelection::Pinned`].
+  /// [`Self::DnsTxt`] is never returned by THIS function because no DID
+  /// method spells it — but a `did:web` DID still reaches it: [`resolve`]'s
+  /// `DidWeb` arm probes DNS TXT first per §8.4.6's order, advancing to the
+  /// document fetch only on ABSENCE (nothing published) and never on
+  /// FAILURE. [`MechanismSelection::Pinned`] narrows to one mechanism when
+  /// an operator wants no sequence at all.
   ///
   /// # Errors
   ///
@@ -128,14 +129,31 @@ pub async fn resolve(
     MechanismSelection::NamedByDid => DiscoveryMechanism::named_by(did_url)?,
     MechanismSelection::Pinned(pinned) => pinned,
   };
-  // One arm, one mechanism, one answer. Adding an `or_else` here — or
-  // turning this into a loop over mechanisms — would reintroduce the
-  // downgrade §8.4.6 forbids, which is why the tests assert that the unused
-  // port was never called and not merely that the right key came back.
   match mechanism {
     DiscoveryMechanism::DidKey => resolve_did_key(did_url),
     DiscoveryMechanism::DnsTxt => resolve_dns_txt(did_url, lookup, at_rfc3339).await,
-    DiscoveryMechanism::DidWeb => resolve_did_web(did_url, fetch).await,
+    // §8.4.6 orders the network mechanisms DNS TXT then did:web, and the
+    // sequence below is NOT the downgrade that section forbids — the
+    // distinction doing the work is ABSENCE vs FAILURE (BOOK 15/140):
+    //
+    //   Ok(Some(key))  TXT published a valid key            -> use it
+    //   Ok(None)       nothing is published via TXT         -> advance;
+    //                  nothing was offered, so nothing failed
+    //   Err(_)         TXT is published-and-broken, or the  -> REJECT.
+    //                  lookup could not be completed           Advancing
+    //                  (timeout/SERVFAIL)                       here would
+    //                  let whoever can break DNS choose the trust anchor.
+    //
+    // Forged absence (an on-path attacker answering with an empty record
+    // set) buys nothing: it advances the verifier to did:web, which is
+    // anchored in a TLS certificate for the same domain — a bar DNS forgery
+    // does not clear.
+    DiscoveryMechanism::DidWeb => {
+      match probe_dns_txt(did_url, lookup, at_rfc3339).await? {
+        std::option::Option::Some(key) => std::result::Result::Ok(key),
+        std::option::Option::None => resolve_did_web(did_url, fetch).await,
+      }
+    }
   }
 }
 
@@ -226,6 +244,34 @@ pub async fn resolve_dns_txt(
         ),
       ));
     }
+  };
+  let records = lookup.lookup_txt(&name).await?;
+  match super::dns_txt::select_key(&records, parsed.fragment.as_deref(), at_rfc3339)? {
+    std::option::Option::Some(key) => std::result::Result::Ok(key),
+    // Terminal absence: this mechanism was explicitly chosen (named or
+    // pinned), so there is no later mechanism to advance to. §11's closed
+    // taxonomy has no "not published" code; E008 is the resolution-failure
+    // code this crate has always surfaced at this boundary, with a message
+    // that says what actually happened.
+    std::option::Option::None => std::result::Result::Err(
+      crate::errors::AphError::NotaryServiceUnreachable,
+    ),
+  }
+}
+
+/// The non-terminal DNS TXT probe the §8.4.6 ordered sequence uses: absence
+/// stays `Ok(None)` so the caller may advance, while an error is a REAL
+/// failure the caller must stop on.
+async fn probe_dns_txt(
+  did_url: &str,
+  lookup: &dyn super::ports::TxtRecordLookup,
+  at_rfc3339: &str,
+) -> std::result::Result<std::option::Option<super::NotaryPublicKey>, crate::errors::AphError> {
+  let parsed = super::DidUrl::parse(did_url);
+  let name = match parsed.dns_txt_name() {
+    std::option::Option::Some(name) => name,
+    // A DID with no derivable TXT name does not offer the mechanism at all.
+    std::option::Option::None => return std::result::Result::Ok(std::option::Option::None),
   };
   let records = lookup.lookup_txt(&name).await?;
   super::dns_txt::select_key(&records, parsed.fragment.as_deref(), at_rfc3339)
@@ -523,15 +569,19 @@ mod tests {
 
   #[test]
   fn did_web_resolves_through_the_fetch_port() {
-    // The §8.4.4 path end to end: derive the well-known URL, fetch it
-    // through the port, parse the document, and return the key the proof's
-    // fragment names. Asserting the kid (not just success) pins that the
-    // document answered for k1 rather than for whatever it listed first.
+    // The §8.4.4 path end to end: probe DNS TXT first per §8.4.6's order,
+    // find NOTHING PUBLISHED (absence — the one outcome that may advance),
+    // then derive the well-known URL, fetch through the port, parse, and
+    // return the key the proof's fragment names. Asserting the kid pins
+    // that the document answered for k1 rather than whatever it listed
+    // first; the empty TXT fake pins that advancing required absence, not
+    // an ignored error.
+    let lookup = FakeTxt::with(&[]);
     let fetch = FakeFetch::with(SPEC_DOC);
     let key = block_on(super::resolve(
       super::MechanismSelection::NamedByDid,
       "did:web:notary.example.com#k1",
-      &Exploding,
+      &lookup,
       &fetch,
       NOW,
     ))
@@ -555,17 +605,22 @@ mod tests {
   }
 
   #[test]
-  fn a_failed_did_web_fetch_never_falls_back_to_dns_txt() {
-    // THE no-downgrade test (§8.4.6: "MUST NOT silently fall back from a
-    // stronger anchor to a weaker one"). A valid TXT record is published at
-    // this DID's domain, so a composer with an `or_else` would succeed here
-    // and look correct. That success is the attack: an adversary who can
-    // block the notary's HTTPS origin — or who controls DNS but not the
-    // origin — gets the verifier to accept key material from the anchor the
-    // attacker can reach. The two assertions are one claim: the failure was
-    // reported, and the weaker mechanism was never even consulted.
-    let lookup = FakeTxt::with(&[SPEC_TXT]);
-    let fetch = FakeFetch::failing(crate::errors::AphError::NotaryServiceUnreachable);
+  fn a_broken_txt_record_never_advances_to_did_web() {
+    // THE no-downgrade test, in the direction §8.4.6 makes sharp: DNS TXT
+    // is PUBLISHED AND BROKEN (a key exists, its window has closed), and a
+    // perfectly good did:web document sits one step further down the
+    // chain. A composer that advanced would succeed here and look correct.
+    // That success is the attack: whoever can expire or corrupt the TXT
+    // record — the preferred anchor — gets to choose that the verifier
+    // trusts the next one instead, and choosing the anchor is an identity
+    // decision (BOOK 15/140). The two assertions are one claim: the TXT
+    // failure was reported AS the outcome, and the web port was never
+    // consulted.
+    let expired = "v=APHv1; alg=ed25519; kid=k1; \
+                   k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw; \
+                   notAfter=2026-01-01T00:00:00Z";
+    let lookup = FakeTxt::with(&[expired]);
+    let fetch = FakeFetch::with(SPEC_DOC);
     let error = block_on(super::resolve(
       super::MechanismSelection::NamedByDid,
       "did:web:notary.example.com#k1",
@@ -574,8 +629,37 @@ mod tests {
       NOW,
     ))
     .unwrap_err();
-    std::assert_eq!(error.code(), "APH_E008");
-    std::assert!(lookup.asked().is_empty(), "DNS was consulted: {:?}", lookup.asked());
+    std::assert_eq!(error.code(), "APH_E003");
+    std::assert!(
+      fetch.asked().is_empty(),
+      "did:web was consulted after a TXT failure: {:?}",
+      fetch.asked()
+    );
+  }
+
+  #[test]
+  fn a_published_txt_key_preempts_the_did_web_fetch() {
+    // The complementary pin: when TXT publishes a valid key, §8.4.6's
+    // order means it IS the answer and the fetch never happens. This is
+    // the resilience §8.4.6 ranks TXT above HTTPS for — an origin outage
+    // does not take out verification for a notary that publishes both.
+    // The record carries kid=k1 because the probe selects by the proof's
+    // fragment; an unlabelled record beside a kid-bearing proof is ABSENCE
+    // (see dns_txt::select_key), which would advance instead of preempting.
+    let labelled =
+      "v=APHv1; alg=ed25519; kid=k1; k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw";
+    let lookup = FakeTxt::with(&[labelled]);
+    let fetch = FakeFetch::failing(crate::errors::AphError::NotaryServiceUnreachable);
+    let key = block_on(super::resolve(
+      super::MechanismSelection::NamedByDid,
+      "did:web:notary.example.com#k1",
+      &lookup,
+      &fetch,
+      NOW,
+    ))
+    .unwrap();
+    std::assert_eq!(key.kid.as_deref(), Some("k1"));
+    std::assert!(fetch.asked().is_empty(), "fetch ran despite a valid TXT key");
   }
 
   #[test]
@@ -652,7 +736,9 @@ mod tests {
       "APH_E010"
     );
 
-    // APH_E008 — the anchor could not be reached at all.
+    // APH_E008 — a PIN is a narrowing (there is no later mechanism), so
+    // absence at a pinned mechanism is terminal. The message differs from a
+    // transport failure; the code is the closed taxonomy's nearest.
     std::assert_eq!(
       block_on(super::resolve(
         super::MechanismSelection::Pinned(super::DiscoveryMechanism::DnsTxt),
@@ -680,12 +766,15 @@ mod tests {
       "APH_E003"
     );
 
-    // APH_E001 — the anchor answered, but publishes no such key.
+    // APH_E001 — the anchor answered, but publishes no such key. The TXT
+    // probe that now precedes the fetch sees absence (nothing published)
+    // and advances, per §8.4.6 — hence a real empty fake here rather than
+    // the exploding one used on the did:key row.
     std::assert_eq!(
       block_on(super::resolve(
         super::MechanismSelection::NamedByDid,
         "did:web:notary.example.com#k9",
-        &Exploding,
+        &FakeTxt::with(&[]),
         &FakeFetch::with(SPEC_DOC),
         NOW,
       ))
