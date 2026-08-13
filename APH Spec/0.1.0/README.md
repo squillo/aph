@@ -47,7 +47,7 @@ The specification text is normative. Where this Snapp and
 | `APH_SPEC/APH_PROTOCOL.n.md` | Roles, closed vocabularies, both flow state machines, the error taxonomy, key discovery (§5, §8.4, §9, §11). |
 | `APH_SPEC/APH_ENVELOPE.n.md` | The notarization envelope and its subject objects (§7). |
 | `APH_SPEC/APH_MANDATES.n.md` | Delegation and Communication Mandates (§6). |
-| `APH_SPEC/APH_TESTS.n` | Type-surface tests (`nlang test`). Plain `.n`, deliberately — see Tests. |
+| `APH_SPEC/APH_TESTS.n.md` | Type-surface tests (`nlang test`), one assertion each — see Tests. |
 | `how/` | Worked examples served by `nlang how`, one JSON file per example. |
 
 Declaration order is load order, and a sibling file that is not declared in
@@ -115,26 +115,30 @@ so an example cannot drift from the type it documents.
 nlang test     # 34 type-surface tests
 ```
 
-Each test constructs an instance and asserts a single field. That shape is
-forced by the toolchain, not a style choice — see below.
+Each test constructs an instance and asserts a single field.
 
-### Two behaviours that silently produce green, meaningless suites
+### Why one assertion per test
 
-Both were found by mutation testing rather than assumed, and both are worth
-knowing before writing a test here.
+Forced by the toolchain, not a style preference. **A test's result
+reflects only its final assertion** — an earlier failing assertion is
+discarded if a later one passes:
 
-**Test bodies in literate `.n.md` files are never executed.** They are
-discovered and reported as passing; a file of them reports success with
-`assert_eq!(1, 2)` in every body. `APH_TESTS.n` is therefore the one plain
-`.n` file in this Snapp. If a `.n` and a `.n.md` of the same module name
-both exist, the `.n.md` wins and the real tests are silently ignored.
+```
+#[test]
+fn fail_then_pass() -> () {
+  assert_eq!(1, 2)   // fails
+  assert_eq!(1, 1)   // passes
+}                    // -> reported as ok
+```
 
-**Only the last assertion in a test body is load-bearing.** A failing
-assertion is masked by any later passing one, so a test with five
-assertions really only checks the fifth. Hence one assertion per test:
-every assertion is the last one and therefore has teeth. Verified by
-mutating four independent assertions, each of which failed exactly one
-test.
+`pass_then_fail` and `fail_then_fail` both report correctly, so only the
+masking case is affected. A five-assertion test therefore really checks
+only the fifth. Splitting each check into its own test makes every
+assertion the last one, which is what gives it teeth. Verified by mutating
+four independent assertions, each failing exactly one test.
+
+This is the reason a suite here can look green while proving nothing, so
+it is worth knowing before adding tests.
 
 ## Round-trip verification
 

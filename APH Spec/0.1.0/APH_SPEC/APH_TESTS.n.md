@@ -1,33 +1,54 @@
-// APH type surface tests, run by `nlang test`.
-//
-// TWO TOOLCHAIN BEHAVIOURS SHAPE THIS FILE. Both were found by mutation
-// testing rather than assumed, and both silently produce green suites that
-// prove nothing, so they are recorded here rather than in prose elsewhere.
-//
-// 1. This file is plain `.n`, not literate `.n.md`. Test bodies inside a
-//    `.n.md` are discovered and reported but NEVER EXECUTED: a file of them
-//    reports "passed" with `assert_eq!(1, 2)` in every body.
-//
-// 2. ONE ASSERTION PER TEST. Only the LAST assertion in a test body is
-//    load-bearing — a failing assertion is masked by any later passing one.
-//    A test with five assertions really only checks the fifth. Hence the
-//    shape below: every test constructs what it needs and asserts exactly
-//    once, so every assertion is the last one and therefore has teeth.
-//
-// WHAT THESE PROVE: each prop is addressable by its declared name and
-// carries the value written to it. Reading an absent or misspelled path
-// yields `None`, which fails the assertion.
-//
-// WHAT THEY DO NOT PROVE: that a construction conforms to its block. The
-// compiler does not structurally validate a typed ledger binding — unknown
-// props, missing required props and wrong-typed values are all accepted.
-// Conformance between the declared types and the published examples is
-// covered outside N Lang by the round-trip suite at
-// interpreters/rust/aph-conformance/tests/nlang_snapp_test.rs.
-//
-// Values come from the published example envelopes, so drift in the
-// canonical examples shows up here.
+---
+section: "APH Specification"
+name: "APH Type Surface Tests"
+version: "0_1_0"
+---
+# APH — Type Surface Tests
 
+Run with `nlang test`. Each test constructs an instance of a declared block
+and reads one prop back.
+
+## Why one assertion per test
+
+This is forced by the toolchain, not a style preference.
+
+**A test's result reflects only its FINAL assertion.** An earlier failing
+assertion is discarded if a later one passes. Minimal repro:
+
+```nlang,ignore
+#[test]
+fn fail_then_pass() -> () {
+  assert_eq!(1, 2)   // fails
+  assert_eq!(1, 1)   // passes
+}                    // -> reported as ok
+```
+
+`pass_then_fail` and `fail_then_fail` both report correctly, so only the
+masking case is affected. A five-assertion test therefore really only
+checks the fifth. Splitting each check into its own test makes every
+assertion the last one, and so gives every assertion teeth — verified by
+mutating four independent assertions, each of which failed exactly one
+test.
+
+## What these prove
+
+Each prop is addressable by its declared name and carries the value written
+to it. A misspelled or absent path reads as `None`, which fails the
+assertion.
+
+## What they do not prove
+
+That a construction conforms to its block. The compiler does not
+structurally validate a typed ledger binding: unknown props, missing
+required props, and wrong-typed values are all accepted. Conformance
+between the declared types and the published examples is covered outside
+N Lang by the round-trip suite at
+`interpreters/rust/aph-conformance/tests/nlang_snapp_test.rs`.
+
+Values come from the published example envelopes, so drift in the canonical
+examples shows up here.
+
+```nlang
 mod * {
   // Envelope identity and window — what a verifier reads first.
   #[test]
@@ -244,3 +265,4 @@ mod * {
     assert_ne!(h.no_such_prop, "Alice")
   }
 }
+```
