@@ -160,6 +160,7 @@ aph/
       aph-cli/          `aph` binary: validate / inspect / golden (conformance fixtures)
       aph-ts/           wasm binding (parse/serialize for JS hosts)
       aph-core/examples/  Runnable, self-narrating usage examples
+    nlang/              N Lang type definitions (library Snapp)
   .claude-plugin/       Agent-plugin + marketplace manifests
   skills/               Agent skill: the protocol crash course (/aph:spec)
   commands/             Agent commands: /aph:validate, /aph:conformance

@@ -1,0 +1,23 @@
+// APH (Agent per Human) — N Lang type definitions.
+//
+// This is a LIBRARY Snapp: it defines the shape of the APH protocol's JSON
+// documents and exports nothing executable. There is no `main.n` and no
+// binary, by design — the protocol ships a Rust reference implementation
+// under `interpreters/rust`, and this Snapp exists so N Lang consumers get
+// the same types without reimplementing them from the specification prose.
+//
+// The normative source is `spec/aph-0.1.md` in this repository. Where this
+// Snapp and the specification disagree, the specification wins.
+//
+// This file is the root module index: declaration order is load order, and
+// a sibling source file that is not declared here never loads.
+
+// The notarization envelope and every object inside it (spec §7).
+pub mod envelope {}
+
+// Delegation and communication mandates (spec §6).
+pub mod mandates {}
+
+// Roles, closed vocabularies, flow states, the error taxonomy, and key
+// discovery (spec §5, §8.4, §9, §11).
+pub mod protocol {}

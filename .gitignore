@@ -1,1 +1,8 @@
 interpreters/rust/target/
+
+# N Lang Snapp build output — regenerate with `nlang export`. The compiler
+# writes to build/ despite the config naming .n/build, so both are listed.
+interpreters/nlang/dist/
+interpreters/nlang/build/
+interpreters/nlang/.n/build/
+interpreters/nlang/.n/wal/

@@ -1,0 +1,192 @@
+// APH closed enumerations, flow states, and the error taxonomy.
+//
+// These are the values the JSON documents are allowed to carry. They live
+// here as real enums rather than as prose beside a `str` prop, so a
+// consumer of this Snapp gets exhaustiveness rather than a comment.
+
+// The five protocol roles (spec §5.1).
+//
+// The separation between them is the point: a HumanPrincipal issues
+// authority but cannot notarize, and a NotaryService attests decisions but
+// cannot issue authority. Collapsing the two would let one party both grant
+// and vouch for its own permission.
+mod blocks Roles {
+  enum AphPartyRole {
+    HumanPrincipal,
+    AgentSender,
+    NotaryService,
+    ChannelAdapter,
+    RecipientEndpoint,
+  }
+
+  // The six operations a role may be permitted (spec §5.2).
+  enum AphOperation {
+    IssueDelegationMandate,
+    IssueCommunicationMandate,
+    Notarize,
+    Transport,
+    Verify,
+    Reject,
+  }
+}
+
+// Closed value sets carried by envelope props (spec §7.1).
+mod blocks Vocabulary {
+  // `credentialSubject.channel.kind`. Note google_chat is snake_case: the
+  // §7.1.5 erratum pinned that spelling because every published example and
+  // signed fixture emits it.
+  enum ChannelKind {
+    Slack,
+    Email,
+    Discord,
+    Teams,
+    Whatsapp,
+    GoogleChat,
+    Imessage,
+  }
+
+  // `credentialSubject.communication.contentClass`.
+  enum ContentClass {
+    Reply,
+    New,
+    Mention,
+    Dm,
+    Channel,
+    BulkSend,
+    Broadcast,
+  }
+
+  // `credentialSubject.policy.decision`. NeverAllow is recorded as a
+  // decision but never yields an envelope.
+  enum PolicyDecision {
+    AlwaysAllow,
+    AskEveryTime,
+    NeverAllow,
+  }
+
+  // `proof.cryptosuite` (spec §8.2). eddsa-jcs-2022 is the default and the
+  // one every published example declares.
+  enum Cryptosuite {
+    EddsaJcs2022,
+    EcdsaJcs2019,
+  }
+}
+
+// The human-present notarization flow (spec §9.1).
+//
+// Seven states. The ordering is load-bearing: MandateIssued is reachable
+// only through PendingDecision, which is what makes it impossible to mint
+// authority without having asked the human.
+mod blocks HumanPresentFlow {
+  enum HumanPresentNotarizationState {
+    Drafted,
+    PendingDecision,
+    Approved,
+    MandateIssued,
+    EnvelopeIssued,
+    // Terminal.
+    Delivered,
+    // Terminal.
+    Denied,
+  }
+}
+
+// The human-not-present notarization flow (spec §9.2).
+//
+// Five states, with no PendingDecision: the human decided in advance by
+// issuing a DelegationMandate. The notary can still refuse, so Drafted
+// reaches Denied without any human interaction.
+mod blocks HumanNotPresentFlow {
+  enum HumanNotPresentNotarizationState {
+    Drafted,
+    MandateIssued,
+    EnvelopeIssued,
+    // Terminal.
+    Delivered,
+    // Terminal.
+    Denied,
+  }
+}
+
+// The closed error taxonomy (spec §11).
+//
+// Exactly ten codes, APH_E001 through APH_E010, in declaration order. Other
+// implementations branch on these, so the set is closed and the numbering
+// is part of the contract.
+mod blocks Errors {
+  enum AphErrorCode {
+    // APH_E001 — envelope proof did not verify.
+    InvalidEnvelopeSignature,
+    // APH_E002 — illegal flow transition.
+    InvalidFlowTransition,
+    // APH_E003 — mandate outside its validity window.
+    MandateExpired,
+    // APH_E004 — role may not perform the operation.
+    RoleViolation,
+    // APH_E005 — channel outside the delegation's allowedChannels.
+    ChannelNotAllowed,
+    // APH_E006 — mandate notarySignature did not verify.
+    NotarySignatureInvalid,
+    // APH_E007 — a human decision is required and was not obtained.
+    HumanAuthenticationRequired,
+    // APH_E008 — the notary could not be reached.
+    NotaryServiceUnreachable,
+    // APH_E009 — delivered body does not match the attested hash.
+    EnvelopeBodyHashMismatch,
+    // APH_E010 — algorithm outside the allow-list; alg:none always.
+    UnsupportedAlgorithm,
+  }
+}
+
+// Notary key discovery (spec §8.4).
+//
+// A verifier recovers a notary's public key with no prior trust
+// relationship. did:key needs no network at all — the key IS the
+// identifier — which is why it is tried first.
+mod blocks Discovery {
+  // Resolution order preference (spec §8.4.6). There is no silent fallback
+  // from a stronger mechanism to a weaker one.
+  enum KeyDiscoveryMechanism {
+    // Self-describing, offline (spec §8.4.3).
+    DidKey,
+    // DKIM-style TXT record at `_aph._notary.<domain>` (spec §8.4.5).
+    DnsTxt,
+    // `/.well-known/did.json` over TLS (spec §8.4.4).
+    DidWeb,
+  }
+
+  enum KeyAlgorithm {
+    Ed25519,
+    P256,
+  }
+}
+
+// One key published in a DNS TXT record, as a tag-list (spec §8.4.5).
+// Required tags are v, alg, and k; the rest disambiguate and bound it.
+//
+// A type definition carries either enums or props, never both, so this sits
+// beside the Discovery enums rather than inside them.
+mod blocks AphTxtKeyRecord {
+    props {
+      // Tag `v`. Literal "APHv1".
+      version: str,
+      // Tag `alg`. "ed25519" or "p256".
+      alg: str,
+      // Tag `k`. Public key bytes, base64url without padding.
+      k: str,
+      // Tag `kid`. Matches the fragment of proof.verificationMethod,
+      // which is what makes key rotation unambiguous while two keys are
+      // published side by side.
+      #[optional(true)]
+      kid: str,
+      // Tag `did`. Full DID URL this entry is bound to.
+      #[optional(true)]
+      did: str,
+      // Tag `notBefore`. RFC 3339.
+      #[optional(true)]
+      not_before: str,
+      // Tag `notAfter`. RFC 3339.
+      #[optional(true)]
+      not_after: str,
+    }
+  }

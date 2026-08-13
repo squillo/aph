@@ -1,0 +1,60 @@
+// APH mandates — the two documents that carry authority (spec §6).
+//
+// A DelegationMandate is standing authority a human grants an agent; a
+// CommunicationMandate is single-use authority for one specific message.
+// Both are signed by the notary, and in both cases `notary_signature`
+// covers the JCS-canonical form of the document MINUS that field.
+
+// Standing authority: which channels, for how long, at what rate
+// (spec §6.1).
+mod blocks DelegationMandate {
+  props {
+    // `urn:uuid:` mandate identifier.
+    id: str,
+    // DID of the human granting authority.
+    human_principal_did: str,
+    // DID of the agent receiving it.
+    agent_did: str,
+    // Channel kinds this mandate permits. Non-empty.
+    allowed_channels: Directional<str>,
+    // Sends per hour; absent means unlimited.
+    #[optional(true)]
+    rate_limit_per_hour: u32,
+    // RFC 3339 start of the window.
+    valid_from: str,
+    // RFC 3339 end of the window. Expiry is the primary revocation
+    // mechanism in v0.1, since on-wire revocation transport is deferred
+    // to v0.2 — hence the spec's advice to keep windows short.
+    valid_until: str,
+    // Notary signature over the canonical form minus this field.
+    notary_signature: str,
+  }
+}
+
+// Single-use authority for one message, bound to its body by hash
+// (spec §6.2).
+mod blocks CommunicationMandate {
+  props {
+    id: str,
+    // Parent delegation; absent for a one-shot AskEveryTime decision,
+    // where the human approved this single send directly.
+    #[optional(true)]
+    delegation_mandate_id: str,
+    // Restated for tamper detection.
+    human_principal_did: str,
+    agent_did: str,
+    channel_kind: str,
+    // Channel-shaped, opaque to the protocol (spec §7.4).
+    recipient_addressing: Positional,
+    content_class: str,
+    // SHA-256 of the body: 64 lowercase hex characters. This is what binds
+    // the mandate to one specific message rather than to any message.
+    body_sha256: str,
+    body_size: u64,
+    policy_decision: str,
+    issued_at: str,
+    // RFC 3339. Short by design — five minutes is the spec's guidance.
+    expires_at: str,
+    notary_signature: str,
+  }
+}
