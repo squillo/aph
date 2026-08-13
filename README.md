@@ -155,6 +155,7 @@ aph/
       aph-conformance/  Golden-envelope + contract conformance suite, channel binding specs
       aph-cli/          `aph` binary: validate / inspect / golden (conformance fixtures)
       aph-ts/           wasm binding (parse/serialize for JS hosts)
+      aph-core/examples/  Runnable, self-narrating usage examples
   .claude-plugin/       Agent-plugin + marketplace manifests
   skills/               Agent skill: the protocol crash course (/aph:spec)
   commands/             Agent commands: /aph:validate, /aph:conformance
@@ -168,18 +169,103 @@ aph/
   CHANGELOG.md
 ```
 
-## Install
+## Using the reference implementation (Rust)
 
-The reference Rust implementation lives in `interpreters/rust/`:
+`aph-core` is the protocol library — wire types, mandates, the two flow state machines, the role matrix, the error taxonomy, and the signing helpers. It depends only on `serde`, `serde_json`, `thiserror`, `chrono`, `p256`, and `base64`.
+
+```toml
+[dependencies]
+aph-core = "0.1"
+```
+
+### Verify an envelope you received
+
+Parsing is strict by design (spec §7.1): an unknown field is a hard error, so a producer cannot smuggle a claim past a verifier that does not understand it.
+
+```rust
+let envelope: aph_core::NotarizationEnvelope = serde_json::from_str(received)?;
+
+let subject = &envelope.credential_subject;
+println!("{} authorized {} to send on {}",
+    subject.human_principal.display_name,
+    subject.agent.display_name,
+    subject.channel.kind);
+```
+
+### Check a signature
+
+The signature covers the *canonical* form of the envelope, not the JSON text it arrived as — which is what lets an envelope survive re-serialization by intermediaries. Strip the signature slot, canonicalize, then verify:
+
+```rust
+let mut unsigned = serde_json::to_value(&envelope)?;
+unsigned["proof"]["proofValue"] = serde_json::json!("");
+
+let canonical = aph_core::canonicalize_rfc8785(&unsigned);
+let ok = aph_core::verify_detached_jws(&jws, canonical.as_bytes(), &notary_key);
+```
+
+Resolving `notary_key` from the issuer DID is the verifier's job (spec §8.4: `did:key` offline, DNS TXT at `_aph._notary.<domain>`, or `did:web`). Key discovery is not yet implemented in this crate.
+
+### Enforce scope and consent
+
+```rust
+// Standing authority: does this mandate still cover this send?
+if !mandate.is_valid_at(now) || !mandate.allows_channel("slack") {
+    return Err(aph_core::AphError::channel_not_allowed("slack"));
+}
+
+// Human-present flow: authority cannot be minted without the human
+// being asked — this transition is refused with APH_E002.
+let mut flow = aph_core::HumanPresentNotarizationFlow::new(mandate_id);
+flow.transition_to(aph_core::HumanPresentNotarizationState::MandateIssued)?; // Err
+```
+
+### Runnable examples
+
+Each one narrates what it is doing as it runs:
 
 ```sh
 cd interpreters/rust
-cargo test                                   # conformance + unit suites
-cargo run -p aph-cli -- validate <file.json> # strict-parse an envelope
-cargo run -p aph-cli -- inspect  <file.json> # human-readable summary
+cargo run -p aph-core --example parse_and_inspect    # strict parsing, reading a claim
+cargo run -p aph-core --example sign_and_verify      # canonicalize -> sign -> verify -> tamper
+cargo run -p aph-core --example mandates_and_flows   # scope, validity, both state machines
 ```
 
-The repository also ships as an installable plugin for agentic coding tools (manifests under `.claude-plugin/`, with `skills/` and `commands/` at the repo root), giving an agent a working knowledge of the protocol plus envelope validation and conformance commands.
+### Command line
+
+```sh
+cargo run -p aph-cli -- validate examples/slack_reply_envelope.json
+cargo run -p aph-cli -- inspect  examples/slack_reply_envelope.json
+cargo run -p aph-cli -- golden                       # list conformance fixtures
+```
+
+`validate` is a strict **structural** check — it does not verify signatures, time windows, or body hashes (spec §8.3 steps 2–8). Exit codes: `0` valid, `1` invalid, `2` usage.
+
+### JavaScript / TypeScript
+
+```sh
+cd interpreters/rust && wasm-pack build aph-ts --target web
+```
+
+```js
+import { parseEnvelopeJson, serializeEnvelope } from './pkg/aph_ts.js';
+const envelope = parseEnvelopeJson(received);  // throws on invalid shape
+```
+
+### Conformance
+
+`interpreters/rust/aph-conformance` carries golden fixtures, contract tests, and the three channel binding specs (email, chat platforms, MCP). It also validates every envelope in `examples/` against the implementation and asserts that what the implementation *emits* is value-identical to those published files — the check that catches serializer-side drift. See [interpreters/rust/README.md](interpreters/rust/README.md) for the full picture, including the two deliberate divergences from RFC 8785 and RFC 7518 that the tests deliberately pin.
+
+## Agent plugin
+
+The repository is also an installable plugin for agentic coding tools, giving an agent working knowledge of the protocol plus envelope-validation and conformance commands:
+
+```
+/plugin marketplace add squillo/aph
+/plugin install aph@aph-protocol
+```
+
+It provides the `/aph:spec` skill (a protocol crash course grounded in the spec sections), `/aph:validate`, and `/aph:conformance`.
 
 ## Contributing
 

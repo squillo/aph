@@ -66,6 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite expanded to 185 tests, each carrying a rationale comment stating what it pins and why. New coverage: JCS edge cases (empty containers, `-0`, exponent-range floats, integer extremes, duplicate keys, astral-plane key ordering, parser recursion limit), detached-JWS negative matrix (malformed arity, empty signature, tampered header, padded and raw-R||S signatures, payload length changes), base64url canonical-form rejection, 1 MiB signing, and RFC 6979 determinism.
 - Corrected `jcs.rs` documentation that claimed strict RFC 8785 compliance and described a trailing-zero strip the code does not perform; both binding specs now mark their v0.2-candidate sections instead of contradicting the shipped envelope shape.
 
+### Added (revision 2026-08-12d — documentation)
+
+- Three runnable, self-narrating examples under `interpreters/rust/aph-core/examples/`: `parse_and_inspect` (strict parsing and reading a claim), `sign_and_verify` (canonicalize → detached JWS → verify → tamper-detection), and `mandates_and_flows` (scope checks, validity windows, both state machines, the permission matrix).
+- `interpreters/rust/README.md` — workspace guide: crate roles, conformance corpora, CLI contract, and the two deliberate RFC divergences.
+- `interpreters/rust/aph-core/README.md` — crate-level documentation.
+- Root README gained a "Using the reference implementation (Rust)" section with worked code for verification, signature checking, and scope/consent enforcement, plus JavaScript/wasm and agent-plugin install instructions.
+- `aph-core` is publishable to crates.io (`aph-core = "0.1"`). `aph-cli` and `aph-conformance` remain unpublished; the manifests record why.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

@@ -1,6 +1,8 @@
 [package]
 name = "aph-cli"
 description = "Command-line tool for validating and inspecting APH notarization envelopes"
+# Not published: the `aph-cli` name on crates.io belongs to an unrelated
+# crate. Build from source, or run via `cargo run -p aph-cli`.
 publish = false
 version.workspace = true
 edition.workspace = true

@@ -6,6 +6,8 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Golden-envelope and contract conformance suite for the APH protocol reference implementation"
+# Test harness rather than a library; the fixtures and binding specs are
+# consumed from this repository rather than crates.io.
 publish = false
 
 [dependencies]

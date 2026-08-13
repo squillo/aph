@@ -9,7 +9,8 @@ repository.workspace = true
 homepage = "https://github.com/squillo/aph"
 documentation = "https://docs.rs/aph-core"
 readme = "README.md"
-keywords = ["aph", "verifiable-credentials", "notarization", "agent", "did"]
+# crates.io allows at most 5 keywords, each at most 20 characters.
+keywords = ["aph", "credentials", "notarization", "agent", "did"]
 categories = ["cryptography", "encoding", "authentication"]
 # Edition 2024 sets the real floor; stated explicitly so consumers get a
 # clear error rather than a cascade of syntax failures.
