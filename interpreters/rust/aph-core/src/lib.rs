@@ -33,6 +33,7 @@ pub mod communication_mandate;
 pub mod credential_access_envelope;
 pub mod crypto;
 pub mod delegation_mandate;
+pub mod discovery;
 pub mod envelope;
 pub mod errors;
 pub mod human_not_present_flow;
@@ -70,6 +71,7 @@ pub use vault_mutation::{VaultMutationKind, VaultMutationMandate};
 
 // Crypto re-exports — JCS canonicalization, detached JWS, and ECDSA
 // mandate signing/verification.
+pub use crate::discovery::{DidUrl, KeyAlgorithm, NotaryPublicKey};
 pub use crate::crypto::did_key::{DecodedDidKey, decode as decode_did_key, encode_ed25519 as did_key_from_ed25519};
 pub use crate::crypto::eddsa_jcs::{
   sign_envelope, signing_input, verify_envelope, verify_envelope_did_key,

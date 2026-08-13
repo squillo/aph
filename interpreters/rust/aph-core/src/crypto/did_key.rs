@@ -51,6 +51,17 @@ pub fn decode(did: &str) -> std::result::Result<DecodedDidKey, crate::errors::Ap
       return std::result::Result::Err(crate::errors::AphError::InvalidEnvelopeSignature);
     }
   };
+  decode_multibase_key(encoded)
+}
+
+/// Decodes a multicodec-prefixed public key in multibase base58btc.
+///
+/// This is the payload half of a `did:key` identifier, and is also exactly
+/// what a DID Document's `publicKeyMultibase` field carries — so `did:web`
+/// discovery reuses this decoder rather than reimplementing it.
+pub fn decode_multibase_key(
+  encoded: &str,
+) -> std::result::Result<DecodedDidKey, crate::errors::AphError> {
   let bytes = super::multibase::base58btc_decode(encoded)?;
   if bytes.len() < 3 {
     return std::result::Result::Err(crate::errors::AphError::InvalidEnvelopeSignature);
