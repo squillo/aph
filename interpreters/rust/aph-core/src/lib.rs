@@ -70,6 +70,10 @@ pub use vault_mutation::{VaultMutationKind, VaultMutationMandate};
 
 // Crypto re-exports — JCS canonicalization, detached JWS, and ECDSA
 // mandate signing/verification.
+pub use crate::crypto::did_key::{DecodedDidKey, decode as decode_did_key, encode_ed25519 as did_key_from_ed25519};
+pub use crate::crypto::eddsa_jcs::{
+  sign_envelope, signing_input, verify_envelope, verify_envelope_did_key,
+};
 pub use crate::crypto::jcs::canonicalize_rfc8785;
 pub use crate::crypto::jws_detached::{create_detached_jws, verify_detached_jws};
 pub use crate::crypto::signing::{sign_mandate, verify_mandate};
