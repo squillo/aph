@@ -1,0 +1,13 @@
+{
+  "title": "Envelope Proof",
+  "tags": [
+    "proof",
+    "signature",
+    "cryptosuite",
+    "data-integrity",
+    "jws"
+  ],
+  "nlang_code": "mod blocks EnvelopeProof {\n  props {\n    type: str,\n    #[optional(true)]\n    cryptosuite: str,\n    verification_method: str,\n    created: str,\n    proof_purpose: str,\n    proof_value: str,\n  }\n}",
+  "note": "Either a W3C Data Integrity Proof or a detached JWS; `cryptosuite` is absent for the JWS form. `proof_purpose` is always \"assertionMethod\". `proof_value` is a multibase base58btc signature over the canonical envelope with proofValue itself set to the empty string \u2014 a signature cannot cover itself, and emptying rather than removing the member is the convention the reference implementation pins.",
+  "book_ref": "APH Spec: \u00a77.1.11 EnvelopeProof, \u00a78.2 Proof block formats"
+}

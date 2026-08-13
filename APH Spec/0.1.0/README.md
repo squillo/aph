@@ -47,6 +47,7 @@ The specification text is normative. Where this Snapp and
 | `APH_SPEC/APH_PROTOCOL.n.md` | Roles, closed vocabularies, both flow state machines, the error taxonomy, key discovery (§5, §8.4, §9, §11). |
 | `APH_SPEC/APH_ENVELOPE.n.md` | The notarization envelope and its subject objects (§7). |
 | `APH_SPEC/APH_MANDATES.n.md` | Delegation and Communication Mandates (§6). |
+| `how/` | Worked examples served by `nlang how`, one JSON file per example. |
 
 Declaration order is load order, and a sibling file that is not declared in
 a `mod` index never loads (N_BOOK 1.1, "The Determinism Invariant"). A
@@ -66,6 +67,46 @@ resolves types across files.
 
 The exported bundle under [`snapp/`](../../snapp) is committed; the
 intermediate `build/` directory is not.
+
+## Learning APH from the CLI
+
+This Snapp registers as an `nlang how` plugin, so once it is installed the
+protocol is searchable from the terminal alongside the language's own
+examples:
+
+```sh
+nlang how --plugin aph --list        # all 15 examples, by category
+nlang how notarization envelope      # search across every plugin
+nlang how delegation mandate scope
+nlang how did:key offline discovery
+```
+
+Each example carries the declaration, a note explaining the reasoning
+behind it, and a citation into the specification.
+
+### Installing locally
+
+Discovery is by symlink into the Snapp directory, the same as the other
+Spec Snapps on a Squillo workstation:
+
+```sh
+ln -sfn "$PWD" ~/.n/snapps/aph
+nlang plugin refresh
+```
+
+`nlang plugin refresh` reports the Snapps it discovered; `aph` appearing in
+that list is the confirmation that registration worked.
+
+### Adding an example
+
+Drop a JSON file into the matching `how/<category>/` directory with exactly
+five keys — `title`, `tags`, `nlang_code`, `note`, `book_ref` — then run
+`nlang plugin refresh`. A new *category* additionally needs an entry under
+`cli_plugin.how.categories` in `.n/nlang.config.n` pointing at its
+directory; without that entry the files are simply never read.
+
+Keep `nlang_code` copied from the `.n.md` sources rather than paraphrased,
+so an example cannot drift from the type it documents.
 
 ## Notes for editors
 

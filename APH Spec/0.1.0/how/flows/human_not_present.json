@@ -1,0 +1,12 @@
+{
+  "title": "Human-Not-Present Notarization Flow",
+  "tags": [
+    "flow",
+    "state-machine",
+    "delegation",
+    "autonomous"
+  ],
+  "nlang_code": "mod blocks HumanNotPresentFlow {\n  enum HumanNotPresentNotarizationState {\n    Drafted,\n    MandateIssued,\n    EnvelopeIssued,\n    Delivered,\n    Denied,\n  }\n}",
+  "note": "Five states, used when the agent acts under standing delegation. There is no PendingDecision because the human decided in advance by issuing a Delegation Mandate. The notary can still refuse \u2014 Drafted reaches Denied with no human interaction \u2014 which is how an expired or out-of-scope delegation is turned away.",
+  "book_ref": "APH Spec: \u00a79.2 Human-not-present flow"
+}

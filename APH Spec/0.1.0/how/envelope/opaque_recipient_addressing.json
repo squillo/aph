@@ -1,0 +1,13 @@
+{
+  "title": "Opaque Recipient Addressing",
+  "tags": [
+    "envelope",
+    "channel",
+    "addressing",
+    "extensibility",
+    "opaque"
+  ],
+  "nlang_code": "mod blocks ChannelDescriptor {\n  props {\n    kind: str,\n    recipient_addressing: Positional,\n  }\n}",
+  "note": "`recipient_addressing` is deliberately untyped so a new channel can be supported without changing this block. Verifiers MUST NOT fail on addressing sub-fields they do not recognize: the strict-parsing rule applies to envelope-level fields, not to this payload. Slack carries teamId/channelId/parentTs here, email carries to/cc/bcc, and neither shape is modeled by the protocol.",
+  "book_ref": "APH Spec: \u00a77.4 Per-channel recipient addressing shapes"
+}

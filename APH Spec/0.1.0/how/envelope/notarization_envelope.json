@@ -1,0 +1,13 @@
+{
+  "title": "Notarization Envelope",
+  "tags": [
+    "envelope",
+    "credential",
+    "verifiable-credential",
+    "notarization",
+    "wire"
+  ],
+  "nlang_code": "mod blocks NotarizationEnvelope {\n  props {\n    aph_version: str,\n    context: Directional<str>,\n    type: Directional<str>,\n    id: str,\n    issuer: str,\n    valid_from: str,\n    valid_until: str,\n    credential_subject: CredentialSubject,\n    #[optional(true)]\n    linked_mandate: LinkedMandate,\n    proof: EnvelopeProof,\n  }\n}",
+  "note": "The APH credential: a W3C Verifiable Credential 2.0-shaped document binding one outbound agent action to the human authorization behind it. A verifier re-canonicalizes the envelope and checks the signature over those bytes, so every prop is part of what was signed \u2014 adding, removing, or renaming one describes a different credential. `aph_version` is pinned to \"0.1\" and a verifier rejects versions it does not support.",
+  "book_ref": "APH Spec: \u00a77.1 Top-level shape"
+}

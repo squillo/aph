@@ -1,0 +1,13 @@
+{
+  "title": "Binding a Credential to One Message Body",
+  "tags": [
+    "envelope",
+    "communication",
+    "hash",
+    "tamper",
+    "body"
+  ],
+  "nlang_code": "mod blocks CommunicationDescriptor {\n  props {\n    content_class: str,\n    // SHA-256 of the body: 64 lowercase hex characters.\n    body_sha256: str,\n    body_size: u64,\n    preview_lines: u32,\n    preview: str,\n  }\n}",
+  "note": "`body_sha256` is the load-bearing field: it binds the credential to one specific message body, so a signature cannot be reused to authorize different content. A mismatch between the attested hash and the delivered body is APH_E009. `preview` exists so the human sees what they are approving rather than approving an opaque hash.",
+  "book_ref": "APH Spec: \u00a77.1.6 CommunicationDescriptor"
+}

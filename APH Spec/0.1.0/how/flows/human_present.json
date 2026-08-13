@@ -1,0 +1,12 @@
+{
+  "title": "Human-Present Notarization Flow",
+  "tags": [
+    "flow",
+    "state-machine",
+    "consent",
+    "human-in-the-loop"
+  ],
+  "nlang_code": "mod blocks HumanPresentFlow {\n  enum HumanPresentNotarizationState {\n    Drafted,\n    PendingDecision,\n    Approved,\n    MandateIssued,\n    EnvelopeIssued,\n    Delivered,\n    Denied,\n  }\n}",
+  "note": "Seven states, used when the human is present to decide. The ordering carries the security property: MandateIssued is reachable only through PendingDecision, which makes it structurally impossible to mint authority without having asked the human. Delivered and Denied are terminal. Implementations MUST reject non-enumerated transitions and SHOULD report APH_E002.",
+  "book_ref": "APH Spec: \u00a79.1 Human-present flow"
+}

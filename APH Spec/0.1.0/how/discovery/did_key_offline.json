@@ -1,0 +1,13 @@
+{
+  "title": "did:key \u2014 Offline Key Discovery",
+  "tags": [
+    "discovery",
+    "did-key",
+    "offline",
+    "verification",
+    "trust"
+  ],
+  "nlang_code": "mod blocks Discovery {\n  enum KeyDiscoveryMechanism {\n    DidKey,\n    DnsTxt,\n    DidWeb,\n  }\n}",
+  "note": "Three ways a verifier recovers a notary's public key with no prior trust relationship, in preference order. did:key is first because it needs no network at all: the public key IS the identifier, so an issuer of `did:key:z6Mk...` can be verified entirely offline. There is no silent fallback from a stronger mechanism to a weaker one.",
+  "book_ref": "APH Spec: \u00a78.4.3 did:key, \u00a78.4.6 Verifier resolution order"
+}

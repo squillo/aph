@@ -1,0 +1,12 @@
+{
+  "title": "Channel Kinds",
+  "tags": [
+    "channel",
+    "enum",
+    "closed-set",
+    "vocabulary"
+  ],
+  "nlang_code": "mod blocks Vocabulary {\n  enum ChannelKind {\n    Slack,\n    Email,\n    Discord,\n    Teams,\n    Whatsapp,\n    GoogleChat,\n    Imessage,\n  }\n}",
+  "note": "The seven delivery media APH v0.1 defines. The set is closed: a verifier meeting an unrecognized kind rejects rather than guessing. On the wire the value is `google_chat` in snake_case, unlike its single-word siblings \u2014 an erratum pinned that spelling because every published example and signed fixture emits it, and changing it now would invalidate credentials already in the field.",
+  "book_ref": "APH Spec: \u00a77.1.5 ChannelDescriptor"
+}

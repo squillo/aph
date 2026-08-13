@@ -78,5 +78,43 @@
   "lint_allow": [],
   "lint_deny": [],
   "lint_warn": [],
-  "lib": null
+  "lib": null,
+  "cli_plugin": {
+    "namespace": "aph",
+    "description": "APH (Agent per Human) Notarization Protocol",
+    "how": {
+      "categories": {
+        "aph_envelope": {
+          "name": "APH Notarization Envelope",
+          "description": "The verifiable credential: subject, channel, communication, policy, and proof",
+          "examples_dir": "how/envelope"
+        },
+        "aph_mandates": {
+          "name": "APH Mandates",
+          "description": "Delegation and Communication Mandates \u2014 standing and single-use authority",
+          "examples_dir": "how/mandates"
+        },
+        "aph_flows": {
+          "name": "APH Notarization Flows",
+          "description": "The human-present and human-not-present state machines",
+          "examples_dir": "how/flows"
+        },
+        "aph_vocabulary": {
+          "name": "APH Vocabularies",
+          "description": "Party roles, channel kinds, and the closed error taxonomy",
+          "examples_dir": "how/vocabulary"
+        },
+        "aph_discovery": {
+          "name": "APH Key Discovery",
+          "description": "Resolving a notary's public key via did:key, DNS TXT, or did:web",
+          "examples_dir": "how/discovery"
+        }
+      }
+    },
+    "permissions": {
+      "fs_read": true,
+      "fs_write": false,
+      "network": false
+    }
+  }
 }

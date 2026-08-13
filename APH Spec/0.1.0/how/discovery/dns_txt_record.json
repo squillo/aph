@@ -1,0 +1,13 @@
+{
+  "title": "DNS TXT Key Publication",
+  "tags": [
+    "discovery",
+    "dns",
+    "dkim",
+    "rotation",
+    "tag-list"
+  ],
+  "nlang_code": "mod blocks AphTxtKeyRecord {\n  props {\n    version: str,   // tag `v`   \u2014 literal \"APHv1\"\n    alg: str,       // tag `alg` \u2014 \"ed25519\" or \"p256\"\n    k: str,         // tag `k`   \u2014 base64url public key, unpadded\n    #[optional(true)]\n    kid: str,\n    #[optional(true)]\n    did: str,\n    #[optional(true)]\n    not_before: str,\n    #[optional(true)]\n    not_after: str,\n  }\n}",
+  "note": "A DKIM-style tag-list published at `_aph._notary.<domain>`, anchoring notary identity to domain ownership exactly as DKIM anchors email signing keys. Required tags are v, alg and k. `kid` is matched against the fragment of proof.verificationMethod, which is what makes rotation unambiguous while an old and a new key are published side by side; notBefore/notAfter bound the window.",
+  "book_ref": "APH Spec: \u00a78.4.5 DNS TXT \u2014 DKIM-style publication"
+}

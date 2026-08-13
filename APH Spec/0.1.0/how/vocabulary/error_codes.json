@@ -1,0 +1,12 @@
+{
+  "title": "Error Taxonomy",
+  "tags": [
+    "errors",
+    "taxonomy",
+    "closed-set",
+    "diagnostics"
+  ],
+  "nlang_code": "mod blocks Errors {\n  enum AphErrorCode {\n    InvalidEnvelopeSignature,     // APH_E001\n    InvalidFlowTransition,        // APH_E002\n    MandateExpired,               // APH_E003\n    RoleViolation,                // APH_E004\n    ChannelNotAllowed,            // APH_E005\n    NotarySignatureInvalid,       // APH_E006\n    HumanAuthenticationRequired,  // APH_E007\n    NotaryServiceUnreachable,     // APH_E008\n    EnvelopeBodyHashMismatch,     // APH_E009\n    UnsupportedAlgorithm,         // APH_E010\n  }\n}",
+  "note": "Exactly ten codes in declaration order. The set is closed and the numbering is part of the contract: other implementations branch on these strings, so a duplicate or renumbering would make two distinct failures indistinguishable to a remote verifier. APH_E001 is an envelope proof failure; APH_E006 is a mandate signature failure \u2014 the distinction tells an operator which document to look at.",
+  "book_ref": "APH Spec: \u00a711 Error Taxonomy"
+}

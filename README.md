@@ -162,6 +162,7 @@ aph/
       aph-core/examples/  Runnable, self-narrating usage examples
   APH Spec/
     0.1.0/              N Lang Specification Snapp (literate .n.md types)
+      how/              Worked examples served by `nlang how --plugin aph`
   snapp/
     aph@0.1.0-alpha.1.json   Compiled Snapp bundle
   .claude-plugin/       Agent-plugin + marketplace manifests

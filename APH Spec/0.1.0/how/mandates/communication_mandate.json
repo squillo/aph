@@ -1,0 +1,13 @@
+{
+  "title": "Communication Mandate",
+  "tags": [
+    "mandate",
+    "single-use",
+    "per-message",
+    "consent",
+    "hash"
+  ],
+  "nlang_code": "mod blocks CommunicationMandate {\n  props {\n    id: str,\n    #[optional(true)]\n    delegation_mandate_id: str,\n    human_principal_did: str,\n    agent_did: str,\n    channel_kind: str,\n    recipient_addressing: Positional,\n    content_class: str,\n    body_sha256: str,\n    body_size: u64,\n    policy_decision: str,\n    issued_at: str,\n    expires_at: str,\n    notary_signature: str,\n  }\n}",
+  "note": "Single-use authority for one message. `delegation_mandate_id` is absent for a one-shot AskEveryTime decision, where the human approved this send directly and no standing authority exists. The principal and agent DIDs are restated rather than only referenced, so a verifier can detect a mandate re-pointed at a different parent. A five-minute `expires_at` is recommended.",
+  "book_ref": "APH Spec: \u00a76.2 CommunicationMandate"
+}

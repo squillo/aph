@@ -1,0 +1,12 @@
+{
+  "title": "Party Roles and Separation of Duties",
+  "tags": [
+    "roles",
+    "permissions",
+    "separation-of-duties",
+    "authorization"
+  ],
+  "nlang_code": "mod blocks Roles {\n  enum AphPartyRole {\n    HumanPrincipal,\n    AgentSender,\n    NotaryService,\n    ChannelAdapter,\n    RecipientEndpoint,\n  }\n\n  enum AphOperation {\n    IssueDelegationMandate,\n    IssueCommunicationMandate,\n    Notarize,\n    Transport,\n    Verify,\n    Reject,\n  }\n}",
+  "note": "Five roles and six operations. The separation is the point: a HumanPrincipal issues authority but cannot Notarize, and a NotaryService attests decisions but cannot issue authority. Collapsing the two would let one party both grant a permission and vouch for it, destroying the third-party verifiability the protocol exists to provide. ChannelAdapter is least-privileged \u2014 it may only Transport.",
+  "book_ref": "APH Spec: \u00a75.1 Party Roles, \u00a75.2 Operations"
+}

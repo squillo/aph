@@ -1,0 +1,13 @@
+{
+  "title": "Cross-Protocol Linked Mandate",
+  "tags": [
+    "ap2",
+    "payment",
+    "composition",
+    "extension",
+    "vault"
+  ],
+  "nlang_code": "mod blocks LinkedMandate {\n  props {\n    #[optional(true)]\n    ap2_intent_mandate_uri: str,\n    #[optional(true)]\n    ap2_signed_payload_b64: str,\n    #[optional(true)]\n    vault_mutation: VaultMutationMandate,\n  }\n}",
+  "note": "How one agent action carries both a payment authorization and a communication authorization while keeping them separately signed. AP2 authorizes the payment; APH authorizes the action surrounding it. All three fields are independently optional, so a vault mutation with no payment link is as legal as a payment link with no mutation.",
+  "book_ref": "APH Spec: \u00a77.1.10 LinkedMandate, \u00a77.5 Registered optional extensions"
+}
