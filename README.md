@@ -1,5 +1,7 @@
 # APH — Agent per Human Notarization Protocol
 
+![The APH emblem — a human figure and an AI chip joined in an infinity loop inside a chained seal — surrounded by scenes of people from many cultures and walks of life working alongside robots and AI assistants: an elder signing a document with a robot, a family with tablets, clinicians, office workers at laptops, and a delivery drone, all linked by glowing network lines carrying padlock and document icons.](assets/aph-banner.jpg)
+
 APH is an open protocol for cryptographically notarizing the actions an autonomous agent takes on behalf of a specific human, producing a W3C Verifiable Credential 2.0-shaped envelope that any downstream recipient can independently verify across vendors and across organizations.
 
 ## Mental model — the agent's driver's license
@@ -141,6 +143,8 @@ aph/
     aph-0.1.md          Specification text (v0.1 draft)
     a2a-extension.md    A2A AgentCard extension descriptor
     security-considerations.md   Threat model / security companion
+  assets/
+    aph-banner.jpg      README banner
   examples/
     slack_reply_envelope.json
     email_reply_envelope.json
