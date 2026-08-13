@@ -130,6 +130,20 @@ pub fn parse_txt_record(
   let key_bytes = crate::crypto::base64url::decode(key_b64)
     .map_err(|_| crate::errors::AphError::InvalidEnvelopeSignature)?;
 
+  // The length is part of what `alg` claims: 32 raw bytes for Ed25519, 33
+  // SEC1-compressed for P-256. Without this check a value in some OTHER
+  // encoding that happens to also be alphabet-valid base64url — every
+  // base58btc string is — decodes to garbage of the wrong length and
+  // becomes a "key" that only fails later, at verification, wearing an
+  // invalid-signature error instead of naming the malformed record.
+  let expected_len = match algorithm {
+    super::KeyAlgorithm::Ed25519 => 32usize,
+    super::KeyAlgorithm::P256 => 33usize,
+  };
+  if key_bytes.len() != expected_len {
+    return std::result::Result::Err(crate::errors::AphError::InvalidEnvelopeSignature);
+  }
+
   std::result::Result::Ok(AphTxtRecord {
     algorithm,
     key_bytes,
@@ -232,6 +246,19 @@ mod tests {
     std::assert_eq!(r.kid.as_deref(), Some("k1"));
     std::assert_eq!(r.not_before.as_deref(), Some("2026-05-21T00:00:00Z"));
     std::assert_eq!(r.not_after.as_deref(), Some("2027-05-21T00:00:00Z"));
+  }
+
+  #[test]
+  fn a_key_of_the_wrong_length_for_its_alg_is_refused() {
+    // A base58btc string is alphabet-valid base64url, so a record written
+    // in the WRONG ENCODING decodes "successfully" — to 34 bytes of
+    // garbage. Only the length check catches it at the record, where the
+    // operator can see which record is malformed, rather than at signature
+    // verification where it reads as a bad signature. This is the exact
+    // shape squillo_notary published before PRD-700 §9.7 settled the
+    // encoding, so the refusal is a migration pin as much as a format one.
+    let base58_key = "v=APHv1; alg=ed25519; k=z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy";
+    std::assert!(super::parse_txt_record(base58_key).is_err());
   }
 
   #[test]
