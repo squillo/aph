@@ -1,0 +1,62 @@
+name: Publish crate
+
+# Publishing is irreversible — a crates.io version can be yanked but never
+# replaced or reused — so this never runs on a branch push. It fires only on
+# an explicit `aph-core-vX.Y.Z` tag, and can be rehearsed with the dry-run
+# input from the Actions tab first.
+on:
+  push:
+    tags:
+      - "aph-core-v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Package and verify without uploading"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    name: cargo publish aph-core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # The gates the tag is asserting have passed.
+      - name: Test
+        working-directory: interpreters/rust
+        run: cargo test
+      - name: Lint
+        working-directory: interpreters/rust
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Refuse to publish a version the tag does not name, which is how a
+      # forgotten version bump would otherwise reach crates.io.
+      - name: Check tag matches crate version
+        if: startsWith(github.ref, 'refs/tags/')
+        working-directory: interpreters/rust
+        run: |
+          set -e
+          crate_version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "aph-core") | .version')
+          tag_version="${GITHUB_REF_NAME#aph-core-v}"
+          if [ "$crate_version" != "$tag_version" ]; then
+            echo "tag $GITHUB_REF_NAME does not match aph-core $crate_version" >&2
+            exit 1
+          fi
+          echo "aph-core $crate_version matches $GITHUB_REF_NAME"
+
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        working-directory: interpreters/rust
+        run: cargo publish --dry-run -p aph-core
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+        working-directory: interpreters/rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p aph-core
