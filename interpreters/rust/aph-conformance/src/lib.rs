@@ -56,8 +56,8 @@ const GOLDEN_01_MINIMAL_EMAIL: &str = r#"{
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
-      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -80,7 +80,7 @@ const GOLDEN_01_MINIMAL_EMAIL: &str = r#"{
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -117,7 +117,7 @@ const GOLDEN_02_SLACK_WITH_AP2: &str = r#"{
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
+      "id": "did:web:agent.squillo.com",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -142,7 +142,7 @@ const GOLDEN_02_SLACK_WITH_AP2: &str = r#"{
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -190,7 +190,7 @@ const GOLDEN_03_INBOUND_VERIFY: &str = r#"{
     "channel": {
       "kind": "email",
       "recipientAddressing": {
-        "to": ["scott@squillo.io"]
+        "to": ["scott@squillo.com"]
       }
     },
     "communication": {
@@ -244,7 +244,7 @@ const GOLDEN_04_DELEGATION_SCOPE: &str = r#"{
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:concierge.squillo.io",
+      "id": "did:web:concierge.squillo.com",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -266,13 +266,13 @@ const GOLDEN_04_DELEGATION_SCOPE: &str = r#"{
       "matchedScope": "per-recipient",
       "delegationMandateId": "urn:uuid:22222222-2222-4222-8222-222222222222",
       "actChain": [
-        "did:web:concierge.squillo.io",
-        "did:web:notary.squillo.io"
+        "did:web:concierge.squillo.com",
+        "did:web:notary.squillo.com"
       ]
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -309,7 +309,7 @@ const GOLDEN_05_MULTI_RECIPIENT: &str = r#"{
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
+      "id": "did:web:agent.squillo.com",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -322,7 +322,7 @@ const GOLDEN_05_MULTI_RECIPIENT: &str = r#"{
           "carol@example.com"
         ],
         "cc": ["dave@example.com"],
-        "bcc": ["audit@squillo.io"]
+        "bcc": ["audit@squillo.com"]
       }
     },
     "communication": {
@@ -339,7 +339,7 @@ const GOLDEN_05_MULTI_RECIPIENT: &str = r#"{
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -376,7 +376,7 @@ const GOLDEN_06_DISCORD_ATTACHMENT: &str = r#"{
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
+      "id": "did:web:agent.squillo.com",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -408,7 +408,7 @@ const GOLDEN_06_DISCORD_ATTACHMENT: &str = r#"{
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -446,7 +446,7 @@ const GOLDEN_07_IMESSAGE_RETENTION: &str = r#"{
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
+      "id": "did:web:agent.squillo.com",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -474,7 +474,7 @@ const GOLDEN_07_IMESSAGE_RETENTION: &str = r#"{
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },

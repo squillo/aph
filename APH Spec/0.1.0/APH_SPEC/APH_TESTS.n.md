@@ -106,25 +106,25 @@ mod * {
 
   #[test]
   fn agent_id() -> () {
-    let a: AgentRef = { id: "did:web:agent.squillo.io", agent_card_uri: "https://agent.squillo.io/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
-    assert_eq!(a.id, "did:web:agent.squillo.io")
+    let a: AgentRef = { id: "did:web:agent.squillo.com", agent_card_uri: "https://agent.squillo.com/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
+    assert_eq!(a.id, "did:web:agent.squillo.com")
   }
 
   #[test]
   fn agent_card_uri_optional_prop_is_readable() -> () {
-    let a: AgentRef = { id: "did:web:agent.squillo.io", agent_card_uri: "https://agent.squillo.io/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
-    assert_eq!(a.agent_card_uri, "https://agent.squillo.io/.well-known/agent-card.json")
+    let a: AgentRef = { id: "did:web:agent.squillo.com", agent_card_uri: "https://agent.squillo.com/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
+    assert_eq!(a.agent_card_uri, "https://agent.squillo.com/.well-known/agent-card.json")
   }
 
   #[test]
   fn agent_display_name() -> () {
-    let a: AgentRef = { id: "did:web:agent.squillo.io", agent_card_uri: "https://agent.squillo.io/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
+    let a: AgentRef = { id: "did:web:agent.squillo.com", agent_card_uri: "https://agent.squillo.com/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
     assert_eq!(a.display_name, "Squillo Concierge")
   }
 
   #[test]
   fn agent_version() -> () {
-    let a: AgentRef = { id: "did:web:agent.squillo.io", agent_card_uri: "https://agent.squillo.io/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
+    let a: AgentRef = { id: "did:web:agent.squillo.com", agent_card_uri: "https://agent.squillo.com/.well-known/agent-card.json", display_name: "Squillo Concierge", version: "1.0" }
     assert_eq!(a.version, "1.0")
   }
 
@@ -299,19 +299,19 @@ mod * {
   // proof's id, which is the binding a verifier checks — array order is not.
   #[test]
   fn chained_proof_id() -> () {
-    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.io#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
+    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.com#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
     assert_eq!(pr.id, "urn:uuid:00000000-0000-4000-8000-0000000000f2")
   }
 
   #[test]
   fn chained_proof_previous_proof() -> () {
-    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.io#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
+    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.com#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
     assert_eq!(pr.previous_proof, "urn:uuid:00000000-0000-4000-8000-0000000000f1")
   }
 
   #[test]
   fn notary_countersignature_uses_the_authentication_purpose() -> () {
-    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.io#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
+    let pr: EnvelopeProof = { id: "urn:uuid:00000000-0000-4000-8000-0000000000f2", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.squillo.com#key-1", created: "2026-05-21T00:00:01Z", proof_purpose: "authentication", previous_proof: "urn:uuid:00000000-0000-4000-8000-0000000000f1", proof_value: "z3WgvA9JHkbV" }
     assert_eq!(pr.proof_purpose, "authentication")
   }
 

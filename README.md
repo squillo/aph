@@ -36,7 +36,7 @@ In one sentence: **A2A is the road network, AP2 is the toll booth, APH is the dr
 Alice's agent and Bob's agent are negotiating a meeting time over a public channel. Both agents act with autonomy within bounded parameters their humans set in advance. Each outbound message carries an APH envelope:
 
 - Alice's agent emits an A2A message proposing 3 pm Tuesday, carrying its APH envelope as extension metadata under the `aph://extensions/notarization/v1` key (APH is transport-independent — the agent-to-agent rail is never the envelope's channel). The envelope is notarized by Squillo's notary on Alice's behalf, with `channel = email` (the medium the confirmed invite will land on), `contentClass = Reply`, `policy.matchedScope = per-channel`, and a `DelegationMandate` reference showing Alice pre-authorized her agent to schedule meetings for the next 30 days.
-- Bob's agent verifies the APH envelope by resolving Squillo's notary public key (via `did:web` `.well-known/did.json` or via the `_aph._notary.squillo.io` DNS TXT record — both anchored in public infrastructure Bob doesn't need a Squillo account to read), then checks the signature, the time window, the scope, and the body hash.
+- Bob's agent verifies the APH envelope by resolving Squillo's notary public key (via `did:web` `.well-known/did.json` or via the `_aph._notary.squillo.com` DNS TXT record — both anchored in public infrastructure Bob doesn't need a Squillo account to read), then checks the signature, the time window, the scope, and the body hash.
 - Bob's agent replies with a counter-proposal under its own APH envelope, notarized by Bob's organization's notary, which Alice's agent verifies the same way.
 - Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a license its human issued ahead of time and can revoke at any time.
 
@@ -82,8 +82,8 @@ A full schema lives under `spec/aph-0.1.md`. The example below is a complete v0.
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
-      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -110,7 +110,7 @@ A full schema lives under `spec/aph-0.1.md`. The example below is a complete v0.
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },

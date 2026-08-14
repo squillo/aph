@@ -133,7 +133,7 @@ fn signed_mandate() -> aph_core::DelegationMandate {
   let mut mandate = aph_core::DelegationMandate {
     id: std::string::String::from(MANDATE_ID),
     human_principal_did: std::string::String::from(PRINCIPAL_DID),
-    agent_did: std::string::String::from("did:web:agent.squillo.io"),
+    agent_did: std::string::String::from("did:web:agent.squillo.com"),
     allowed_channels: std::vec![std::string::String::from("slack")],
     rate_limit_per_hour: std::option::Option::Some(20),
     valid_from: std::string::String::from("2026-05-20T00:00:00Z"),
@@ -180,7 +180,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
   principal.id = std::option::Option::Some(std::string::String::from(PRINCIPAL_PROOF_ID));
 
   let mut notary = proof_template();
-  notary.verification_method = std::string::String::from("did:web:notary.squillo.io#key-1");
+  notary.verification_method = std::string::String::from("did:web:notary.squillo.com#key-1");
   notary.created = std::string::String::from("2026-05-21T00:00:02Z");
   notary.proof_purpose = std::string::String::from("authentication");
   notary.id = std::option::Option::Some(std::string::String::from(NOTARY_PROOF_ID));
@@ -208,9 +208,9 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         display_name: std::string::String::from("Scott Wyatt"),
       },
       agent: aph_core::AgentRef {
-        id: std::string::String::from("did:web:agent.squillo.io"),
+        id: std::string::String::from("did:web:agent.squillo.com"),
         agent_card_uri: std::option::Option::Some(std::string::String::from(
-          "https://agent.squillo.io/.well-known/agent-card.json",
+          "https://agent.squillo.com/.well-known/agent-card.json",
         )),
         display_name: std::string::String::from("Squillo Concierge"),
         version: std::string::String::from("1.0"),
@@ -246,7 +246,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
       },
       notarization: aph_core::NotarizationMetadata {
         notary_service: aph_core::NotaryServiceRef {
-          id: std::string::String::from("did:web:notary.squillo.io"),
+          id: std::string::String::from("did:web:notary.squillo.com"),
           name: std::string::String::from("Squillo Notary Service"),
           version: std::string::String::from("0.1.0"),
           attested_digest: std::option::Option::None,

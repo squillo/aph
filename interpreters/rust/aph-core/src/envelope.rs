@@ -487,9 +487,9 @@ mod tests {
 
   fn sample_agent() -> super::AgentRef {
     super::AgentRef {
-      id: "did:web:agent.squillo.io".to_string(),
+      id: "did:web:agent.squillo.com".to_string(),
       agent_card_uri: std::option::Option::Some(
-        "https://agent.squillo.io/.well-known/agent-card.json".to_string(),
+        "https://agent.squillo.com/.well-known/agent-card.json".to_string(),
       ),
       display_name: "Squillo Concierge".to_string(),
       version: "1.0".to_string(),
@@ -546,7 +546,7 @@ mod tests {
     );
 
     let with_claim: super::NotaryServiceRef = serde_json::from_str(
-      r#"{"id":"did:web:notary.squillo.io","name":"Squillo Notary Service","version":"0.1.0","attestedDigest":"sha256:abc","attestationUri":"https://notary.squillo.io/.well-known/aph-attestation.json"}"#,
+      r#"{"id":"did:web:notary.squillo.com","name":"Squillo Notary Service","version":"0.1.0","attestedDigest":"sha256:abc","attestationUri":"https://notary.squillo.com/.well-known/aph-attestation.json"}"#,
     )
     .expect("a notary advertising an attestation must parse");
     std::assert_eq!(
@@ -557,7 +557,7 @@ mod tests {
 
   fn sample_notary_service() -> super::NotaryServiceRef {
     super::NotaryServiceRef {
-      id: "did:web:notary.squillo.io".to_string(),
+      id: "did:web:notary.squillo.com".to_string(),
       name: "Squillo Notary Service".to_string(),
       version: "0.1.0".to_string(),
       attested_digest: std::option::Option::None,
@@ -863,7 +863,7 @@ mod tests {
           "displayName": "X"
         },
         "agent": {
-          "id": "did:web:agent.squillo.io",
+          "id": "did:web:agent.squillo.com",
           "displayName": "X",
           "version": "1.0"
         },
@@ -884,7 +884,7 @@ mod tests {
         },
         "notarization": {
           "notaryService": {
-            "id": "did:web:notary.squillo.io",
+            "id": "did:web:notary.squillo.com",
             "name": "Squillo Notary Service",
             "version": "0.1.0"
           },
@@ -953,7 +953,7 @@ mod tests {
           "displayName": "X"
         },
         "agent": {
-          "id": "did:web:agent.squillo.io",
+          "id": "did:web:agent.squillo.com",
           "displayName": "X",
           "version": "1.0"
         },
@@ -974,7 +974,7 @@ mod tests {
         },
         "notarization": {
           "notaryService": {
-            "id": "did:web:notary.squillo.io",
+            "id": "did:web:notary.squillo.com",
             "name": "Squillo Notary Service",
             "version": "0.1.0"
           },
@@ -1001,7 +1001,7 @@ mod tests {
     // Not every agent publishes an A2A AgentCard; omitting the URI must
     // stay legal rather than making those agents unable to be notarized.
     let s = serde_json::json!({
-      "id": "did:web:agent.squillo.io",
+      "id": "did:web:agent.squillo.com",
       "displayName": "X",
       "version": "1.0"
     })
@@ -1135,7 +1135,7 @@ mod tests {
         "displayName": "Legacy User"
       },
       "agent": {
-        "id": "did:web:agent.squillo.io",
+        "id": "did:web:agent.squillo.com",
         "displayName": "Squillo Concierge",
         "version": "1.0"
       },
@@ -1156,7 +1156,7 @@ mod tests {
       },
       "notarization": {
         "notaryService": {
-          "id": "did:web:notary.squillo.io",
+          "id": "did:web:notary.squillo.com",
           "name": "Squillo Notary Service",
           "version": "0.1.0"
         },

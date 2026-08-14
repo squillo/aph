@@ -78,7 +78,7 @@ mod tests {
     super::DelegationMandate {
       id: String::from("urn:uuid:00000000-0000-4000-8000-000000000001"),
       human_principal_did: String::from("did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy"),
-      agent_did: String::from("did:web:agent.squillo.io"),
+      agent_did: String::from("did:web:agent.squillo.com"),
       allowed_channels: std::vec![String::from("slack"), String::from("email")],
       rate_limit_per_hour: std::option::Option::Some(60),
       valid_from: String::from("2026-05-21T00:00:00Z"),

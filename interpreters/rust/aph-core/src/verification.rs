@@ -485,7 +485,7 @@ mod tests {
   // what makes the disagreement visible in the test body.
   const HUMAN_DID: &str = "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy";
   const NOTARY_DID: &str = "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV";
-  const AGENT_DID: &str = "did:web:agent.squillo.io";
+  const AGENT_DID: &str = "did:web:agent.squillo.com";
   const PRINCIPAL_PROOF_ID: &str = "urn:uuid:00000000-0000-4000-8000-0000000000a1";
   const NOTARY_PROOF_ID: &str = "urn:uuid:00000000-0000-4000-8000-0000000000b1";
   const MANDATE_ID: &str = "urn:uuid:00000000-0000-4000-8000-0000000000c1";
@@ -597,7 +597,7 @@ mod tests {
         },
         notarization: crate::envelope::NotarizationMetadata {
           notary_service: crate::envelope::NotaryServiceRef {
-            id: std::string::String::from("did:web:notary.squillo.io"),
+            id: std::string::String::from("did:web:notary.squillo.com"),
             name: std::string::String::from("Squillo Notary Service"),
             version: std::string::String::from("0.1.0"),
             attested_digest: std::option::Option::None,

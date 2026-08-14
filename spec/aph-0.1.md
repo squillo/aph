@@ -68,7 +68,7 @@ The negotiation rides A2A, and APH is transport-independent: each A2A message ca
 
 1. Alice opens her agent and grants it a Delegation Mandate scoped to channel `email` — the medium the confirmed meeting invite will ultimately land on — content class `Reply` and `New`, valid for 30 days, with `rateLimitPerHour = 12`. Squillo's notary signs the mandate and persists it to Alice's local store.
 2. Alice's agent drafts the first message: "How about 3 pm Tuesday?" The agent sends it under an APH envelope notarized by Squillo's notary on Alice's behalf, with `credentialSubject.policy.delegationMandateId` pointing at the just-issued mandate.
-3. Bob's agent receives the envelope. Bob's agent has never previously transacted with Squillo. It resolves Squillo's notary public key via `did:web:notary.squillo.io` (fetching `https://notary.squillo.io/.well-known/did.json`) OR via the `_aph._notary.squillo.io` DNS TXT record. Both publication mechanisms are anchored in public infrastructure Bob does not need a Squillo account to read.
+3. Bob's agent receives the envelope. Bob's agent has never previously transacted with Squillo. It resolves Squillo's notary public key via `did:web:notary.squillo.com` (fetching `https://notary.squillo.com/.well-known/did.json`) OR via the `_aph._notary.squillo.com` DNS TXT record. Both publication mechanisms are anchored in public infrastructure Bob does not need a Squillo account to read.
 4. Bob's agent verifies the envelope signature, validates the time window, confirms the body hash matches the received payload, confirms the scope permits this channel + content class, and accepts the message.
 5. Bob's agent replies under its own APH envelope, notarized by Bob's organization's notary. Alice's agent verifies the reply using the same flow.
 6. Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a credential its human issued ahead of time and can revoke at any time.
@@ -669,8 +669,8 @@ The following is a complete v0.1 Slack-reply envelope demonstrating a thread-rep
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
-      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -697,7 +697,7 @@ The following is a complete v0.1 Slack-reply envelope demonstrating a thread-rep
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -747,8 +747,8 @@ implementation.
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
-      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -775,7 +775,7 @@ implementation.
       "delegationMandate": {
         "id": "urn:uuid:00000000-0000-4000-8000-0000000000d1",
         "humanPrincipalDid": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
-        "agentDid": "did:web:agent.squillo.io",
+        "agentDid": "did:web:agent.squillo.com",
         "allowedChannels": ["slack"],
         "rateLimitPerHour": 20,
         "validFrom": "2026-05-20T00:00:00Z",
@@ -787,7 +787,7 @@ implementation.
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },
@@ -810,7 +810,7 @@ implementation.
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f2",
       "type": "DataIntegrityProof",
       "cryptosuite": "eddsa-jcs-2022",
-      "verificationMethod": "did:web:notary.squillo.io#key-1",
+      "verificationMethod": "did:web:notary.squillo.com#key-1",
       "created": "2026-05-21T00:00:02Z",
       "proofPurpose": "authentication",
       "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000f1",

@@ -339,7 +339,7 @@ mod tests {
     crate::delegation_mandate::DelegationMandate {
       id: std::string::String::from("urn:uuid:00000000-0000-4000-8000-000000000001"),
       human_principal_did: std::string::String::from("did:key:zHuman"),
-      agent_did: std::string::String::from("did:web:agent.squillo.io"),
+      agent_did: std::string::String::from("did:web:agent.squillo.com"),
       allowed_channels: std::vec![std::string::String::from("slack")],
       rate_limit_per_hour: std::option::Option::Some(30),
       valid_from: std::string::String::from("2026-05-21T00:00:00Z"),

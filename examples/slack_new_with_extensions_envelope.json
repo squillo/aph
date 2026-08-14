@@ -18,8 +18,8 @@
       "displayName": "Scott Wyatt"
     },
     "agent": {
-      "id": "did:web:agent.squillo.io",
-      "agentCardUri": "https://agent.squillo.io/.well-known/agent-card.json",
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
       "displayName": "Squillo Concierge",
       "version": "1.0"
     },
@@ -46,7 +46,7 @@
     },
     "notarization": {
       "notaryService": {
-        "id": "did:web:notary.squillo.io",
+        "id": "did:web:notary.squillo.com",
         "name": "Squillo Notary Service",
         "version": "0.1.0"
       },

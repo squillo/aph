@@ -134,6 +134,13 @@ APH is pre-production with no external adopters, so this correction lands **in p
 
 - **CI finally runs the `aph-ts` tests.** `aph-ts` sits outside the workspace's `default-members`, so the interpreter workflow's bare `cargo test` never reached its tests; the workflow now runs `cargo test -p aph-ts` natively AND a new wasm32 smoke suite under Node (`wasm-pack test --node aph-ts`), which replaces the old type-check-only wasm step. The smoke test feeds the published `PrincipalSigned` golden through the real exported wasm functions — parse, structural verification, re-serialization, and the no-downgrade gate — pinning integer fidelity across the compiled boundary. The tag-gated publish workflow names `aph-ts` explicitly for the same reason.
 
+### Changed (revision 2026-08-14b — domain canon)
+
+- **`squillo.com` is the canonical domain; `squillo.io` is retired.** Every illustrative DID, agent card URI, notary identifier, DNS TXT record name, and example address across the specification, the README, the N Lang Snapp sources, the published examples, and the reference implementation now names `squillo.com` — 115 occurrences in 26 hand-swept files, plus the two generated artifacts below. Nothing normative moves: these are the spec's illustrative identifiers, never registered protocol constants, and no wire field, error code, or canonicalization rule changes with them.
+- **The signed `PrincipalSigned` golden was re-minted, not text-edited.** `examples/principal_signed_envelope.json` carries the agent DID, the agent card URI, and the notary's `verificationMethod` *inside* the bytes that both envelope proofs and both §6.1 mandate signatures cover, so substituting the domain in place would have published a credential whose four real Ed25519 signatures no longer verify — the precise failure the byte-identity gate in `principal_signed_example_test.rs` exists to make impossible. The domains embedded in that generator were updated and the golden regenerated through `aph-core`'s own signing path, so every signature is made over the canon bytes. The keys did not move: RFC 8032 §7.1 TEST 2 and TEST 3 remain the fixed public seeds, and the golden stays re-derivable by anyone with no secret material. Its ids, timestamps, and the principal's `did:key` are unchanged.
+- The §7.3 and §7.3.1 worked examples keep their placeholder signature values — they are illustrative, not test vectors — so only identifiers change there.
+- The N Lang Snapp bundle `snapp/aph@0.1.0-alpha.1.json` is re-exported from the swept `APH Spec/0.1.0/` sources, which also refreshes its `integrity` digest.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

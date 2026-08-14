@@ -52,7 +52,7 @@ mod tests {
         "urn:uuid:00000000-0000-4000-8000-000000000001",
       )),
       human_principal_did: String::from("did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy"),
-      agent_did: String::from("did:web:agent.squillo.io"),
+      agent_did: String::from("did:web:agent.squillo.com"),
       channel_kind: String::from("slack"),
       recipient_addressing: serde_json::json!({
         "teamId": "T01234567",

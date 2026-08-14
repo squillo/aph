@@ -55,7 +55,7 @@ fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
         display_name: std::string::String::from("Human"),
       },
       agent: crate::envelope::AgentRef {
-        id: std::string::String::from("did:web:agent.squillo.io"),
+        id: std::string::String::from("did:web:agent.squillo.com"),
         agent_card_uri: std::option::Option::None,
         display_name: std::string::String::from("Agent"),
         version: std::string::String::from("1.0"),
@@ -81,7 +81,7 @@ fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
       },
       notarization: crate::envelope::NotarizationMetadata {
         notary_service: crate::envelope::NotaryServiceRef {
-          id: std::string::String::from("did:web:notary.squillo.io"),
+          id: std::string::String::from("did:web:notary.squillo.com"),
           name: std::string::String::from("Squillo Notary Service"),
           version: std::string::String::from("0.1.0"),
           attested_digest: std::option::Option::None,
@@ -182,7 +182,7 @@ proptest! {
         },
         notarization: crate::envelope::NotarizationMetadata {
           notary_service: crate::envelope::NotaryServiceRef {
-            id: std::string::String::from("did:web:notary.squillo.io"),
+            id: std::string::String::from("did:web:notary.squillo.com"),
             name: notary_name.clone(),
             version: notary_version.clone(),
             attested_digest: std::option::Option::None,
