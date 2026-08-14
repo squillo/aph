@@ -124,6 +124,12 @@ APH is pre-production with no external adopters, so this correction lands **in p
 - **§15.1 requires the two threshold signatures to come from two distinct holder keys** — otherwise one compromised holder signs twice and k-of-3 silently degrades to 1-of-3.
 - Stale canonicalization language ("strip", "minus `proof.proofValue`") removed from §8.2 and §8.3, which contradicted §7.2.1 and would have failed every signature a conformant signer produced.
 
+### Changed (revision 2026-08-13b — worked-example ids + wasm JSON-text boundary)
+
+- **The worked examples no longer share envelope ids with the published channel examples.** §7.3's envelope id is now `…00f0` (was `…0001`, which `slack_reply_envelope.json` also carries) and §7.3.1's — and therefore the signed golden `principal_signed_envelope.json`'s — is now `…00f3` (was `…0002`, which `email_reply_envelope.json` also carries). The `…00f1`/`…00f2` slots remain the golden's own proof ids, untouched. §7.3 and the Slack-reply example file were the same envelope; after this renumber they intentionally diverge. The golden's envelope proofs are re-signed because the id sits inside the signed bytes; its embedded mandate id (`…00d1`) collides with nothing published and is unchanged, so both §6.1 mandate signatures stand. The §7.3/§7.3.1 spec blocks keep their placeholder signatures — only ids change there.
+- **The `aph-ts` wasm boundary is JSON text in BOTH directions.** `parseEnvelopeJson` takes a JSON string and returns the envelope re-emitted as canonical JSON text; `serializeEnvelope` takes JSON text instead of a `JsValue`. The `serde-wasm-bindgen` route (and dependency) is removed: a JS number is always an `f64`, and the untagged object-or-array `proof` union is exactly where a widened integer could silently change which arm deserializes — JSON text makes that impossible structurally. The crate gains its first tests: native round-trips of the signed `PrincipalSigned` golden (chain form) and a legacy envelope (single form), pinning both union arms and integer fidelity across the boundary.
+- **`aph-ts` exports `verifyProofStructure` and `requireAttestationMode`**, wrapping the reference implementation's §7.1.11 structural check and §8.3.1 step-1a mode gate, so a TypeScript consumer can detect a forged `PrincipalSigned` label (`APH_E013`) and refuse an attestation-mode downgrade (`APH_E012`) with the same codes the Rust API raises.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

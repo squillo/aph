@@ -8,7 +8,7 @@
     "VerifiableCredential",
     "AgentSendAuthorizationCredential"
   ],
-  "id": "urn:uuid:00000000-0000-4000-8000-000000000002",
+  "id": "urn:uuid:00000000-0000-4000-8000-0000000000f3",
   "issuer": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
   "validFrom": "2026-05-21T00:00:00Z",
   "validUntil": "2026-05-22T00:00:00Z",
@@ -76,7 +76,7 @@
       "verificationMethod": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT#z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
       "created": "2026-05-21T00:00:01Z",
       "proofPurpose": "assertionMethod",
-      "proofValue": "z599zj7K7DrqYk9AigfxvTxTM9FCwYBAEGt3qXqBrsYcKw996XBJmk9RyyAvdPHGJLuWWrUJ8vXkV5HBWKWpUox8x",
+      "proofValue": "z5gagVFM6qRWdwwmsLANK1NafA1XLoxxfVqEUHpcNtq9XF32EA4MKaeAkB3M9Q75shNEUuewyrtu6X8m4sV7T74Z6",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f1"
     },
     {
@@ -85,7 +85,7 @@
       "verificationMethod": "did:web:notary.squillo.io#key-1",
       "created": "2026-05-21T00:00:02Z",
       "proofPurpose": "authentication",
-      "proofValue": "z3B52ttvBBS4uy8wFxi82Nudk5bqi1AjxmQ1oxq6oFqLbEapdp35HGTsq8ndfNYXy6cNwsSPFoKtrjyBaAqWJA3xn",
+      "proofValue": "z5xqUvjVXZgWaEhhdS2BoJMDwt1kPdoaP3tE5opiz4zNrDEMX3mncZzLyxKdN5fHhtCbvZkZ5u4saiv3ckFQmJjwc",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f2",
       "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000f1"
     }

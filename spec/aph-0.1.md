@@ -659,7 +659,7 @@ The following is a complete v0.1 Slack-reply envelope demonstrating a thread-rep
     "https://w3id.org/aph/v1"
   ],
   "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
-  "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
+  "id": "urn:uuid:00000000-0000-4000-8000-0000000000f0",
   "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
   "validFrom": "2026-05-21T00:00:00Z",
   "validUntil": "2026-05-22T00:00:00Z",
@@ -737,7 +737,7 @@ implementation.
     "https://w3id.org/aph/v1"
   ],
   "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
-  "id": "urn:uuid:00000000-0000-4000-8000-000000000002",
+  "id": "urn:uuid:00000000-0000-4000-8000-0000000000f3",
   "issuer": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
   "validFrom": "2026-05-21T00:00:00Z",
   "validUntil": "2026-05-22T00:00:00Z",

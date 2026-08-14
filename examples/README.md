@@ -60,8 +60,9 @@ every placeholder replaced by a REAL Ed25519 signature — the first
   every byte with no secret material.
 - The `id`s and timestamps are the §7.3.1 worked example's own values, so
   the spec's prose and this file describe the same credential. Its
-  envelope `id` (`...0002`) therefore repeats the worked example's rather
-  than extending the `{1..8}` sequence above.
+  envelope `id` (`...00f3`) sits in the tail range worked examples now
+  reserve — distinct from the `{1..8}` channel-example sequence above,
+  ending the id collision the earlier `...0002` reuse carried.
 - The conformance suite regenerates this file from constants through the
   reference implementation's own signing path and byte-compares the
   result, verifies both envelope proofs, the issuance order, the

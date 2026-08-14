@@ -13,10 +13,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 aph-core = { workspace = true }
-serde = { workspace = true }
+# The JS boundary is JSON text in BOTH directions (see src/lib.rs module
+# docs); envelopes never cross as `JsValue`, so there is deliberately no
+# serde-wasm-bindgen dependency here.
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
-serde-wasm-bindgen = { workspace = true }
 
 # aph-core's p256 dependency pulls getrandom transitively; on
 # wasm32-unknown-unknown getrandom needs its "js" backend enabled.

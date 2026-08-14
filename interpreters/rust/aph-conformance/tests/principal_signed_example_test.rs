@@ -55,7 +55,7 @@ const NOTARY_PUBLIC_KEY: [u8; 32] = [
 const PRINCIPAL_DID: &str = "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT";
 
 /// Envelope id — the §7.3.1 worked example's own value.
-const ENVELOPE_ID: &str = "urn:uuid:00000000-0000-4000-8000-000000000002";
+const ENVELOPE_ID: &str = "urn:uuid:00000000-0000-4000-8000-0000000000f3";
 /// Embedded Delegation Mandate id — the §7.3.1 worked example's own value.
 const MANDATE_ID: &str = "urn:uuid:00000000-0000-4000-8000-0000000000d1";
 /// Principal proof id — the §7.3.1 worked example's own value.

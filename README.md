@@ -72,7 +72,7 @@ A full schema lives under `spec/aph-0.1.md`. The example below is a complete v0.
     "https://w3id.org/aph/v1"
   ],
   "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
-  "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
+  "id": "urn:uuid:00000000-0000-4000-8000-0000000000f0",
   "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
   "validFrom": "2026-05-21T00:00:00Z",
   "validUntil": "2026-05-22T00:00:00Z",
