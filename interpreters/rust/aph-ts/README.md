@@ -14,7 +14,8 @@ only number parser that runs is `serde_json`'s.
 This crate targets `wasm32` and is excluded from default host builds and
 tests (see `default-members` in the workspace `Cargo.toml`); build it
 explicitly with `wasm-pack` as shown below. Its native tests run with
-`cargo test -p aph-ts`.
+`cargo test -p aph-ts`; the wasm32 smoke suite runs under Node with
+`wasm-pack test --node aph-ts`. CI runs both on every push.
 
 ## Build
 

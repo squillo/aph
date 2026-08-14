@@ -130,6 +130,10 @@ APH is pre-production with no external adopters, so this correction lands **in p
 - **The `aph-ts` wasm boundary is JSON text in BOTH directions.** `parseEnvelopeJson` takes a JSON string and returns the envelope re-emitted as canonical JSON text; `serializeEnvelope` takes JSON text instead of a `JsValue`. The `serde-wasm-bindgen` route (and dependency) is removed: a JS number is always an `f64`, and the untagged object-or-array `proof` union is exactly where a widened integer could silently change which arm deserializes — JSON text makes that impossible structurally. The crate gains its first tests: native round-trips of the signed `PrincipalSigned` golden (chain form) and a legacy envelope (single form), pinning both union arms and integer fidelity across the boundary.
 - **`aph-ts` exports `verifyProofStructure` and `requireAttestationMode`**, wrapping the reference implementation's §7.1.11 structural check and §8.3.1 step-1a mode gate, so a TypeScript consumer can detect a forged `PrincipalSigned` label (`APH_E013`) and refuse an attestation-mode downgrade (`APH_E012`) with the same codes the Rust API raises.
 
+### Changed (revision 2026-08-14 — CI reaches aph-ts)
+
+- **CI finally runs the `aph-ts` tests.** `aph-ts` sits outside the workspace's `default-members`, so the interpreter workflow's bare `cargo test` never reached its tests; the workflow now runs `cargo test -p aph-ts` natively AND a new wasm32 smoke suite under Node (`wasm-pack test --node aph-ts`), which replaces the old type-check-only wasm step. The smoke test feeds the published `PrincipalSigned` golden through the real exported wasm functions — parse, structural verification, re-serialization, and the no-downgrade gate — pinning integer fidelity across the compiled boundary. The tag-gated publish workflow names `aph-ts` explicitly for the same reason.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

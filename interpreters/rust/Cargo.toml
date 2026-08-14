@@ -27,4 +27,6 @@ bs58 = "0.5"
 base64 = "0.22"
 proptest = "1.5"
 wasm-bindgen = "0.2"
-serde-wasm-bindgen = "0.6"
+# The wasm smoke harness (aph-ts); the JS boundary itself is JSON text in
+# both directions, so there is deliberately no serde-wasm-bindgen here.
+wasm-bindgen-test = "0.3"

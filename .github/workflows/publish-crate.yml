@@ -25,10 +25,13 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # The gates the tag is asserting have passed.
+      # The gates the tag is asserting have passed. aph-ts sits outside
+      # default-members, so it is named explicitly or it is not tested.
       - name: Test
         working-directory: interpreters/rust
-        run: cargo test
+        run: |
+          cargo test
+          cargo test -p aph-ts
       - name: Lint
         working-directory: interpreters/rust
         run: cargo clippy --all-targets -- -D warnings

@@ -30,6 +30,15 @@ jobs:
       - name: Run tests
         working-directory: interpreters/rust
         run: cargo test
-      - name: Type-check wasm binding
+      # aph-ts is outside default-members, so the bare `cargo test` above
+      # never reaches its tests — run them explicitly, natively first.
+      - name: Run aph-ts native tests
         working-directory: interpreters/rust
-        run: cargo check -p aph-ts --target wasm32-unknown-unknown
+        run: cargo test -p aph-ts
+      # The wasm run subsumes the old `cargo check --target wasm32` step:
+      # it compiles the same target AND executes the smoke suite under Node.
+      - name: Install wasm-pack
+        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+      - name: Run aph-ts wasm tests
+        working-directory: interpreters/rust
+        run: wasm-pack test --node aph-ts

@@ -23,3 +23,9 @@ wasm-bindgen = { workspace = true }
 # wasm32-unknown-unknown getrandom needs its "js" backend enabled.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
+
+# The wasm smoke harness is wasm32-only by construction: the native
+# `cargo test -p aph-ts` run exercises the module tests in src/lib.rs and
+# compiles tests/wasm.rs to an empty binary (see its crate-level cfg).
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
