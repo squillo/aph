@@ -16,6 +16,12 @@ on:
       - "spec/**"
       - ".github/workflows/rust-interpreter.yml"
 
+# Least privilege: this workflow only reads the tree. Nothing it runs needs a
+# writable token, so the default grant is narrowed to read-only here rather
+# than relied upon per job.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: cargo test
@@ -27,6 +33,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+      # Cache the cargo registry and target dir for the TEST job only. A test
+      # run is repeated constantly and is safe to warm-start.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: interpreters/rust
       - name: Run tests
         working-directory: interpreters/rust
         run: cargo test
@@ -37,8 +48,12 @@ jobs:
         run: cargo test -p aph-ts
       # The wasm run subsumes the old `cargo check --target wasm32` step:
       # it compiles the same target AND executes the smoke suite under Node.
+      # Pinned + checksum-verified installer instead of piping a remote script
+      # into a shell: the version CI runs is the version CI was reviewed with.
       - name: Install wasm-pack
-        run: curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+        uses: taiki-e/install-action@82cd3e7658a6f96c86c0234aeeda1748937cb0a1 # v2.85.13
+        with:
+          tool: wasm-pack@0.15.0
       - name: Run aph-ts wasm tests
         working-directory: interpreters/rust
         run: wasm-pack test --node aph-ts

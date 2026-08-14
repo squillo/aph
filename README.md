@@ -221,7 +221,7 @@ let canonical = aph_core::canonicalize_rfc8785(&unsigned);
 let ok = aph_core::verify_detached_jws(&jws, canonical.as_bytes(), &notary_key);
 ```
 
-Resolving `notary_key` from the issuer DID is the verifier's job (spec §8.4: `did:key` offline, DNS TXT at `_aph._notary.<domain>`, or `did:web`). Key discovery is not yet implemented in this crate.
+Resolving `notary_key` from the issuer DID is the verifier's job (spec §8.4: `did:key` offline, DNS TXT at `_aph._notary.<domain>`, or `did:web`). `aph_core::discovery` ships that resolution split in two halves: the parsing and publication code is pure and offline (`dns_txt`, `did_document`, `publish`, and the `did:key` decode), while the DNS query and the HTTPS document fetch stay behind the two one-method traits in `discovery::ports` for your adapter to supply. `discovery::composer::resolve` drives them in the §8.4.6 order — `did:key`, then DNS TXT, then `did:web` — advancing on ABSENCE only, and never falling back to a weaker anchor after a failure.
 
 ### Enforce scope and consent
 

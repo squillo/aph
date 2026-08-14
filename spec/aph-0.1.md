@@ -1167,6 +1167,14 @@ Notary Service operators rotating a key MUST:
 
 Verifiers MUST consult the `notBefore`/`notAfter` window of the TXT record (or, for DID Documents, the per-`verificationMethod` validity metadata if present) and accept any envelope where the signing key was valid at the envelope's `decisionTimestamp`.
 
+**Expressing the overlap on the `did:web` mechanism.** Steps 3 and 4 above are written in the dated form that only the DNS TXT mechanism carries: `notBefore` and `notAfter` are §8.4.5 tags. The §8.4.4 DID Document schema defines no per-key validity metadata, and this specification deliberately does NOT add any — the document stays a plain DID Document that any conformant `did:web` resolver can read. On `did:web`, therefore, rotation overlap is **presence-based**:
+
+- **The overlap window IS both keys appearing in one document.** The operator adds the NEW key as a second `verificationMethod` entry alongside the OLD one, and both remain resolvable for the whole overlap window. The RECOMMENDED 30-day minimum of step 1 is unchanged.
+- **Retirement IS removal.** After the overlap window the operator REMOVES the OLD `verificationMethod` entry from the document. Step 3's `notAfter` and step 4's further-visibility window have no `did:web` expression; an operator who wants step 4's historical-resolution property MUST also publish DNS TXT, which is where the dated form lives.
+- **An identity publishing ONLY `did:web` rotates by add-then-remove.** This is the ordinary case for an operator serving a document from a host whose DNS zone they do not control (a subdomain on a shared platform, say), who therefore cannot publish any record at `_aph._notary.<domain>`. Such an operator is conformant: steps 3 and 4 bind only where the mechanism can express them.
+
+Consequences for verifiers. The `notBefore`/`notAfter` check stated above applies to whatever mechanism actually published validity metadata; a `did:web` key that publishes none is valid exactly while it is present in the document, and its absence from the document is absence in the §8.4.6 sense, not failure. Because presence is the only signal, a verifier pinning a key under §8.4.8 MUST re-pin during the overlap window: once the OLD entry is removed it is unresolvable, and an envelope signed under it before removal can no longer be checked against the published document.
+
 #### 8.4.8 Trust-on-first-use + pinning
 
 Recipient applications that store a notary's resolved public key after the first successful verification MAY pin the key locally and prefer the pinned copy on subsequent verifications. Pinning is OPTIONAL in v0.1 and is RECOMMENDED for high-stakes verifiers (e.g., compliance-recording systems) that want to detect notary-key compromise via mismatch with the pinned copy.

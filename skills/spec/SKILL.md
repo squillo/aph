@@ -230,10 +230,21 @@ the principal would be signing bytes that do not exist yet.
 
 The order distinguishes **absent** from **broken** (§8.4.6): a mechanism that
 is simply not published (no TXT record, no served `did.json`) ADVANCES the
-verifier to the next one — terminal absence is `APH_E014` — while a mechanism
-that is published and broken (malformed record, unfetchable document) REFUSES
-on the spot with `APH_E008` and never falls through. Key rotation requires
-overlapping publication windows (§8.4.7, 30-day minimum recommended).
+verifier to the next one, and absence that is TERMINAL — the last mechanism in
+the sequence, or a pinned mechanism with no successor — is `APH_E014`. A
+mechanism that IS published and then fails (malformed record, unfetchable
+document, key outside its validity window, unsupported algorithm) REFUSES on
+the spot and never falls through — surfacing **the failure's own code**:
+`APH_E008` unreachable, `APH_E003` outside the validity window, `APH_E010`
+unsupported algorithm, and so on. Do not flatten those into one code. The two
+fixed points: `APH_E014` means terminal ABSENCE and nothing else; `APH_E008`
+means offered-and-unreachable and nothing else.
+
+Key rotation requires overlapping publication windows (§8.4.7, 30-day minimum
+recommended). The overlap is expressed by dated `notBefore`/`notAfter` tags on
+the DNS TXT mechanism, and by PRESENCE on `did:web` — both keys in one
+document, then the old one removed — because the DID Document schema carries
+no per-key validity metadata.
 
 A live reference publication surface exists at
 `https://aph-notary.squillo.workers.dev/.well-known/did.json`

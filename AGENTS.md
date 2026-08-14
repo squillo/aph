@@ -52,16 +52,15 @@ cargo run -q -p aph-cli -- validate <envelope.json>
    label is never trusted alone: structure is checked (`APH_E013` on a forged
    label), and mode downgrades are refused (`APH_E012`).
 4. **The error taxonomy is a closed set of fourteen** (`APH_E001`–`APH_E014`).
-   `APH_E014` means a discovery surface is ABSENT (advances the §8.4.6
-   resolution order: `did:key` → DNS TXT → `did:web`); `APH_E008` means it was
-   offered and BROKE (refuses on the spot, never falls through). Do not
-   conflate them.
+   `APH_E014` is TERMINAL ABSENCE of a discovery surface and nothing else —
+   absence advances the §8.4.6 order (`did:key` → DNS TXT → `did:web`). A
+   surface that was offered and then FAILED never falls through: it refuses on
+   the spot under the failure's OWN code (`APH_E008` unreachable, `APH_E003`
+   validity window, `APH_E010` algorithm, …), never a blanket one.
 5. **Signed fixtures are never text-edited.**
    `examples/principal_signed_envelope.json` carries four real Ed25519
-   signatures over its bytes. Regenerate it through
-   `interpreters/rust/aph-conformance/tests/principal_signed_example_test.rs`:
-   run the byte-identity test, materialize the bytes it prints between the
-   `----8<----` cut lines (trailing newline included), re-run the suite green.
+   signatures over its bytes. Regenerate it — the recipe is in
+   `skills/spec/SKILL.md`.
 6. **Test keys only.** Fixtures sign with RFC 8032 test vectors. Never place
    production-looking key material — and never any private key — in a
    committed or published artifact.
@@ -74,10 +73,6 @@ cargo run -q -p aph-cli -- validate <envelope.json>
 
 ## The live reference deployment
 
-`https://aph-notary.squillo.workers.dev/.well-known/did.json` is a live
-`did:web` publication surface (`did:web:aph-notary.squillo.workers.dev`)
-serving the §8.4.4 DID Document byte-verbatim from its edge binding. While
-unprovisioned it answers HTTP 503 with `{"available": false, "reason": …}` —
-that typed refusal is the normative degrade shape, not an outage. It publishes
-no DNS TXT record on purpose: resolving it exercises the absence-advances rule
-live.
+`did:web:aph-notary.squillo.workers.dev` is a live §8.4.4 publication surface
+you can resolve against. Its degrade shape and what resolving it exercises are
+described in `skills/spec/SKILL.md`.
