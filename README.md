@@ -284,6 +284,8 @@ The repository is also an installable plugin for agentic coding tools, giving an
 
 It provides the `/aph:spec` skill (a protocol crash course grounded in the spec sections), `/aph:validate`, and `/aph:conformance`.
 
+For OpenAI Codex and any tool following the [agents.md](https://agents.md) convention, the repo root carries an `AGENTS.md` with orientation, CI-exact build/test commands, and the invariants — it points into the same `skills/spec/SKILL.md`, which follows the open Agent Skills format both ecosystems load, so both packs read one knowledge source.
+
 ## N Lang Specification Snapp
 
 `APH Spec/0.1.0/` defines the protocol's JSON documents as [N Lang](https://squillo.com/nlang) types, compiled to `snapp/aph@0.1.0-alpha.1.json`. N Lang is a proprietary language by Squillo Inc., commercially licensable only through Squillo Inc.; the Snapp sources themselves are Apache-2.0 like the rest of this repository.

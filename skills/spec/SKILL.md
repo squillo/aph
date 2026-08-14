@@ -4,7 +4,7 @@ description: >-
   APH (Agent per Human) protocol crash course and reference. Use when working with
   APH, NotarizationEnvelope JSON, envelope validation or verification, notarization
   flows, a Delegation Mandate or Communication Mandate, the notary service, the
-  "agent driver's license" model, APH error codes (APH_E001..APH_E010), signing
+  "agent driver's license" model, APH error codes (APH_E001..APH_E014), signing
   profiles (eddsa-jcs-2022, ecdsa-jcs-2019, detached JWS), notary public-key
   discovery (did:key, did:web, DNS TXT), channel kinds, or the A2A notarization
   extension. Covers wire shape, state machines, closed enums, and how to run the
@@ -111,7 +111,7 @@ EnvelopeIssued -> Delivered
 
 Any other transition MUST be rejected with `APH_E002`.
 
-## Error taxonomy (spec §11) — closed set of 10
+## Error taxonomy (spec §11) — closed set of 14
 
 | Code | Variant | Meaning |
 |---|---|---|
@@ -125,6 +125,10 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E008` | `NotaryServiceUnreachable` | Remote notary timed out |
 | `APH_E009` | `EnvelopeBodyHashMismatch` | Recipient's SHA-256 of the body != `communication.bodySha256` |
 | `APH_E010` | `UnsupportedAlgorithm` | Algorithm outside {`ES256`, `EdDSA`}, or `alg: none` |
+| `APH_E011` | `PrincipalSignatureInvalid` | A signature made by the HUMAN's key failed: the principal proof of a chain, or an embedded mandate's `principalSignature`. Distinct from E001/E006, which are notary signatures |
+| `APH_E012` | `AttestationModeRefused` | Verifier policy requires `PrincipalSigned` and the envelope is `NotaryAttested` (§8.3.1 step 1a). A refusal of the weaker claim, not an envelope defect |
+| `APH_E013` | `ProofChainInvalid` | Malformed chain: wrong length, wrong `proofPurpose` per position, or `previousProof` missing/dangling/duplicated/cyclic (§7.1.11). Also what a forged `PrincipalSigned` label raises |
+| `APH_E014` | `NotaryKeyNotPublished` | Nothing published at the queried discovery surface: no TXT record at the name, or the DID Document names no matching key. ABSENT, held distinct from E008 (offered-and-broke) |
 
 ## Trust model — WHO signs (the most important section here)
 
@@ -224,9 +228,19 @@ the principal would be signing bytes that do not exist yet.
    TLS, find the `verificationMethod` entry whose `id` equals the full DID URL,
    decode `publicKeyMultibase`.
 
-Never fall back from a stronger anchor to a weaker one mid-resolution; failure
-escalates to rejection. Key rotation requires overlapping publication windows
-(§8.4.7, 30-day minimum recommended).
+The order distinguishes **absent** from **broken** (§8.4.6): a mechanism that
+is simply not published (no TXT record, no served `did.json`) ADVANCES the
+verifier to the next one — terminal absence is `APH_E014` — while a mechanism
+that is published and broken (malformed record, unfetchable document) REFUSES
+on the spot with `APH_E008` and never falls through. Key rotation requires
+overlapping publication windows (§8.4.7, 30-day minimum recommended).
+
+A live reference publication surface exists at
+`https://aph-notary.squillo.workers.dev/.well-known/did.json`
+(`did:web:aph-notary.squillo.workers.dev`). While unprovisioned it answers
+HTTP 503 with the typed refusal `{"available": false, "reason": …}` — that
+shape is the normative degrade, not an outage. It deliberately publishes no
+DNS TXT record, so resolving it also exercises absence-advances live.
 
 ## HOW-TO
 
@@ -253,6 +267,28 @@ cargo test
 This exercises the workspace default members (`aph-core`, `aph-conformance`,
 `aph-cli`): golden envelope fixtures, contract tests, channel-binding specs, and
 round-trips of the repo `examples/*.json`.
+
+**Test the wasm/TS binding** (`aph-ts` sits OUTSIDE default-members, so plain
+`cargo test` never reaches it — name it):
+
+```
+cargo test -p aph-ts          # native tests of the JSON-text boundary
+wasm-pack test --node aph-ts  # the wasm32 smoke over the signed golden
+```
+
+The TS boundary is JSON **text in both directions** (never `JsValue`): a JS
+number is always an f64, and the untagged single-object-or-chain `proof` union
+is exactly where a widened integer could flip which arm deserializes. Exports:
+`parseEnvelopeJson`, `serializeEnvelope`, `verifyProofStructure` (returns the
+mode the STRUCTURE proves; forged `PrincipalSigned` label throws `APH_E013`),
+`requireAttestationMode` (no-downgrade gate; throws `APH_E012`).
+
+**Signed fixtures are never text-edited.** `examples/principal_signed_envelope.json`
+carries four REAL Ed25519 signatures (RFC 8032 test seeds). To change it,
+update the generator at
+`interpreters/rust/aph-conformance/tests/principal_signed_example_test.rs`,
+run its byte-identity test, and materialize the bytes it prints between the
+`----8<----` cut lines — then re-run the suite green.
 
 **Golden fixtures:** the repo-level `examples/*.json` files are the canonical
 wire-shape fixtures (one per channel kind); the conformance crate under

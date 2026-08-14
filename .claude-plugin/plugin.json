@@ -1,8 +1,8 @@
 {
   "name": "aph",
   "displayName": "APH Protocol",
-  "version": "0.1.0",
-  "description": "Work with the APH agent-communication notarization protocol — envelopes, mandates, conformance.",
+  "version": "0.2.0",
+  "description": "Work with the APH agent-communication notarization protocol — envelopes, mandates, proof chains, key discovery, conformance.",
   "author": {
     "name": "APH Protocol Contributors"
   },

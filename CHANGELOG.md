@@ -141,6 +141,11 @@ APH is pre-production with no external adopters, so this correction lands **in p
 - The §7.3 and §7.3.1 worked examples keep their placeholder signature values — they are illustrative, not test vectors — so only identifiers change there.
 - The N Lang Snapp bundle `snapp/aph@0.1.0-alpha.1.json` is re-exported from the swept `APH Spec/0.1.0/` sources, which also refreshes its `integrity` digest.
 
+### Added (revision 2026-08-14c — agent packs: Codex support + currency refresh)
+
+- **`AGENTS.md` at the repo root** — the [agents.md](https://agents.md)-convention entry point (OpenAI Codex and compatible tools): repo map, CI-exact build/test commands, the eight invariants (strict parsing, the untagged proof union and the JSON-text boundary rationale, mode semantics, the fourteen-code taxonomy with the E014-absent/E008-broke distinction, the signed-fixture regeneration recipe, test-keys-only, domain canon, name hygiene), and the live `did:web` reference deployment with its typed-refusal degrade shape. It points into `skills/spec/SKILL.md` rather than duplicating it — the skill follows the open Agent Skills format both ecosystems load, so both packs share one knowledge source.
+- **`skills/spec/SKILL.md` brought to protocol currency**: the error table grows from ten to fourteen rows (`APH_E011`–`APH_E014`), the §8.4.6 section gains the absence-advances/broken-refuses distinction and the live `aph-notary.squillo.workers.dev` publication surface, and the HOW-TO gains the `aph-ts` test commands, the JSON-text boundary contract with all four exports, and the signed-fixture regeneration recipe. `commands/conformance.md` error range updated. Plugin manifest bumped to 0.2.0.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.
