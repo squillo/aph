@@ -33,7 +33,7 @@
 //! [`super::did_document`] parses DID Documents. This module adds no second
 //! decoder and — importantly — no `map_err`: each mechanism's failure
 //! distinctions (`APH_E008` unreachable, `APH_E003` outside its validity
-//! window, `APH_E010` unsupported, `APH_E001` no such key) reach the caller
+//! window, `APH_E010` unsupported, `APH_E014` not published) reach the caller
 //! unflattened, because "the notary is down" and "the notary rotated last
 //! week" have different next steps for an operator.
 
@@ -225,9 +225,10 @@ pub fn resolve_did_key(
 /// fails rather than decoding the `did:key` offline: a caller that pinned
 /// DNS TXT asked for DNS TXT, and quietly answering from a different
 /// mechanism is the substitution this module exists to prevent.
-/// Otherwise whatever the port or `select_key` returns: `APH_E008` when
-/// nothing resolvable was published, `APH_E003` when a matching key's
-/// `notBefore`/`notAfter` window excludes `at_rfc3339`.
+/// Otherwise whatever the port or `select_key` returns: `APH_E014` when
+/// nothing resolvable is published at the TXT name, `APH_E003` when a
+/// matching key's `notBefore`/`notAfter` window excludes `at_rfc3339`,
+/// `APH_E008` when the lookup itself failed.
 pub async fn resolve_dns_txt(
   did_url: &str,
   lookup: &dyn super::ports::TxtRecordLookup,
@@ -249,12 +250,17 @@ pub async fn resolve_dns_txt(
   match super::dns_txt::select_key(&records, parsed.fragment.as_deref(), at_rfc3339)? {
     std::option::Option::Some(key) => std::result::Result::Ok(key),
     // Terminal absence: this mechanism was explicitly chosen (named or
-    // pinned), so there is no later mechanism to advance to. §11's closed
-    // taxonomy has no "not published" code; E008 is the resolution-failure
-    // code this crate has always surfaced at this boundary, with a message
-    // that says what actually happened.
+    // pinned), so there is no later mechanism to advance to — but absence
+    // is still not failure, and since APH_E014 joined the §11 taxonomy the
+    // boundary can finally say which one happened. A caller holding E014
+    // knows nothing is published here; a caller holding E008 knows the
+    // lookup broke. §8.4.6's no-downgrade rule is only writable downstream
+    // because these are different codes.
     std::option::Option::None => std::result::Result::Err(
-      crate::errors::AphError::NotaryServiceUnreachable,
+      crate::errors::AphError::notary_key_not_published(std::format!(
+        "DNS TXT `{}` (terminal: this mechanism was explicitly selected)",
+        name
+      )),
     ),
   }
 }
@@ -302,8 +308,11 @@ async fn probe_dns_txt(
 ///
 /// `APH_E010` if the identifier yields no document URL (e.g. an empty host)
 /// or the named key is published only as `publicKeyJwk`; `APH_E008` if the
-/// port could not fetch or the body will not parse; `APH_E001` if the
-/// document publishes no key under the named fragment.
+/// port could not fetch or the body will not parse; `APH_E014` if the
+/// document was fetched but publishes no key under the named fragment —
+/// the document exists, this key is simply not published in it, and the
+/// requester already knows the host is reachable so the code leaks nothing
+/// a transport-opaque `APH_E008` was protecting.
 pub async fn resolve_did_web(
   did_url: &str,
   fetch: &dyn super::ports::DidDocumentFetch,
@@ -736,9 +745,12 @@ mod tests {
       "APH_E010"
     );
 
-    // APH_E008 — a PIN is a narrowing (there is no later mechanism), so
-    // absence at a pinned mechanism is terminal. The message differs from a
-    // transport failure; the code is the closed taxonomy's nearest.
+    // APH_E014 — a PIN is a narrowing (there is no later mechanism), so
+    // absence at a pinned mechanism is terminal — but terminal absence is
+    // still absence, and since E014 joined the taxonomy the code says so.
+    // Pinning E014 (not E008) here is the point of the widening: a caller
+    // can now tell "nothing is published" from "the lookup broke" without
+    // parsing a message string.
     std::assert_eq!(
       block_on(super::resolve(
         super::MechanismSelection::Pinned(super::DiscoveryMechanism::DnsTxt),
@@ -749,7 +761,7 @@ mod tests {
       ))
       .unwrap_err()
       .code(),
-      "APH_E008"
+      "APH_E014"
     );
 
     // APH_E003 — the key was found, but not valid at this instant.
@@ -766,10 +778,13 @@ mod tests {
       "APH_E003"
     );
 
-    // APH_E001 — the anchor answered, but publishes no such key. The TXT
-    // probe that now precedes the fetch sees absence (nothing published)
-    // and advances, per §8.4.6 — hence a real empty fake here rather than
-    // the exploding one used on the did:key row.
+    // APH_E014 — the anchor answered, but publishes no such key. The TXT
+    // probe that precedes the fetch sees absence (nothing published) and
+    // advances, per §8.4.6 — hence a real empty fake here rather than the
+    // exploding one used on the did:key row. The fetched document exists
+    // and simply lacks `#k9`, which is "not published" (E014), not "the
+    // envelope's signature is invalid" (the E001 this arm reported before
+    // the taxonomy had a word for absence).
     std::assert_eq!(
       block_on(super::resolve(
         super::MechanismSelection::NamedByDid,
@@ -780,7 +795,7 @@ mod tests {
       ))
       .unwrap_err()
       .code(),
-      "APH_E001"
+      "APH_E014"
     );
   }
 

@@ -110,8 +110,16 @@ impl DidDocument {
 
     let entry = match entry {
       std::option::Option::Some(e) => e,
+      // The document was fetched and parsed; it simply names no key
+      // matching the queried DID URL (or names several and the URL carries
+      // no fragment to choose by). That is "not published" (APH_E014), not
+      // a signature defect: the E001 this arm returned before the taxonomy
+      // had a word for absence accused the envelope of a forgery no key
+      // was ever obtained to check.
       std::option::Option::None => {
-        return std::result::Result::Err(crate::errors::AphError::InvalidEnvelopeSignature);
+        return std::result::Result::Err(crate::errors::AphError::notary_key_not_published(
+          std::format!("DID Document names no verificationMethod matching `{}`", did_url),
+        ));
       }
     };
 

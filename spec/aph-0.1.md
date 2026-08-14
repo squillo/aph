@@ -1149,8 +1149,8 @@ A verifier MAY pin a preferred mechanism per notary (typically via configuration
 
 **Absence is not failure, and the distinction is normative.** An ordered list and a no-downgrade rule only coexist if a verifier can tell the two apart:
 
-- **Not published** — no TXT record exists at `_aph._notary.<domain>`, or no `did.json` is served. That mechanism is simply not offered, and the verifier advances to the next one in the list.
-- **Published and failed** — the lookup errored, the record is malformed, the signature does not verify, the key is outside its validity window, or the algorithm is unsupported. The verifier **MUST reject the envelope** rather than advance.
+- **Not published** — no TXT record exists at `_aph._notary.<domain>`, or no `did.json` is served. That mechanism is simply not offered, and the verifier advances to the next one in the list. When absence is *terminal* — the last mechanism in the sequence, or a pinned mechanism with no successor — the error is `APH_E014` (§11), never `APH_E008`.
+- **Published and failed** — the lookup errored, the record is malformed, the signature does not verify, the key is outside its validity window, or the algorithm is unsupported. The verifier **MUST reject the envelope** rather than advance, surfacing the failure's own code (`APH_E008` unreachable, `APH_E003` window, `APH_E010` algorithm, …).
 
 The second rule is what makes the ordering safe. Without it, an attacker who can make a stronger mechanism *fail* — a DNS outage they cause, a record they corrupt — thereby chooses which anchor the verifier trusts, and choosing the anchor is an identity decision rather than a reachability one. **A verifier MUST NOT silently fall back from a stronger anchor to a weaker one after a failure; failures escalate to envelope rejection.**
 
@@ -1290,7 +1290,7 @@ APH identifies both the human principal and the agent via DIDs. v0.1 implementat
 
 ## 11. Error Taxonomy
 
-APH defines a closed set of thirteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
+APH defines a closed set of fourteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
 
 | Code | Variant | Meaning | Suggested resolution |
 |---|---|---|---|
@@ -1307,6 +1307,7 @@ APH defines a closed set of thirteen error codes for v0.1. Implementations MUST 
 | `APH_E011` | `PrincipalSignatureInvalid` | A signature made by the HUMAN's key did not verify: the principal proof of a chain (§8.3.1 step 1c), or an embedded Delegation Mandate's `principalSignature` (step 1d). Distinct from `APH_E001` and `APH_E006`, which are both notary signatures — a verifier that conflated them would report a forged authorization as a notary misconfiguration. | Confirm the principal's key resolved from `humanPrincipalDid` matches `verificationMethod`; re-sign with the human's key. |
 | `APH_E012` | `AttestationModeRefused` | The verifier's policy requires `PrincipalSigned` and the envelope is `NotaryAttested` (§8.3.1 step 1a). Not a defect in the envelope — a refusal to accept the weaker claim. | Re-issue in `PrincipalSigned` mode, or relax the verifier's policy deliberately and in the open. |
 | `APH_E013` | `ProofChainInvalid` | The proof chain is malformed: wrong length, wrong `proofPurpose` for a position, or a `previousProof` that is missing, dangling, duplicated, or cyclic (§7.1.11, §8.3.1 step 1e). | Emit exactly two proofs, principal first, with the notary proof's `previousProof` naming the principal proof's `id`. |
+| `APH_E014` | `NotaryKeyNotPublished` | No notary key is published at the queried discovery surface: the DNS TXT name carries no APH record (or none matching the named `kid`), or a fetched DID Document names no key under the queried fragment (§8.4.5, §8.4.4). Deliberately distinct from `APH_E008`, which means the surface could not be REACHED — §8.4.6's no-downgrade rule turns on exactly this distinction (absence advances the resolution sequence; failure stops it), and a taxonomy that flattened the two would force every implementation's error surface to flatten them again. | Publish the key at the queried surface, or direct verifiers to a surface the notary actually publishes to. |
 
 ---
 

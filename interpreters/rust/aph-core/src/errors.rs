@@ -106,6 +106,20 @@ pub enum AphError {
     /// What specifically is wrong with the chain.
     reason: String,
   },
+
+  /// `APH_E014` — no notary key is published at the queried discovery
+  /// surface: the DNS TXT name carries no APH record (or none matching the
+  /// named `kid`), or a fetched DID Document names no key under the queried
+  /// fragment. Deliberately distinct from `APH_E008`, which means the
+  /// surface could not be REACHED: §8.4.6's no-downgrade rule turns on
+  /// exactly this distinction — absence advances the fallback sequence,
+  /// failure must stop it — and a taxonomy that flattens the two forces
+  /// every consumer's error surface to flatten them again.
+  #[error("APH_E014: notary key not published: {surface}")]
+  NotaryKeyNotPublished {
+    /// Which discovery surface answered "nothing is published here".
+    surface: String,
+  },
 }
 
 impl AphError {
@@ -127,6 +141,7 @@ impl AphError {
       Self::PrincipalSignatureInvalid => "APH_E011",
       Self::AttestationModeRefused { .. } => "APH_E012",
       Self::ProofChainInvalid { .. } => "APH_E013",
+      Self::NotaryKeyNotPublished { .. } => "APH_E014",
     }
   }
 
@@ -146,6 +161,7 @@ impl AphError {
       Self::PrincipalSignatureInvalid => "Re-sign with the human's key; check it matches `humanPrincipalDid`",
       Self::AttestationModeRefused { .. } => "Re-issue in `PrincipalSigned` mode, or relax the policy deliberately",
       Self::ProofChainInvalid { .. } => "Emit principal proof then notary proof, linked by `previousProof`",
+      Self::NotaryKeyNotPublished { .. } => "Publish the key at this surface (§8.4.4/§8.4.5), or query one the notary publishes to",
     }
   }
 
@@ -166,6 +182,13 @@ impl AphError {
   pub fn mandate_expired(mandate_id: impl std::convert::Into<String>) -> Self {
     Self::MandateExpired {
       mandate_id: mandate_id.into(),
+    }
+  }
+
+  /// Builds an `APH_E014` naming the surface that published nothing.
+  pub fn notary_key_not_published(surface: impl std::convert::Into<String>) -> Self {
+    Self::NotaryKeyNotPublished {
+      surface: surface.into(),
     }
   }
 
