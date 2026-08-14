@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: jq and grep over a checkout need nothing writable.
+permissions:
+  contents: read
+
 jobs:
   json-syntax-check:
     name: JSON syntax

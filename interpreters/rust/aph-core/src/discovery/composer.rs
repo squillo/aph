@@ -8,23 +8,28 @@
 //! > A verifier MUST NOT silently fall back from a stronger anchor to a
 //! > weaker one mid-resolution; failures escalate to envelope rejection.
 //!
-//! **That rule is the whole design of this module.** ONE mechanism is chosen
-//! before any I/O happens, and its outcome is the answer — success or
-//! failure. There is no loop over mechanisms and no `or_else`, because a
-//! verifier that retries a weaker anchor when a stronger one fails hands an
-//! attacker a free downgrade: break (or merely block) the mechanism the
-//! notary actually anchors its identity to, and the verifier volunteers to
-//! trust whatever is published under the one it can reach.
+//! **That rule is the whole design of this module.** The SELECTION is fixed
+//! before any I/O happens, and failure is always the answer — what advances
+//! the §8.4.6 sequence is ABSENCE, never failure. There is no `or_else` on
+//! an error path, because a verifier that retries a weaker anchor when a
+//! stronger one FAILS hands an attacker a free downgrade: break (or merely
+//! block) the mechanism the notary actually anchors its identity to, and the
+//! verifier volunteers to trust whatever is published under the one it can
+//! reach. A mechanism that was never published offered nothing to break, so
+//! advancing past it concedes nothing — that distinction is the whole §8.4.6
+//! order.
 //!
 //! Which mechanism a DID *names* is [`DiscoveryMechanism::named_by`]: a
 //! `did:key` DID names the offline decode, a `did:web` DID names its DID
 //! Document. DNS TXT is never named by a DID — §8.4.5 anchors it to the
-//! domain of a `did:web` identifier, so it is an ALTERNATIVE anchor for that
-//! same domain rather than something the DID selects. A verifier therefore
-//! reaches it only by asking, via [`MechanismSelection::Pinned`], which is
-//! §8.4.6's "A verifier MAY pin a preferred mechanism per notary (typically
-//! via configuration or via prior successful resolution)". Making that
-//! explicit is what keeps the DNS path from becoming an implicit fallback.
+//! domain of a `did:web` identifier — but a `did:web` DID still reaches it:
+//! [`resolve`]'s `DidWeb` arm probes DNS TXT FIRST per §8.4.6's order,
+//! advancing to the document fetch only when nothing is published there
+//! (absence), and rejecting outright when TXT is published-and-broken.
+//! [`MechanismSelection::Pinned`] narrows to exactly one mechanism — §8.4.6's
+//! "A verifier MAY pin a preferred mechanism per notary (typically via
+//! configuration or via prior successful resolution)" — for the operator who
+//! wants no sequence at all.
 //!
 //! Nothing here does I/O. The two ports in [`super::ports`] supply it, the
 //! `did:key` path needs none, and every parsing rule is delegated:
@@ -98,13 +103,15 @@ pub enum MechanismSelection {
   Pinned(DiscoveryMechanism),
 }
 
-/// Resolves the notary public key that `did_url` names, using ONE mechanism
-/// and never a second (spec §8.4.6).
+/// Resolves the notary public key that `did_url` names, through §8.4.6's
+/// order for the selected mechanism — and a FAILURE in one mechanism never
+/// reaches another (spec §8.4.6).
 ///
-/// Both ports are taken because a pinned selection may route to either, but
-/// exactly one of them is used per call and the `did:key` path uses neither.
-/// The single `match` below is the no-downgrade guarantee: there is no
-/// control flow by which a failure in one mechanism can reach another.
+/// Both ports are taken because the `DidWeb` sequence and the pinned
+/// selections route between them; the `did:key` path uses neither. The
+/// `match` below is the no-downgrade guarantee: every error propagates with
+/// `?` or is returned, so absence (a mechanism with nothing published) is
+/// the only thing that advances — see the `DidWeb` arm's table.
 ///
 /// `at_rfc3339` is the instant the key must be valid at. Per §8.4.7 a
 /// verifier "accept[s] any envelope where the signing key was valid at the
