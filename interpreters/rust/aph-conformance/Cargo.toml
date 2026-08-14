@@ -14,3 +14,6 @@ publish = false
 aph-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The PrincipalSigned golden is regenerated from the RFC 8032 §7.1 public
+# test seeds, which requires constructing Ed25519 keys directly.
+ed25519-dalek = { workspace = true }

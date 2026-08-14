@@ -98,15 +98,19 @@ fn every_repo_example_strict_parses_and_round_trips() {
 }
 
 #[test]
-fn every_repo_example_verifies_as_notary_attested() {
-  // These are the documents the spec hands to third-party implementers, and
-  // every one of them carries a single proof object with no
-  // `attestationMode`. Adding the §7.1.11 chain shape must not change what
-  // they mean: each must still pass the structural rules, and each must
-  // resolve to `NotaryAttested` — the claim a notary alone can make. If a
-  // future change made absence resolve to `PrincipalSigned`, this whole
-  // corpus would start asserting a human signature nobody produced, and
-  // nothing else in the suite would notice.
+fn every_repo_example_declares_the_mode_its_proof_structure_supports() {
+  // These are the documents the spec hands to third-party implementers.
+  // Every published example must pass the §7.1.11 structural rules, and the
+  // mode each resolves to must match its wire shape: the single-object
+  // corpus is `NotaryAttested` — the claim a notary alone can make; if
+  // absence ever resolved to `PrincipalSigned`, those envelopes would start
+  // asserting a human signature nobody produced. Exactly ONE example — the
+  // signed §7.3.1 golden — carries a chain and resolves to
+  // `PrincipalSigned`; its cryptographic verification lives in
+  // `principal_signed_example_test.rs`. Issuance order (§7.2.1) is also
+  // checked corpus-wide here: vacuous for a single proof, load-bearing for
+  // the chain.
+  let mut principal_signed: std::vec::Vec<std::path::PathBuf> = std::vec::Vec::new();
   for path in example_json_files() {
     let json = std::fs::read_to_string(&path)
       .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
@@ -114,23 +118,48 @@ fn every_repo_example_verifies_as_notary_attested() {
       .unwrap_or_else(|e| std::panic!("{:?} failed strict parse: {}", path, e));
     let mode = aph_core::verification::verify_proof_structure(&parsed)
       .unwrap_or_else(|e| std::panic!("{:?} failed §7.1.11 structure: {}", path, e));
-    std::assert_eq!(
-      mode,
-      aph_core::envelope::AttestationMode::NotaryAttested,
-      "{:?} must verify as NotaryAttested",
-      path
-    );
+    aph_core::verification::verify_timestamp_order(&parsed)
+      .unwrap_or_else(|e| std::panic!("{:?} failed §7.2.1 issuance order: {}", path, e));
+    match mode {
+      aph_core::envelope::AttestationMode::NotaryAttested => {
+        std::assert!(
+          !parsed.proof.is_chain(),
+          "{:?} resolves NotaryAttested and must carry the single-object form",
+          path
+        );
+      }
+      aph_core::envelope::AttestationMode::PrincipalSigned => {
+        std::assert!(
+          parsed.proof.is_chain(),
+          "{:?} resolves PrincipalSigned and must carry the chain form",
+          path
+        );
+        principal_signed.push(path.clone());
+      }
+    }
   }
+  std::assert_eq!(
+    principal_signed.len(),
+    1,
+    "exactly one published example is PrincipalSigned, got {:?}",
+    principal_signed
+  );
+  std::assert_eq!(
+    principal_signed[0].file_name().and_then(std::ffi::OsStr::to_str),
+    std::option::Option::Some("principal_signed_envelope.json"),
+    "the PrincipalSigned example must be the signed §7.3.1 golden"
+  );
 }
 
 #[test]
 fn no_repo_example_carries_an_embedded_delegation_mandate_it_cannot_bind() {
   // `verify_embedded_mandate_binding` is a no-op when no mandate is
   // embedded, so running it over the corpus proves the published examples
-  // are internally consistent: any example that later grows a
-  // `delegationMandate` member must name this envelope's own human, agent
-  // and mandate id, or it would be teaching implementers the exact staple
-  // §7.1.7.1 exists to forbid.
+  // are internally consistent. Since the signed §7.3.1 golden landed, this
+  // is no longer vacuous for the whole corpus: that example embeds its
+  // parent mandate, and it must name this envelope's own human, agent and
+  // mandate id — anything else would be teaching implementers the exact
+  // staple §7.1.7.1 exists to forbid.
   for path in example_json_files() {
     let json = std::fs::read_to_string(&path)
       .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));

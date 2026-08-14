@@ -1,0 +1,13 @@
+{
+  "title": "PrincipalSigned — The Signed Worked Example",
+  "tags": [
+    "principal-signed",
+    "worked-example",
+    "golden",
+    "proof-chain",
+    "test-vectors"
+  ],
+  "nlang_code": "mod blocks NotarizationEnvelope {\n  props {\n    aph_version: str,\n    context: Directional<str>,\n    type: Directional<str>,\n    id: str,\n    // In PrincipalSigned mode the issuer is the HUMAN principal's DID,\n    // not the notary's: the human is the issuing authority in substance,\n    // the notary a witness (§7.3.1).\n    issuer: str,\n    valid_from: str,\n    valid_until: str,\n    credential_subject: CredentialSubject,\n    #[optional(true)]\n    linked_mandate: LinkedMandate,\n    // On the wire: a two-element ARRAY — the principal proof, then the\n    // notary countersignature linked by `previous_proof`.\n    proof: EnvelopeProof,\n  }\n}",
+  "note": "§7.3.1's worked example exists as a fully SIGNED artifact: `examples/principal_signed_envelope.json`, the first PrincipalSigned envelope in the ecosystem whose signatures are real. Every key derives from a fixed PUBLIC test seed — RFC 8032 §7.1 TEST 2 is the human principal, TEST 3 the notary — so anyone can re-derive every byte with no secret material, and the ids and timestamps are the worked example's own values. Three things differ from the §7.3 NotaryAttested shape: `policy.attestation_mode` declares \"PrincipalSigned\", `policy.delegation_mandate` embeds the parent grant with the human's `principal_signature` verifiable offline, and `proof` is the two-element chain. The three timestamps ascend by requirement, not habit (§7.2.1): the notary decided at :00, the human signed the prepared envelope at :01, the notary countersigned what the human signed at :02. The golden cannot drift: the conformance suite rebuilds it from constants through the reference signing path and byte-compares the result, verifies both envelope proofs and both mandate signatures from the published bytes, and proves the negative — strip the countersignature and the remainder verifies under NO key, because the principal's base is the one-element ARRAY form.",
+  "book_ref": "APH Spec: §7.3.1 Worked example — PrincipalSigned, §7.2.1 Canonicalization base per proof, §7.1.11 EnvelopeProof"
+}

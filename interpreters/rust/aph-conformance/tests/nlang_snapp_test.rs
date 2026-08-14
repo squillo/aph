@@ -276,6 +276,35 @@ fn check_object(
         std::option::Option::None => {}
       }
     }
+
+    // A block-typed prop may also carry an ARRAY of objects on the wire:
+    // `proof` is the untagged §7.1.11 union, a single proof object or a
+    // two-element chain. Walking each element against the same block is
+    // what lets a chain-form example exercise the chain-only props (`id`,
+    // `previous_proof`) that no single-object example can ever reach.
+    // String arrays (`type`, `actChain`, `allowedChannels`) have no object
+    // elements, so this loop is vacuous for them.
+    if let serde_json::Value::Array(items) = value {
+      match prop_target(prop) {
+        std::option::Option::Some(PropTarget::Block(child_block))
+          if !is_opaque_collection(&child_block) =>
+        {
+          for (index, item) in items.iter().enumerate() {
+            if let serde_json::Value::Object(child) = item {
+              check_object(
+                child,
+                &child_block,
+                blocks,
+                &std::format!("{}.{}[{}]", path, key, index),
+                missing,
+                seen,
+              );
+            }
+          }
+        }
+        _ => {}
+      }
+    }
   }
 }
 
@@ -346,6 +375,9 @@ fn every_required_envelope_prop_is_exercised_by_an_example() {
 
   // Walk the blocks the envelope actually reaches, and require that each
   // of their non-optional props was seen in at least one example.
+  // `DelegationMandate` joined the reachable set when the signed §7.3.1
+  // golden landed: it embeds the full parent mandate, so every required
+  // mandate prop — `principal_signature` above all — is now exercised.
   let reachable = [
     "NotarizationEnvelope",
     "CredentialSubject",
@@ -357,6 +389,7 @@ fn every_required_envelope_prop_is_exercised_by_an_example() {
     "NotarizationMetadata",
     "NotaryServiceRef",
     "EnvelopeProof",
+    "DelegationMandate",
   ];
 
   let mut unexercised: std::vec::Vec<String> = std::vec::Vec::new();
@@ -386,6 +419,50 @@ fn every_required_envelope_prop_is_exercised_by_an_example() {
     "required N Lang props no published example exercises:\n  {}",
     unexercised.join("\n  ")
   );
+}
+
+#[test]
+fn the_principal_signed_golden_exercises_the_chain_and_mandate_props() {
+  // Before the signed §7.3.1 golden landed, five declared props existed in
+  // the Snapp that NO published example ever reached: the chain-only proof
+  // members (`id`, `previous_proof`), the mode label (`attestation_mode`),
+  // the embedded grant (`delegation_mandate`), and the human's own
+  // signature on it (`principal_signature`). This pins that the corpus now
+  // exercises all five — remove or break the golden and the N Lang types
+  // for the protocol's STRONGER mode go back to being dead declarations no
+  // example validates.
+  let blocks = snapp_blocks();
+  let mut missing: std::vec::Vec<String> = std::vec::Vec::new();
+  let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+  for path in example_files() {
+    let raw = std::fs::read_to_string(&path)
+      .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
+    let value: serde_json::Value = serde_json::from_str(&raw)
+      .unwrap_or_else(|e| std::panic!("{:?} is not valid JSON: {}", path, e));
+    check_object(
+      value
+        .as_object()
+        .unwrap_or_else(|| std::panic!("{:?} is not a JSON object", path)),
+      "NotarizationEnvelope",
+      &blocks,
+      "",
+      &mut missing,
+      &mut seen,
+    );
+  }
+  for required in [
+    "EnvelopeProof.id",
+    "EnvelopeProof.previous_proof",
+    "PolicyDescriptor.attestation_mode",
+    "PolicyDescriptor.delegation_mandate",
+    "DelegationMandate.principal_signature",
+  ] {
+    std::assert!(
+      seen.contains(required),
+      "the example corpus no longer exercises `{}` against the Snapp types",
+      required
+    );
+  }
 }
 
 #[test]

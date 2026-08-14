@@ -25,6 +25,7 @@ name = "aph-conformance"
 version = "0.1.0"
 dependencies = [
  "aph-core",
+ "ed25519-dalek",
  "serde",
  "serde_json",
 ]
