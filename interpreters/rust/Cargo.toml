@@ -1,9 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["aph-core", "aph-conformance", "aph-cli", "aph-ts"]
+members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver", "aph-ts"]
 # aph-ts targets wasm32; it is built explicitly (wasm-pack / --target wasm32-unknown-unknown)
-# and excluded from default host builds and tests.
-default-members = ["aph-core", "aph-conformance", "aph-cli"]
+# and excluded from default host builds and tests. aph-resolver is a native
+# crate and IS in the default set, so plain `cargo test` covers it.
+default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver"]
 
 [workspace.package]
 version = "0.1.0"
@@ -26,6 +27,22 @@ ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
 bs58 = "0.5"
 base64 = "0.22"
 proptest = "1.5"
+# ── I/O stack: linked ONLY by aph-resolver ─────────────────────────────
+# Every entry below exists so ONE crate can carry the DNS + HTTPS adapters
+# for adopters who have no host transport of their own. aph-core,
+# aph-conformance and aph-cli MUST NOT gain a dependency edge to any of
+# them — that separation is what keeps `cargo test -p aph-core` runnable
+# with no network and no async runtime.
+# Linked ONLY by aph-resolver: the executor its two adapters run under.
+tokio = { version = "1", default-features = false, features = ["rt", "net", "time"] }
+# Linked ONLY by aph-resolver: the §8.4.5 DNS TXT query.
+hickory-resolver = "0.24"
+# Linked ONLY by aph-resolver: the §8.4.4 did:web document fetch. `stream`
+# is not decoration — `Response::bytes_stream` is gated behind it, and the
+# 64 KiB cap must abort mid-body rather than read-then-measure.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+# Linked ONLY by aph-resolver: `StreamExt::next` over that body stream.
+futures-util = { version = "0.3", default-features = false }
 wasm-bindgen = "0.2"
 # The wasm smoke harness (aph-ts); the JS boundary itself is JSON text in
 # both directions, so there is deliberately no serde-wasm-bindgen here.

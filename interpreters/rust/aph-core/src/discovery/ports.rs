@@ -58,8 +58,21 @@ pub trait TxtRecordLookup: std::marker::Send + std::marker::Sync {
   /// # Errors
   ///
   /// `APH_E008` ([`crate::errors::AphError::NotaryServiceUnreachable`]) for
-  /// every transport outcome: NXDOMAIN, timeout, SERVFAIL, refused. The
-  /// error MUST NOT carry a status, an address, a resolver identity, or a
+  /// a transport outcome that left the question UNANSWERED: timeout,
+  /// SERVFAIL, refused.
+  ///
+  /// NXDOMAIN is NOT in that list, and neither is a NOERROR answer carrying
+  /// no records. Both are ABSENCE — the server answered, and the answer is
+  /// "nothing is published here" — so an adapter returns `Ok` with an empty
+  /// `Vec` and the §8.4.6 composer advances to the next mechanism. This is
+  /// live-proven, not a reading: real DNS reports NXDOMAIN for the
+  /// `_aph._notary` name of a notary that publishes only a DID Document, and
+  /// a verifier that reported that as `APH_E008` would refuse every such
+  /// notary outright. The distinction is the same one
+  /// [`crate::errors::AphError::NotaryKeyNotPublished`] exists for: absence
+  /// advances the fallback sequence, failure must stop it.
+  ///
+  /// The error MUST NOT carry a status, an address, a resolver identity, or a
   /// timing. A verifier's result is disclosed to whoever sent the envelope,
   /// and an envelope names the DID that names the DNS name — so a port that
   /// leaked *how* a lookup failed would turn every verifier into a network

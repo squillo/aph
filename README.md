@@ -166,6 +166,7 @@ aph/
       aph-core/         Wire types, mandates, flow state machines, signing helpers
       aph-conformance/  Golden-envelope + contract conformance suite, channel binding specs
       aph-cli/          `aph` binary: validate / inspect / golden (conformance fixtures)
+      aph-resolver/     Optional DNS TXT + did:web fetch adapters (the only crate carrying HTTP/DNS deps)
       aph-ts/           wasm binding (parse/serialize for JS hosts)
       aph-core/examples/  Runnable, self-narrating usage examples
   APH Spec/

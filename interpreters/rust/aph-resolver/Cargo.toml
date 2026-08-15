@@ -1,0 +1,31 @@
+[package]
+name = "aph-resolver"
+description = "Ready-made §8.4.5 DNS TXT and §8.4.4 did:web fetch adapters over aph-core's two discovery ports, for consumers with no host adapter layer of their own"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage = "https://github.com/squillo/aph"
+documentation = "https://docs.rs/aph-resolver"
+readme = "README.md"
+# crates.io allows at most 5 keywords, each at most 20 characters.
+keywords = ["aph", "did", "notarization", "resolver", "discovery"]
+categories = ["cryptography", "authentication", "network-programming"]
+# Edition 2024 sets the real floor; stated explicitly so consumers get a
+# clear error rather than a cascade of syntax failures.
+rust-version = "1.85"
+
+[dependencies]
+aph-core = { workspace = true }
+tokio = { workspace = true }
+hickory-resolver = { workspace = true }
+reqwest = { workspace = true }
+futures-util = { workspace = true }
+
+[dev-dependencies]
+# `macros` for `#[tokio::test]`; `rt` already arrives from the workspace
+# entry. No test in this crate opens a socket, so no other feature is
+# needed — the async tests exist because the port methods return futures,
+# not because they do I/O.
+tokio = { workspace = true, features = ["macros"] }

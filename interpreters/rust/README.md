@@ -15,6 +15,7 @@ cargo clippy --all-targets -- -D warnings
 | [`aph-conformance`](aph-conformance/) | Golden fixtures, contract tests, the three channel binding specs, and a suite that validates the repo's `examples/` against the implementation. |
 | [`aph-cli`](aph-cli/) | The `aph` binary — `validate`, `inspect`, `golden`. |
 | [`aph-ts`](aph-ts/) | WebAssembly binding: `parseEnvelopeJson` / `serializeEnvelope`. |
+| [`aph-resolver`](aph-resolver/) | Ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` fetch adapters over `aph-core`'s discovery ports, for adopters with no adapter layer of their own. The ONLY crate carrying HTTP/DNS/runtime dependencies. |
 
 `aph-ts` targets `wasm32-unknown-unknown` and is excluded from default host
 builds, so `cargo test` at the workspace root does not attempt it. Build it
