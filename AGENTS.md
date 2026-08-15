@@ -75,6 +75,6 @@ cargo run -q -p aph-cli -- validate <envelope.json>
 
 ## The live reference deployment
 
-`did:web:aph-notary.squillo.workers.dev` is a live §8.4.4 publication surface
+`did:web:aph-notary.squillo.com` is a live §8.4.4 publication surface
 you can resolve against. Its degrade shape and what resolving it exercises are
 described in `skills/spec/SKILL.md`.

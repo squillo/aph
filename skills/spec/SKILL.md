@@ -172,9 +172,12 @@ Two consequences worth carrying:
 - **A notary cannot forge an authorization**, because it never holds the
   principal's key. That is why a Notary Service is infrastructure anyone
   may host, and why the question about a notary is code attestation
-  (§15, k-of-3 authority over reproducible builds) rather than key
-  custody. Note the stated limit: attestation proves what was *published*,
-  never what is *running*.
+  (§15, k-of-3 authority over **content digests of published release
+  artifacts**) rather than key custody. §15.2 deliberately does NOT say
+  "reproducible" — nobody re-derives the digest, so an attestation binds
+  the holders' word to an artifact rather than offering an independently
+  checkable derivation. Note the stated limit too: attestation proves
+  what was *published*, never what is *running*.
 
 Canonicalization per proof (§7.2.1): the principal proof covers the
 envelope with EVERY `proofValue` emptied; the notary proof covers it with the
@@ -247,11 +250,14 @@ document, then the old one removed — because the DID Document schema carries
 no per-key validity metadata.
 
 A live reference publication surface exists at
-`https://aph-notary.squillo.workers.dev/.well-known/did.json`
-(`did:web:aph-notary.squillo.workers.dev`). While unprovisioned it answers
-HTTP 503 with the typed refusal `{"available": false, "reason": …}` — that
-shape is the normative degrade, not an outage. It deliberately publishes no
-DNS TXT record, so resolving it also exercises absence-advances live.
+`https://aph-notary.squillo.com/.well-known/did.json`
+(`did:web:aph-notary.squillo.com`; until 2026-08-15 the same key published
+as `did:web:aph-notary.squillo.workers.dev` — that host now serves nothing,
+because a did:web identity is domain-bound and a retired domain must not
+serve a mismatched document). While unprovisioned it answers HTTP 503 with
+the typed refusal `{"available": false, "reason": …}` — that shape is the
+normative degrade, not an outage. It publishes no DNS TXT record today, so
+resolving it also exercises absence-advances live.
 
 ## HOW-TO
 
