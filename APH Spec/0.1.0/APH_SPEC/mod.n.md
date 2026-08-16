@@ -16,7 +16,7 @@ license: "Apache-2.0 (file contents). N Lang itself is proprietary to Squillo In
 
 
 Deterministic declaration index for the `APH_SPEC` directory.
-Per N_BOOK 1.1 "The Determinism Invariant": declaration order IS load order.
+By the language's determinism invariant, declaration order IS load order.
 
 Load order is dependency order. `APH` declares the Snapp itself and the
 protocol constants. `APH_PROTOCOL` declares the closed vocabularies and

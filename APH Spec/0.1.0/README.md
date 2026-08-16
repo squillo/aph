@@ -53,7 +53,7 @@ The specification text is normative. Where this Snapp and
 | `how/` | Worked examples served by `nlang how`, one JSON file per example. |
 
 Declaration order is load order, and a sibling file that is not declared in
-a `mod` index never loads (N_BOOK 1.1, "The Determinism Invariant"). A
+a `mod` index never loads — the language's determinism invariant. A
 module declared as `mod X {};` must be backed by a file named exactly
 `X.n.md`; prose-only companions carry no `.n` and are not modules.
 
