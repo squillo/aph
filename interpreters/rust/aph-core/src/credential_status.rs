@@ -83,12 +83,20 @@ pub const MULTIBASE_BASE64URL_PREFIX: char = 'u';
 
 /// Hard cap on the expanded bitstring this module will index into.
 ///
-/// The expansion is performed by a caller-supplied decompressor over bytes
-/// fetched from the network, so the size the verifier is willing to hold has
-/// to be stated somewhere. 1 MiB addresses 8,388,608 mandates — orders of
-/// magnitude past any notary this specification contemplates — while keeping
-/// a decompression bomb from turning one inbound envelope into a memory
-/// exhaustion.
+/// 1 MiB addresses 8,388,608 mandates — orders of magnitude past any notary
+/// this specification contemplates — so a list larger than this is a
+/// malformed or hostile document rather than a big deployment.
+///
+/// ⛔ WHERE THIS IS AND IS NOT A BOMB DEFENCE. The expansion happens in a
+/// caller-supplied decompressor ([`ExpandEncodedList`]), so this constant can
+/// only be a real memory bound at the place that produces the bytes: the
+/// contract on that alias makes stopping at this cap a MUST on the expander.
+/// The check inside [`revocation_bit`] runs on a `Vec` that already exists
+/// and therefore refuses an over-long list AFTER the allocation — a
+/// correctness backstop, not protection against a decompression bomb. Stating
+/// the split matters because the opposite claim was written here first, and a
+/// verifier that believed it would run an unbounded codec over unbounded
+/// network bytes on the strength of a comment.
 pub const MAX_EXPANDED_LIST_BYTES: usize = 1024 * 1024;
 
 /// `credentialStatus.type`, a closed set of exactly one member (§6.3.3.1).
@@ -439,6 +447,70 @@ pub fn status_list_signing_base(
   std::result::Result::Ok(crate::crypto::jcs::canonicalize_rfc8785(&value))
 }
 
+/// §6.3.3.3 — verifies the status list's OWN proof against a known key.
+///
+/// ⛔ WHY THIS IS NOT OPTIONAL, AND WHY THE KEY IS A REQUIRED ARGUMENT RATHER
+/// THAN A DOC COMMENT ASKING NICELY: a status list that is not signature-checked
+/// is an unauthenticated assertion about whether somebody's authority is still
+/// valid. An attacker who can write to the status endpoint — or who can answer
+/// for it — would otherwise flip a revoked mandate back to live, and the
+/// revocation transport would become the mechanism by which a revoked agent
+/// proves it is fine. Earlier drafts documented this as "the caller's step";
+/// documentation is prose, and prose is the weakest rung of
+/// `type > sealed port > tripwire > prose`. Taking the key by value makes the
+/// check unskippable: there is no way to reach a verdict without supplying the
+/// key that authenticates it.
+///
+/// The caller already HAS this key. It must resolve the issuer's key through
+/// §8.4 to verify the envelope itself before a status question is even
+/// meaningful, so this consumes that resolution rather than performing a second
+/// one (§3.4) — and no new port is introduced to fetch it.
+///
+/// # Errors
+///
+/// `APH_E008` when the document carries no proof, when the proof value is
+/// malformed, or when the signature does not verify — all §6.3.3.4 case-2
+/// outcomes, which the caller REFUSES rather than admits.
+pub fn verify_status_list_proof(
+  raw_json: &str,
+  credential: &StatusListCredential,
+  key: &ed25519_dalek::VerifyingKey,
+) -> std::result::Result<(), crate::errors::AphError> {
+  let proof_value = match &credential.proof {
+    serde_json::Value::Object(object) => match object.get("proofValue").and_then(|v| v.as_str()) {
+      std::option::Option::Some(value) if !value.is_empty() => value,
+      // No proof, or an empty one, is an UNSIGNED document. §6.3.3.4 case 2
+      // names it explicitly; it is never "nothing to check".
+      _ => return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable),
+    },
+    // A proof chain is not a shape §6.3.3.3 defines for a status list. Refusing
+    // beats guessing which link would have been authoritative.
+    _ => return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable),
+  };
+  let raw = match crate::crypto::multibase::base58btc_decode(proof_value) {
+    std::result::Result::Ok(bytes) => bytes,
+    std::result::Result::Err(_) => {
+      return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
+    }
+  };
+  let bytes: [u8; 64] = match raw.as_slice().try_into() {
+    std::result::Result::Ok(b) => b,
+    std::result::Result::Err(_) => {
+      return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
+    }
+  };
+  let signature = ed25519_dalek::Signature::from_bytes(&bytes);
+  // Signed over the SAME canonical base the issuer signed: the document with
+  // its own `proof` member removed, JCS-canonicalised.
+  let canonical = status_list_signing_base(raw_json)?;
+  match ed25519_dalek::Verifier::verify(key, canonical.as_bytes(), &signature) {
+    std::result::Result::Ok(()) => std::result::Result::Ok(()),
+    std::result::Result::Err(_) => {
+      std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable)
+    }
+  }
+}
+
 /// Decodes `encodedList` to the GZIP stream it wraps (§6.3.3.3).
 ///
 /// The value is MULTIBASE — a `u` prefix naming base64url-no-pad — and the
@@ -493,6 +565,11 @@ pub fn decode_encoded_list(
 /// to contain `statusListIndex`" explicitly: a verifier that read a missing
 /// bit as `0` would treat a truncated list as a blanket "nothing is
 /// revoked".
+///
+/// The over-long half of that is a BACKSTOP and nothing more: `expanded_list`
+/// is already allocated by the time this function sees it, so the memory
+/// bound has to be honoured by the expander ([`ExpandEncodedList`]) and this
+/// check only stops an implausible list from being indexed.
 pub fn revocation_bit(
   expanded_list: &[u8],
   index: u64,
@@ -528,25 +605,22 @@ pub enum StatusCheck {
   /// §6.3.3.4 case 1 — the envelope carried no `credentialStatus`, so no
   /// claim was offered and none was checked. NOT the same as "not revoked".
   Skipped,
-  /// §6.3.3.4 case 3, negative — the bit at `statusListIndex` is `0`.
+  /// §6.3.3.4 case 3, negative — the bit at `statusListIndex` was `0` **in a
+  /// document whose proof this crate did NOT check**.
+  ///
+  /// ⛔ The qualifier is part of the value, not a footnote, because this is
+  /// the exact variant a caller branches on to ADMIT an envelope. §6.3.3.3's
+  /// proof check is the only thing standing between "a bit was clear" and
+  /// "the notary says this mandate is live": same-origin deliberately permits
+  /// a DIFFERENT PATH (§6.3.3.2), so any writable path on the notary's origin
+  /// can serve a forged list that satisfies same-origin and writes the
+  /// notary's DID into its own `issuer`. Verifying the proof is the caller's
+  /// step for the reasons in the module preamble; until it has run,
+  /// `NotRevoked` means only that the document the caller was handed said so.
+  /// [`check_envelope_status`] carries the obligation in full.
   NotRevoked,
 }
 
-/// §8.3 step 8a over a whole envelope: the §6.3.3.4 trichotomy, end to end.
-///
-/// Absent ⇒ [`StatusCheck::Skipped`] with no error and no I/O. Present ⇒ the
-/// derived endpoint is computed from the envelope's OWN notary DID, the
-/// carried `statusListCredential` is bound same-origin against it, the
-/// document is fetched, validated and indexed, and a set bit is `APH_E015`.
-/// Anything that leaves the status unestablished is `APH_E008`.
-///
-/// `expand_encoded_list` decompresses the GZIP stream — see the module
-/// preamble for why the codec is the caller's. It is invoked only after
-/// every other check has passed.
-///
-/// # Errors
-///
-/// `APH_E015` when the parent mandate's bit is set; `APH_E008` for every
 /// The GZIP-then-base64url expansion of a status list's `encodedList`,
 /// supplied by the caller rather than performed here.
 ///
@@ -559,16 +633,85 @@ pub enum StatusCheck {
 /// WHY AN ALIAS: the same signature appeared inline in two public functions,
 /// which is the duplication `clippy::type_complexity` exists to catch —
 /// spelling one contract twice invites the two spellings to drift (§3.4).
+///
+/// ⛔ THE CALLER'S OBLIGATION — the byte cap lives HERE, not downstream. An
+/// implementation of this contract MUST stop and return `APH_E008` as soon
+/// as the output it would produce exceeds [`MAX_EXPANDED_LIST_BYTES`],
+/// rather than expanding fully and letting a caller measure afterwards. This
+/// is the only place the cap can actually bound anything: by the time
+/// [`check_credential_status`] holds a `Vec`, the allocation has already
+/// happened, so the length check inside [`revocation_bit`] is a backstop
+/// against an over-long list and NOT a defence against a decompression bomb.
+/// The shape that satisfies this is an inflate reader with a budget on the
+/// DECOMPRESSED side (`std::io::Read::take` over the decoder, never over the
+/// compressed input, whose length says nothing about the expansion).
+///
+/// `Send + Sync` for exactly the reason
+/// [`crate::discovery::ports::DiscoveryFuture`] carries `+ Send`: adapters
+/// run under a host executor that moves tasks between threads and
+/// `tokio::spawn` demands it. A bare `dyn Fn` has neither auto trait, and a
+/// `&ExpandEncodedList<'_>` without them makes the futures of BOTH public
+/// entry points below `!Send` — unspawnable by every real caller, and broken
+/// in the host crate far from the line that caused it.
 pub type ExpandEncodedList<'a> =
-  dyn std::ops::Fn(&[u8]) -> std::result::Result<std::vec::Vec<u8>, crate::errors::AphError> + 'a;
+  dyn std::ops::Fn(&[u8]) -> std::result::Result<std::vec::Vec<u8>, crate::errors::AphError>
+    + std::marker::Send
+    + std::marker::Sync
+    + 'a;
 
-/// §6.3.3.4 case-2 outcome, including an envelope that carries a status
-/// reference but no `delegationMandateId` for it to be the status OF
-/// (§6.3.3.1).
+/// §8.3 step 8a over a whole envelope: the §6.3.3.4 trichotomy MINUS the
+/// §6.3.3.3 proof check, which is the caller's — read the ⛔ below BEFORE
+/// wiring this into a verifier.
+///
+/// Absent ⇒ [`StatusCheck::Skipped`] with no error and no I/O. Present ⇒ the
+/// derived endpoint is computed from the envelope's OWN notary DID, the
+/// carried `statusListCredential` is bound same-origin against it, the
+/// document is fetched, checked as far as a KEYLESS check reaches
+/// ([`StatusListCredential::validate`]) and indexed, and a set bit is
+/// `APH_E015`. Every case-2 outcome reachable without a key — no derivable
+/// origin, an unreachable, oversized or unparseable document, a wrong
+/// `issuer`, `statusPurpose`, freshness or index — is `APH_E008`.
+///
+/// ⛔ THE §6.3.3.3 PROOF CHECK IS NOT PERFORMED HERE. This function never
+/// reads `proof`: an entirely UNSIGNED status list whose other members are
+/// well formed returns `Ok(StatusCheck::NotRevoked)`, and the test
+/// `a_clear_bit_admits_the_envelope` pins exactly that. §6.3.3.4 case 2
+/// enumerates "its proof did not verify" among its `APH_E008` outcomes, so
+/// **a caller that admits an envelope on this function's `Ok` without
+/// verifying that proof has NOT implemented §6.3.3.4 case 2.** The
+/// gap is exploitable rather than theoretical: same-origin deliberately
+/// permits a DIFFERENT PATH (§6.3.3.2), so any writable path on the notary's
+/// origin serves a forged list that satisfies same-origin and writes the
+/// notary's DID into its own `issuer`, and only the signature closes it. The
+/// module preamble states why the step lives in the caller (it needs a §8.4
+/// key resolution and a rotation-aware cache this crate must not hold);
+/// [`status_list_signing_base`] yields the exact bytes the signature covers
+/// and [`StatusListCredential::proof_verification_method`] the method to
+/// resolve, so discharging it is a few lines rather than a re-derivation.
+/// Note what this arm hands back: a decision, never the document, so the
+/// check cannot be bolted onto this signature after the fact — the caller
+/// needs the body in its own hands. Nor may it be hidden inside the
+/// fetch adapter: [`crate::discovery::ports::StatusCredentialFetch`]
+/// contracts an adapter to form no opinion about which document is
+/// authoritative, and a proof check is exactly that opinion.
+///
+/// `expand_encoded_list` decompresses the GZIP stream — see the module
+/// preamble for why the codec is the caller's, and [`ExpandEncodedList`] for
+/// the byte cap the caller owes along with it. It is invoked only after
+/// every other check has passed.
+///
+/// # Errors
+///
+/// `APH_E015` when the parent mandate's bit is set; `APH_E008` for every
+/// §6.3.3.4 case-2 outcome this function can detect WITHOUT a key — the
+/// proof is NOT among them, per the ⛔ above — including an envelope that
+/// carries a status reference but no `delegationMandateId` for it to be the
+/// status OF (§6.3.3.1).
 pub async fn check_envelope_status(
   envelope: &crate::envelope::NotarizationEnvelope,
   fetch: &dyn crate::discovery::ports::StatusCredentialFetch,
   expand_encoded_list: &ExpandEncodedList<'_>,
+  issuer_key: &ed25519_dalek::VerifyingKey,
   now_rfc3339: &str,
 ) -> std::result::Result<StatusCheck, crate::errors::AphError> {
   let entry = match envelope.credential_status.as_ref() {
@@ -606,6 +749,7 @@ pub async fn check_envelope_status(
       .as_str(),
     fetch,
     expand_encoded_list,
+    issuer_key,
     now_rfc3339,
   )
   .await
@@ -622,13 +766,17 @@ pub async fn check_envelope_status(
 ///
 /// # Errors
 ///
-/// As [`check_envelope_status`].
+/// As [`check_envelope_status`] — INCLUDING its ⛔: the status list's
+/// §6.3.3.3 proof is not verified here either, so a caller that admits on
+/// this function's `Ok` without checking that proof has not implemented
+/// §6.3.3.4 case 2.
 pub async fn check_credential_status(
   entry: &CredentialStatusEntry,
   delegation_mandate_id: &str,
   notary_service_id: &str,
   fetch: &dyn crate::discovery::ports::StatusCredentialFetch,
   expand_encoded_list: &ExpandEncodedList<'_>,
+  issuer_key: &ed25519_dalek::VerifyingKey,
   now_rfc3339: &str,
 ) -> std::result::Result<StatusCheck, crate::errors::AphError> {
   // Read the index BEFORE any network work: an unreadable index makes the
@@ -661,6 +809,14 @@ pub async fn check_credential_status(
     .await?;
   let credential = parse_status_list_credential(&body)?;
   credential.validate(notary_service_id, now_rfc3339)?;
+  // ⛔ §6.3.3.3 — AUTHENTICATE THE DOCUMENT BEFORE BELIEVING ONE BIT OF IT.
+  // Everything above proves the bytes came from the right ORIGIN; nothing
+  // above proves the right PARTY wrote them. Without this step an attacker
+  // who can write to the status endpoint flips a revoked mandate back to
+  // live, and the transport built to enforce revocation becomes the way a
+  // revoked agent proves it is fine. It runs BEFORE the bit lookup so a
+  // forged document can never reach an admit.
+  verify_status_list_proof(&body, &credential, issuer_key)?;
 
   let compressed = decode_encoded_list(&credential.credential_subject.encoded_list)?;
   let expanded = expand_encoded_list(&compressed)?;
@@ -783,7 +939,54 @@ mod tests {
   }
 
   /// A status list credential document with the given bitstring.
+  /// The obviously-fake seed every fixture signs with, matching the
+  /// `[9u8; 32]`-style convention already used in `crypto::eddsa_jcs`.
+  /// NEVER a production-shaped key.
+  const FIXTURE_SEED: [u8; 32] = [9u8; 32];
+
+  /// The key a fixture is signed with, and therefore the key a passing check
+  /// must be given.
+  fn fixture_key() -> ed25519_dalek::VerifyingKey {
+    ed25519_dalek::SigningKey::from_bytes(&FIXTURE_SEED).verifying_key()
+  }
+
+  /// Signs `unsigned_json` the way a notary does and returns the document
+  /// WITH its `proof` member.
+  ///
+  /// WHY THE FIXTURES ARE REALLY SIGNED: the check refuses an unsigned status
+  /// list, so a fixture without a proof would make every admit-path test fail
+  /// for the wrong reason — and a fixture whose proof were faked past the
+  /// verifier would prove nothing at all. Signing over
+  /// `status_list_signing_base` is what makes these tests exercise the same
+  /// bytes a real issuer commits to.
+  fn sign_document(unsigned_json: &str) -> String {
+    let base = super::status_list_signing_base(unsigned_json).expect("fixture is a JSON object");
+    let sk = ed25519_dalek::SigningKey::from_bytes(&FIXTURE_SEED);
+    let signature = ed25519_dalek::Signer::sign(&sk, base.as_bytes());
+    let proof_value = crate::crypto::multibase::base58btc_encode(&signature.to_bytes());
+    let mut value: serde_json::Value =
+      serde_json::from_str(unsigned_json).expect("fixture is valid JSON");
+    let object = value.as_object_mut().expect("fixture is a JSON object");
+    object.insert(
+      String::from("proof"),
+      serde_json::json!({
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "proofPurpose": "assertionMethod",
+        "verificationMethod": std::format!("{NOTARY_DID}#k1"),
+        "proofValue": proof_value,
+      }),
+    );
+    serde_json::to_string(&value).expect("re-serialising a JSON object cannot fail")
+  }
+
   fn status_document(bits: &[u8]) -> String {
+    sign_document(&status_document_unsigned(bits))
+  }
+
+  /// The document BEFORE its proof is attached — the shape a signer starts
+  /// from, and the shape the unsigned-document refusal test needs.
+  fn status_document_unsigned(bits: &[u8]) -> String {
     std::format!(
       r#"{{
   "@context": ["https://www.w3.org/ns/credentials/v2"],
@@ -976,7 +1179,12 @@ mod tests {
     // (APH_E008), not the parse failure the ENVELOPE entry raises. The
     // asymmetry is the spec's and is easy to collapse by accident, so both
     // halves are pinned.
-    let document = status_document(&[0x00]).replace(
+    // The UNSIGNED builder on purpose: `validate` is the keyless half of
+    // §6.3.3.3 and never looks at a proof, so signing here would add nothing
+    // — and the signed builder re-serialises compactly, which would silently
+    // turn the string replace below into a no-op and make this test pass
+    // while asserting nothing.
+    let document = status_document_unsigned(&[0x00]).replace(
       "\"statusPurpose\": \"revocation\"",
       "\"statusPurpose\": \"suspension\"",
     );
@@ -1031,7 +1239,7 @@ mod tests {
     std::assert_eq!(base, unsigned);
   }
 
-  // ── The §6.3.3.4 trichotomy, end to end ─────────────────────────────
+  // ── The §6.3.3.4 trichotomy, minus the caller's proof check ─────────
 
   /// An envelope whose notary is [`NOTARY_DID`], carrying `status` and
   /// naming `mandate` as the parent Delegation Mandate.
@@ -1071,6 +1279,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect("an absent status reference is not an error");
@@ -1083,6 +1292,19 @@ mod tests {
     // §6.3.3.4 case 3, negative. The positive control for every refusal
     // below: without it a test suite where everything rejects would pass
     // even if the arm refused unconditionally.
+    //
+    // ⛔ THE GAP THIS COMMENT USED TO PIN IS CLOSED, and it closed exactly the
+    // way the old text predicted it would have to. It read: "if this crate
+    // ever starts verifying proofs, THIS TEST MUST FAIL, and the fix is to
+    // give the fixture a real signature, never to relax the assertion." It
+    // did fail, and the fixture now carries a REAL signature over
+    // `status_list_signing_base` (see `sign_document`), verified against the
+    // key this call supplies. The earlier design left §6.3.3.3's proof check
+    // to the caller on the reasoning that a §8.4-resolved key does not belong
+    // in this crate; the key is now an ARGUMENT, which keeps that reasoning
+    // (the crate still resolves nothing) while making the check unskippable.
+    // A caller cannot obtain a verdict without handing over the key that
+    // authenticates it.
     let fetch = RecordingFetch::new(&status_document(&[0b0100_0000]));
     let entry = entry_at(DERIVED_ENDPOINT, "0");
     let envelope = envelope_with(
@@ -1093,11 +1315,73 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect("a clear bit continues verification");
     std::assert_eq!(outcome, super::StatusCheck::NotRevoked);
     std::assert_eq!(fetch.calls(), 1);
+  }
+
+  /// WHY THIS TEST EXISTS: same-origin proves the bytes came from the right
+  /// ORIGIN; it says nothing about which PARTY wrote them. Without a proof
+  /// check, anyone able to write to (or answer for) the status endpoint could
+  /// flip a revoked mandate back to live — turning the transport built to
+  /// ENFORCE revocation into the way a revoked agent proves it is fine. This
+  /// crate shipped with exactly that hole for one commit.
+  /// WHAT IT PINS: an UNSIGNED status list is §6.3.3.4 case 2 — refused, never
+  /// admitted as "nothing to check" — even when its bit is clear and every
+  /// other check passes.
+  #[test]
+  fn an_unsigned_status_list_is_refused_even_when_the_bit_is_clear() {
+    let fetch = RecordingFetch::new(&status_document_unsigned(&[0b0100_0000]));
+    let entry = entry_at(DERIVED_ENDPOINT, "0");
+    let envelope = envelope_with(
+      std::option::Option::Some(entry),
+      std::option::Option::Some(MANDATE_ID),
+    );
+    let error = crate::discovery::test_support::block_on(super::check_envelope_status(
+      &envelope,
+      &fetch,
+      &test_expander,
+      &fixture_key(),
+      NOW,
+    ))
+    .expect_err("an unsigned status list must never be admitted");
+    std::assert!(std::matches!(
+      error,
+      crate::errors::AphError::NotaryServiceUnreachable
+    ));
+  }
+
+  /// WHY THIS TEST EXISTS: a signature that verifies under the WRONG key is
+  /// the forgery case — an attacker signs a document with their own key and
+  /// serves it from a host that satisfies same-origin.
+  /// WHAT IT PINS: a well-formed proof made by a key other than the issuer's
+  /// is refused.
+  #[test]
+  fn a_status_list_signed_by_the_wrong_key_is_refused() {
+    let fetch = RecordingFetch::new(&status_document(&[0b0100_0000]));
+    let entry = entry_at(DERIVED_ENDPOINT, "0");
+    let envelope = envelope_with(
+      std::option::Option::Some(entry),
+      std::option::Option::Some(MANDATE_ID),
+    );
+    // A different obviously-fake seed: the impostor convention already used
+    // in `crypto::eddsa_jcs`.
+    let impostor = ed25519_dalek::SigningKey::from_bytes(&[13u8; 32]).verifying_key();
+    let error = crate::discovery::test_support::block_on(super::check_envelope_status(
+      &envelope,
+      &fetch,
+      &test_expander,
+      &impostor,
+      NOW,
+    ))
+    .expect_err("a status list signed by a foreign key must be refused");
+    std::assert!(std::matches!(
+      error,
+      crate::errors::AphError::NotaryServiceUnreachable
+    ));
   }
 
   #[test]
@@ -1117,6 +1401,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect_err("a set bit must refuse the envelope");
@@ -1144,6 +1429,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect_err("an offered-but-unreachable reference must refuse");
@@ -1175,6 +1461,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect_err("a cross-origin status URL must refuse");
@@ -1204,6 +1491,7 @@ mod tests {
         &envelope,
         &fetch,
         &test_expander,
+        &fixture_key(),
         NOW,
       ))
       .expect_err(url);
@@ -1228,6 +1516,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect("a same-origin second list is legitimate");
@@ -1257,6 +1546,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect_err("no derivable origin must refuse");
@@ -1279,6 +1569,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       NOW,
     ))
     .expect_err("a subjectless status reference must refuse");
@@ -1300,6 +1591,7 @@ mod tests {
       &envelope,
       &fetch,
       &test_expander,
+      &fixture_key(),
       // 361 seconds after ISSUED_AT: past 300 + 60.
       "2026-05-28T00:06:01Z",
     ))
@@ -1334,6 +1626,7 @@ mod tests {
       &envelope,
       &fetch,
       &counting,
+      &fixture_key(),
       NOW,
     ))
     .expect_err("a foreign issuer must refuse");
@@ -1380,21 +1673,78 @@ mod tests {
 
   #[test]
   fn proof_verification_method_is_surfaced_for_the_caller() {
-    // This module does not check the proof, so it must at least hand the
-    // caller the one thing needed to: which key to resolve through §8.4.
-    let signed = status_document(&[0x00]).replace(
-      "\n}",
-      ",\n  \"proof\": {\"type\": \"DataIntegrityProof\", \"verificationMethod\": \"did:web:aph-notary.squillo.com#k1\"}\n}",
-    );
-    let credential = super::parse_status_list_credential(&signed).unwrap();
+    // The accessor still matters after the crate started checking proofs
+    // itself: a caller that resolves the key, or an operator diagnosing a
+    // refusal, needs to know WHICH key the document claims to be signed by.
+    // Both halves now come from the real builders rather than string surgery
+    // — `status_document` signs, `status_document_unsigned` does not — so the
+    // fixtures cannot drift from what the signer actually emits.
+    let credential = super::parse_status_list_credential(&status_document(&[0x00])).unwrap();
     std::assert_eq!(
       credential.proof_verification_method(),
       std::option::Option::Some("did:web:aph-notary.squillo.com#k1")
     );
-    let unsigned = super::parse_status_list_credential(&status_document(&[0x00])).unwrap();
+    let unsigned =
+      super::parse_status_list_credential(&status_document_unsigned(&[0x00])).unwrap();
     std::assert_eq!(
       unsigned.proof_verification_method(),
       std::option::Option::None
+    );
+  }
+
+  #[test]
+  fn both_entry_points_return_futures_that_can_cross_a_thread_boundary() {
+    // WHY THIS EXISTS: every real caller drives this arm from a host
+    // executor — the squillo verifier calls it inside an actor's inbound
+    // handler — and `tokio::spawn` demands a `Send` future. Nothing else in
+    // this file would notice if that stopped holding, because
+    // `test_support::block_on` polls on the calling thread: the whole suite
+    // would stay green while no host could compile against the crate.
+    //
+    // WHAT IT PINS: the `+ Send + Sync` on `super::ExpandEncodedList`.
+    // `&dyn StatusCredentialFetch` is already `Send` via that trait's
+    // supertraits and the envelope is plain data, so the caller-supplied
+    // expander is the ONE capture that can poison the auto trait — a bare
+    // `dyn Fn` carries neither. Moving both futures into a scoped thread is
+    // the runtime form of the bound, the same shape
+    // `discovery::ports::port_futures_can_cross_a_thread_boundary` uses for
+    // `DiscoveryFuture`. Awaiting them there rather than merely dropping
+    // them also pins that the OUTPUT is `Send`, which is what a spawned task
+    // must return.
+    let fetch = RecordingFetch::new(&status_document(&[0b0100_0000]));
+    let entry = entry_at(DERIVED_ENDPOINT, "0");
+    let envelope = envelope_with(
+      std::option::Option::Some(entry.clone()),
+      std::option::Option::Some(MANDATE_ID),
+    );
+    // Annotated with the alias rather than inferred: the coercion IS the
+    // assertion, so the bound has to be named at the coercion site. Bound to
+    // a `let` for a second reason — an inline `&test_expander` would be a
+    // temporary dropped at the end of its own statement, and these futures
+    // outlive their statement.
+    let expander: &super::ExpandEncodedList<'_> = &test_expander;
+    let key = fixture_key();
+    let envelope_future = super::check_envelope_status(&envelope, &fetch, expander, &key, NOW);
+    let direct_future =
+      super::check_credential_status(&entry, MANDATE_ID, NOTARY_DID, &fetch, expander, &key, NOW);
+    let outcomes = std::thread::scope(|scope| {
+      scope
+        .spawn(move || {
+          (
+            crate::discovery::test_support::block_on(envelope_future),
+            crate::discovery::test_support::block_on(direct_future),
+          )
+        })
+        .join()
+    })
+    .expect("the moved futures must complete on the other thread");
+    std::assert_eq!(
+      outcomes.0.expect("a clear bit admits the envelope"),
+      super::StatusCheck::NotRevoked
+    );
+    std::assert_eq!(
+      outcomes.1.expect("a clear bit admits the entry"),
+      super::StatusCheck::NotRevoked
     );
   }
 }
