@@ -315,6 +315,63 @@ wire-shape fixtures (one per channel kind); the conformance crate under
 Remember: example `proofValue`s are placeholders, so signature verification on
 them is EXPECTED to fail — only shape validation is meaningful there.
 
+**Use APH in your own project.** Pick the crate by what it is allowed to
+touch, because that boundary is deliberate:
+
+| crate | what it does | network? |
+|---|---|---|
+| `aph-core` | types, strict parsing, validation, signing bases, the §6.3.3 status check | **never** — no HTTP, no DNS, no clock |
+| `aph-resolver` | ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` adapters over `aph-core`'s ports | yes — the ONLY crate that may carry them |
+| `aph-cli` | the `aph` binary: `validate | inspect | golden` | no |
+| `aph-ts` | the wasm/TS binding (JSON text in both directions) | no |
+
+Most integrations want `aph-core` alone and supply their own transport by
+implementing its two fetch ports; take `aph-resolver` only if you want the
+batteries-included adapters. Depend on it either by version
+(`aph-core = "0.1"`) or, to track a specific commit,
+`aph-core = { git = "https://github.com/squillo/aph", rev = "<sha>" }` — pin a
+`rev`, never a bare branch, so a verifier's behaviour cannot change under it.
+
+**Check whether a mandate has been revoked** (§6.3.3). The entry point is
+`aph_core::credential_status::check_envelope_status`, and it asks the caller for
+TWO things that are NOT oversights — each one exists to make a specific failure
+impossible:
+
+```rust
+check_envelope_status(
+  &envelope,
+  &fetch,                // impl StatusCredentialFetch — your HTTP
+  &expand_encoded_list,  // &dyn Fn(&[u8]) -> Result<Vec<u8>, AphError> — your gzip
+  &issuer_key,           // ed25519_dalek::VerifyingKey — REQUIRED
+  now_rfc3339,           // your clock
+).await
+```
+
+- **`expand_encoded_list` is yours because this crate carries no compression
+  dependency.** It links into a wasm binding and into a kernel that both pay for
+  every byte, and inflating a gzip stream is a pure `&[u8] -> Vec<u8>` transform
+  with no protocol content. Hand in whatever inflater you already have.
+- ⛔ **`issuer_key` is REQUIRED, and that is the security property.** A status
+  list nobody verified is an unauthenticated assertion about whether somebody's
+  authority is still valid — an attacker who can answer for the status endpoint
+  would otherwise flip a revoked mandate back to live, turning the mechanism
+  built to ENFORCE revocation into the way a revoked agent proves it is fine.
+  This crate shipped for exactly one commit with that check documented as a
+  caller obligation instead of taken as an argument; documentation is the
+  weakest rung, so it became a parameter. You cannot obtain a verdict without
+  naming the key that authenticates it. Pass the SAME key you resolved to verify
+  the envelope — the same notary signs both, and resolving twice is two chances
+  to disagree.
+- The clock is an argument for the same reason `aph-core` never reads one: the
+  §6.3.3.3 freshness bound needs `now`, and a library that reads its own clock
+  cannot be tested deterministically.
+
+Outcomes: `Ok(Skipped)` when the envelope carries no `credentialStatus` (absent
+is NOT "unrevoked" — enforcing a claim nobody made is not fail-closed),
+`Ok(NotRevoked)` on a clear bit in a document whose proof verified, and `Err` for
+everything else — `APH_E015` revoked, `APH_E008` unreachable or unauthenticated.
+A cross-origin status URL is refused WITHOUT being fetched.
+
 ## Going deeper
 
 Read the actual spec files rather than trusting this summary for edge cases:

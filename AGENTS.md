@@ -64,16 +64,26 @@ cargo run -q -p aph-cli -- validate <envelope.json>
    `APH_E003` (authority that ran out on schedule). `APH_E008` now covers any
    protocol-mandated fetch from a notary-hosted surface, the status list
    included, not only a notarization request that timed out.
-5. **Signed fixtures are never text-edited.**
+5. **A status verdict must name the key that authenticated it.**
+   `aph_core::credential_status::check_envelope_status` takes the issuer's
+   verifying key BY VALUE, plus a caller-supplied gzip expander (this crate
+   carries no compression dependency — it links into wasm and into a kernel).
+   Neither is an oversight: an unverified status list is an unauthenticated
+   assertion about whether someone's authority still holds, so an unauthenticated
+   verdict is made unrepresentable rather than merely discouraged. Do not add a
+   convenience wrapper that resolves the key internally or defaults it — the
+   whole point is that a caller cannot skip it. Integration recipe in
+   `skills/spec/SKILL.md`.
+6. **Signed fixtures are never text-edited.**
    `examples/principal_signed_envelope.json` carries four real Ed25519
    signatures over its bytes. Regenerate it — the recipe is in
    `skills/spec/SKILL.md`.
-6. **Test keys only.** Fixtures sign with RFC 8032 test vectors. Never place
+7. **Test keys only.** Fixtures sign with RFC 8032 test vectors. Never place
    production-looking key material — and never any private key — in a
    committed or published artifact.
-7. **Domains are `squillo.com`.** The former domain is retired; do not
+8. **Domains are `squillo.com`.** The former domain is retired; do not
    reintroduce it in examples or docs.
-8. **Name-hygiene CI.** Every push runs brand/name hygiene checks over the
+9. **Name-hygiene CI.** Every push runs brand/name hygiene checks over the
    whole tree; keep tool-vendor names and internal-repo path references out of
    committed files, and write interpreter paths as
    `interpreters/rust/<crate>`.
