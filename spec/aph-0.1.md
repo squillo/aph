@@ -15,6 +15,38 @@ This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, publ
 ---
 
 
+> ### Revision 2026-08-15 — the revocation transport
+>
+> This draft made revocation normative (§6.3.1) and then left a recipient no
+> way to observe one. The issuing human could pull a Delegation Mandate, the
+> notary would stop issuing against it, and a third party holding an envelope
+> issued the hour before had no mechanism — none — for learning any of that.
+> The only mitigation on offer was "keep validity windows short", which is
+> advice about how long to be wrong for.
+>
+> That is fixed in this revision, in place. New **§6.3.3 Revocation transport**
+> profiles W3C Bitstring Status List v1.0: the envelope MAY carry a
+> `credentialStatus` entry (new §7.1.1 row) naming the parent Delegation
+> Mandate's position in a status list the notary publishes, and §8.3 step 8a
+> makes checking it a verifier **MUST** whenever the entry is present.
+> §6.3.1 item 3's recipient `MAY` is promoted accordingly, §6.2's validation
+> list gains revocation beside expiry, and §11 gains `APH_E015`
+> `MandateRevoked` at last position.
+>
+> **The status endpoint's origin is DERIVED from the notary's `did:web`, never
+> taken from the envelope.** A URL the envelope chose would let whoever holds
+> an old envelope also choose the host that answers "has this been revoked" —
+> and an attacker's host always answers no. When an envelope carries a status
+> URL it MUST be same-origin with the derived endpoint or the envelope is
+> refused unfetched.
+>
+> **What did NOT change:** every published example envelope in `examples/`
+> parses and round-trips exactly as before, and the one carrying real
+> signatures still verifies against them. `credentialStatus` is
+> omitted-when-absent and MUST NOT be emitted as `null`, so an envelope that
+> offers no status reference is byte-identical to a pre-revocation envelope
+> and every existing signature stands.
+
 > ### Revision 2026-08-13 — the principal signs
 >
 > This draft previously described a protocol in which the **Notary Service**
@@ -54,7 +86,7 @@ APH credentials function as **drivers' licenses for agents**. The metaphor maps 
 - **The issuing authority is the human principal.** Like a state issuing a license, the human is the only party with the authority to grant an agent permission to act on their behalf. The human's signature (directly or transitively via the Notary Service capturing explicit attestation) is the root of every APH credential.
 - **The notary service is the DMV.** It runs the human's policy, captures attestation when required, signs the credential with its own keypair, and publishes its public verification key via DNS or HTTPS so any recipient can independently confirm the signature is genuine (§8.4). The notary does NOT decide whether to issue — it executes the human's pre-declared policy.
 - **Every credential carries a bounded scope.** A Delegation Mandate names the channels the agent may operate on (`allowedChannels`), the rate at which it may act (`rateLimitPerHour`), the time window during which authority is valid (`validFrom` … `validUntil`), and the policy decision the human selected (`AlwaysAllow` / `AskEveryTime` / `NeverAllow`). A Communication Mandate further binds a single action to a specific outbound payload hash. Like a driver's license that authorizes operating a specific class of vehicle in specific places, APH credentials authorize specific actions on specific channels.
-- **The license is revocable at any time.** The issuing human can revoke a Delegation Mandate before its `validUntil`. The conceptual revocation model is normative in this version of the spec (§6.3); the on-wire revocation transport (status list / status credential) is deferred to v0.2.
+- **The license is revocable at any time, and a recipient can see it.** The issuing human can revoke a Delegation Mandate before its `validUntil`. Both halves are normative in this version of the spec: the revocation model itself (§6.3.1) and the on-wire transport a third-party recipient uses to observe a revocation at verification time (§6.3.3, a status list the notary publishes at an endpoint derived from its own `did:web`). Like a licence the roadside check actually queries, not one whose suspension only the issuing office knows about.
 - **The license is portable across jurisdictions.** Like an interstate driver's license, an APH credential issued by one organization's notary is verifiable by any other organization's agent or system using only public standards (W3C VC 2.0, RFC 8785, RFC 7515, RFC 8032, DNS). No bilateral integration, no shared identity provider, no out-of-band trust establishment. The notary's public key is published in DNS or at a `.well-known` URI; any recipient on the open internet can resolve it.
 - **The license is independently auditable.** Every credential is a self-contained Verifiable Credential. Recipients store them in their own audit logs. Disputes can be resolved by re-verifying the credential against the notary's published key — by the recipient, by a third-party auditor, or by a regulator — without ever contacting the notary.
 
@@ -73,7 +105,7 @@ The negotiation rides A2A, and APH is transport-independent: each A2A message ca
 5. Bob's agent replies under its own APH envelope, notarized by Bob's organization's notary. Alice's agent verifies the reply using the same flow.
 6. Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a credential its human issued ahead of time and can revoke at any time.
 
-If Alice changes her mind and revokes the Delegation Mandate, Squillo's notary records the revocation; subsequent envelopes from Alice's agent referencing that mandate fail verification on Bob's side once the revocation transport (v0.2) is wired. In v0.1 the recovery posture is to use short validity windows (RECOMMENDED: hours-to-days, not weeks-to-months) so revocation gaps are small.
+If Alice changes her mind and revokes the Delegation Mandate, Squillo's notary records the revocation and sets the mandate's bit in the status list it publishes. Squillo's notary stops issuing new Communication Mandates against the mandate immediately, and Bob's agent — which resolved the status endpoint from Squillo's own `did:web`, not from anything Alice's agent sent — refuses subsequent envelopes referencing it with `APH_E015` (§6.3.3). Short validity windows (RECOMMENDED: hours-to-days, not weeks-to-months) remain good practice as defense in depth: they bound the damage if Bob's agent cannot reach the status surface at all.
 
 ---
 
@@ -123,7 +155,7 @@ APH v0.1 is explicitly NOT:
 - A chat or transport protocol. APH does not define how bytes move between endpoints.
 - An identity provider. APH consumes identity (DIDs, AgentCards) but does not issue or manage identifiers.
 - A content moderation system. APH attests that a human authorized a message; it does not evaluate the message's content.
-- A revocation **transport**. Revocation itself is normative in v0.1 (§6.3.1): the issuing human may revoke a Delegation Mandate at any time, and the notary MUST stop issuing against it. What v0.1 omits is the on-wire mechanism by which a third-party recipient learns of a revocation; v0.2 will address that with a status credential.
+- A general credential-status service. v0.1 DOES define a revocation transport (§6.3.3), but only for the one artifact whose lifecycle needs it: the Delegation Mandate. There is no status for individual envelopes, none for Communication Mandates (single-use and already consumed, §6.3.1), and no suspension purpose — §6.3.2 forbids re-activation, so a reversible status would describe a lifecycle APH does not have.
 
 ---
 
@@ -291,7 +323,7 @@ Validation rules:
 - `bodySize` MUST be a non-negative integer.
 - `policyDecision` MUST be one of the three enumerated values.
 - `expiresAt` MUST be greater than `issuedAt`. v0.1 RECOMMENDS a short expiry (5 minutes default) to bound replay windows.
-- If `delegationMandateId` is non-null, the referenced Delegation Mandate MUST exist, MUST be unexpired at `issuedAt`, and MUST list `channelKind` in its `allowedChannels`.
+- If `delegationMandateId` is non-null, the referenced Delegation Mandate MUST exist, MUST be unexpired at `issuedAt`, MUST NOT be revoked at `issuedAt` (§6.3.1, §6.3.3), and MUST list `channelKind` in its `allowedChannels`. Expiry and revocation are the two ways standing authority ends — one on schedule, one by the human's decision — and a rule that named only the first would let a notary issue against authority its own records show was withdrawn.
 
 ### 6.3 Mandate lifecycle
 
@@ -299,14 +331,14 @@ A Delegation Mandate is issued and signed by the Human Principal (`principalSign
 
 #### 6.3.1 Revocation — conceptual model
 
-A Delegation Mandate is REVOCABLE by the issuing Human Principal at any time before its `validUntil`. Revocation is normative in v0.1 even though the on-wire revocation transport is deferred. Revocation is the corollary of the driver's-license framing: a license that cannot be pulled is not a license.
+A Delegation Mandate is REVOCABLE by the issuing Human Principal at any time before its `validUntil`. Revocation is the corollary of the driver's-license framing: a license that cannot be pulled is not a license. This subsection defines the model — who may revoke, and what a revocation means for mandates and envelopes already issued. §6.3.3 defines the on-wire transport by which a third-party recipient observes one.
 
 The conceptual revocation model is:
 
 1. **Issuer-side state.** The Notary Service tracks, for every Delegation Mandate it has signed, a `revoked: bool` state and a `revokedAt: RFC 3339 string` timestamp (set when revoked, absent otherwise). The Notary Service exposes a revocation operation to the Human Principal; calling it sets `revoked = true` and stamps `revokedAt = now`.
 2. **Effect on downstream Communication Mandates.** A Notary Service MUST NOT issue a new Communication Mandate referencing a revoked Delegation Mandate. A Communication Mandate signed before its parent Delegation Mandate was revoked remains cryptographically valid; the revocation cuts off issuance of NEW mandates rather than invalidating existing signatures.
-3. **Effect on issued envelopes.** Envelopes already in flight when the parent mandate is revoked remain verifiable as signed credentials. Recipient policy MAY treat envelopes whose parent Delegation Mandate is currently revoked as suspect even if cryptographically valid; v0.1 leaves this policy to the recipient.
-4. **Revocation transport.** v0.1 does NOT specify how a third-party recipient discovers that a mandate has been revoked. Implementations that need recipient-side revocation before v0.2 SHOULD use short validity windows (RECOMMENDED: hours to days, not weeks to months) so revocation gaps are bounded. v0.2 will define a status credential (W3C Verifiable Credential Status List 2021) or equivalent transport so recipients can pull revocation state at verification time.
+3. **Effect on issued envelopes.** Envelopes already in flight when the parent mandate is revoked remain verifiable as signed credentials — the signatures are genuine and stay genuine. What ended is the authority behind them. **A Recipient Endpoint that receives an envelope carrying a `credentialStatus` reference (§7.1.1) MUST resolve that reference and MUST reject the envelope when the parent Delegation Mandate is revoked** (`APH_E015`, §6.3.3, §8.3 step 8a). This is a MUST rather than the recipient policy earlier drafts left it as: a transport nobody is obliged to consult protects nobody, and expiry in the next subsection (§6.3.2) already binds verifiers with a MUST — an authority that ran out on schedule and an authority the human deliberately pulled cannot carry opposite normative force. When an envelope carries NO status reference the recipient has been offered no claim to check, and §6.3.3.4 case 1 governs.
+4. **Revocation transport.** Defined normatively in §6.3.3: the notary publishes a status list credential at an endpoint derived from its own `did:web`, and each envelope issued under a mandate carries that mandate's position in the list. Short validity windows (RECOMMENDED: hours to days, not weeks to months) remain RECOMMENDED as defense in depth — they bound the exposure of a recipient that cannot reach the status surface at all, and of one whose deployment predates this revision.
 
 A Communication Mandate is single-use and conceptually "consumed" by issuing the corresponding envelope; revocation of a Communication Mandate has no practical meaning (the envelope has either been issued or it has not). Revocation applies to Delegation Mandates only.
 
@@ -315,6 +347,78 @@ A Communication Mandate is single-use and conceptually "consumed" by issuing the
 When `now > validUntil`, a Delegation Mandate is EXPIRED. A Notary Service MUST NOT issue a new Communication Mandate referencing an expired Delegation Mandate. Verifiers MUST reject envelopes whose Communication Mandate's `delegationMandateId` resolves to an expired Delegation Mandate (when the verifier has access to that lookup).
 
 A Delegation Mandate that has reached its `validUntil` cannot be "re-activated" — the human must issue a new mandate with a new `id` and new validity window.
+
+#### 6.3.3 Revocation transport (normative)
+
+§6.3.1 makes revocation normative and §6.3.2 makes expiry normative, but only expiry is observable from an envelope alone. This subsection specifies the on-wire mechanism by which a third-party Recipient Endpoint — one with no account at the notary and no prior relationship with the principal — learns at verification time that a Delegation Mandate has been revoked.
+
+APH profiles **W3C Bitstring Status List v1.0** (§14.1). This specification defines the derivation, the binding, the freshness bound and the allocation discipline; the bitstring encoding, the entry shape and the list credential shape are the W3C profile's and are not restated here. The vintage is pinned rather than left as "or equivalent" because the entry's `type` value is signed wire content under §7.1's strict parse: two implementations reading different vintages of the same idea would both look conformant and would never interoperate — the same failure §7.2 warns about for `proofValue`.
+
+##### 6.3.3.1 The status entry on the envelope
+
+The envelope carries the entry as the OPTIONAL top-level `credentialStatus` field (§7.1.1). Its shape is the W3C `BitstringStatusListEntry`:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string | no | Identifier for this status entry. Omitted when absent. |
+| `type` | string | yes | MUST be `"BitstringStatusListEntry"`. Closed value. |
+| `statusPurpose` | string | yes | MUST be `"revocation"` (§6.3.3.5). Closed value set of exactly one member. |
+| `statusListIndex` | string | yes | This mandate's position in the list, as a base-10 integer **in a JSON string** — never a JSON number (§6.3.3.6). |
+| `statusListCredential` | string | yes | Absolute `https:` URL of the status list credential. MUST be same-origin with the derived status endpoint (§6.3.3.2). |
+
+No JSON-LD context term is added by this revision: `BitstringStatusListEntry` and its members are defined by `https://www.w3.org/ns/credentials/v2`, which every APH envelope already lists first in `@context` (§7.1.1). Choosing this vintage is therefore also what keeps the context array unchanged.
+
+**Whose status this is — an APH profile of the W3C field, stated because it narrows the default reading.** In W3C VC 2.0, `credentialStatus` describes the status of *the credential carrying it*. In APH it describes the status of the **parent Delegation Mandate** named by `credentialSubject.policy.delegationMandateId`. The narrowing follows from §6.3.1: revocation applies to Delegation Mandates only, and an envelope already issued stays cryptographically valid whatever happens afterwards. A verifier applying the default reading would be answering a question APH never asks.
+
+An envelope carrying `credentialStatus` MUST also carry a non-null `credentialSubject.policy.delegationMandateId`. An envelope violating this is rejected under §7.1's strict-parse rule at §8.3 step 1: a status reference with nothing to be the status *of* is malformed, not merely unhelpful, and admitting it would leave a verifier checking a bit whose subject it cannot name.
+
+##### 6.3.3.2 The derived endpoint, and why the envelope does not choose it
+
+The **derived status endpoint** is computed from the notary's own identifier and is never read out of the envelope's status entry:
+
+1. Take `credentialSubject.notarization.notaryService.id` (§7.1.9) — the DID of the notary that issued and countersigned the mandate. If it is not a `did:web` identifier, no status endpoint is derivable; §6.3.3.4 states the consequence.
+2. Apply §8.4.4 step 2's rule — percent-decode the method-specific identifier, prefix `https://`, and map colons to path segments — then suffix `/.well-known/aph-status.json` in place of `/.well-known/did.json`. The result is the derived status endpoint.
+3. A notary that publishes any revocation status MUST serve its default status list credential at that endpoint, over TLS validating against the verifier's trust store under §8.4.4 step 3.
+
+**Same-origin binding.** When the envelope's entry carries `statusListCredential`, that URL MUST use the `https:` scheme and MUST be same-origin — identical scheme, host and port — with the derived status endpoint. A verifier encountering a cross-origin or non-`https:` value MUST reject the envelope and MUST NOT fetch the named URL.
+
+The rule reads like paranoia until the attack is named. The authority for "is this mandate revoked" is the notary that issued the mandate, and that notary's identity is anchored in a domain (§8.4.4's trust model). If the envelope could name the host answering the revocation question, then whoever holds an old envelope also chooses that host — and a host of the attacker's choosing always answers *not revoked*. Deriving the origin puts the answer back with the party whose key signed the mandate. Same-origin deliberately permits a **different path**, which is how a notary with more than one list points at the second one; the path is the notary's to choose because it is behind the notary's own TLS name, and the origin is not the envelope's to choose at all.
+
+##### 6.3.3.3 The status list credential
+
+The document served at the derived endpoint (or at a same-origin path named by `statusListCredential`) is a `BitstringStatusListCredential` per the W3C profile, with `credentialSubject.statusPurpose` equal to `"revocation"` and `credentialSubject.encodedList` holding the compressed, base64url-encoded bitstring.
+
+- **Issuer binding.** Its `issuer` MUST be the same notary DID the endpoint was derived from in §6.3.3.2 step 1. Same-origin alone does not make a document authoritative — a host may serve many documents — so the list must also be signed by the notary whose mandate is in question.
+- **Proof.** The credential is secured under §8.1/§8.2 and its verification method resolves through §8.4 exactly as an envelope proof does. v0.1 signs it with the notary's ordinary signing key. This specification does not express per-key proof purposes in a published DID Document, so a key added *only* for status would also be accepted for envelope signing; minting one is therefore an authority widening this revision declines to make.
+- **Freshness (normative).** A verifier MUST NOT accept a status list credential whose issuance (`validFrom`) is more than **5 minutes** before `now`, allowing the same 60-second clock-skew tolerance as §8.3 step 6. A notary that publishes status MUST re-issue and republish at an interval no greater than **2 minutes**, so a conformant verifier always finds a credential inside the bound. A cached copy MUST expire at or before the freshness bound; RECOMMENDED verifier cache TTL is 60 seconds.
+
+  *Why five minutes.* The mitigation this transport replaces (§6.3.1 item 4) is a short validity window, RECOMMENDED at hours-to-days. A staleness bound measured in hours would cost a network fetch and buy nothing — the mandate would usually have expired before the stale answer changed. Five minutes is the interval this specification already treats as "prompt" (§6.2's default Communication Mandate expiry), and it is at least twelve times tighter than the tightest window the short-window mitigation recommends. Checking status therefore strictly improves on not checking it, which is the property that justifies making the check a MUST.
+
+##### 6.3.3.4 The trichotomy — absent, unresolvable, revoked
+
+A Recipient Endpoint evaluates status at §8.3 step 8a in exactly three outcomes:
+
+1. **Absent — skip.** The envelope carries no `credentialStatus`. No claim was offered, and enforcing a claim nobody made is not fail-closed, it is fail-arbitrary: it would refuse every conformant pre-revision envelope. The verifier advances, the same way §8.4.6 has *absence* advance the discovery sequence. A verifier MAY additionally be configured to REQUIRE a status reference and refuse envelopes offering none — that is policy, not protocol, in the shape of §8.3.1 step 10, and a verifier that does not require it remains conformant.
+2. **Present and unresolvable — MUST reject the envelope, with `APH_E008`.** The reference was offered and the verifier could not establish the status from it. Every one of the following is this case: the notary's `notaryService.id` is not a `did:web`, so no origin can be derived and the same-origin rule cannot be satisfied; the derived origin could not be reached; TLS validation failed; the document was absent, oversized, or unparseable; its proof did not verify; its `issuer` was not the derived notary; its `statusPurpose` was not `revocation`; its list is too short to contain `statusListIndex`; or the credential is staler than §6.3.3.3's bound. This is §8.4.6's *published and failed* one level up, and it carries the same reasoning: an attacker who can make the status check **fail** must not thereby get to choose that it is **skipped**.
+3. **Revoked — MUST reject the envelope, with `APH_E015`.** The bit at `statusListIndex` is `1`. A bit of `0` means not revoked, and verification continues.
+
+*Why one code covers all of case 2.* Fetch, TLS, parse, proof, issuer, purpose and freshness failures all surface `APH_E008`, whose §11 meaning covers any protocol-mandated fetch from a notary-hosted surface. The verifier's action is identical in every one of them — reject — and so is the operator's remediation: repair the notary's status surface. Implementations SHOULD log which specific cause fired, because an investigator needs it; the protocol code does not distinguish them because no recipient acts differently on the distinction. Note the boundary with `APH_E014`: that code means a *discovery surface* answered and published no key, which advances the §8.4.6 sequence. There is no sequence to advance here — the status surface has no alternate mechanism — so terminal absence of a status document the envelope pointed at is a failure, not an absence.
+
+##### 6.3.3.5 `statusPurpose` is `revocation`, and an unrecognized purpose is a failure
+
+The `statusPurpose` value set is CLOSED at exactly one member, `"revocation"`. Bitstring Status List's other defined purpose, `"suspension"`, is deliberately excluded: suspension is reversible, and §6.3.2 forbids re-activation. A mandate whose authority has ended cannot be brought back — the human issues a new mandate with a new `id`. Admitting a reversible purpose would put a lifecycle in the transport that the mandate itself does not have, and a recipient would eventually be asked to un-refuse an envelope this specification says stays refused.
+
+An unrecognized or excluded `statusPurpose` is a FAILURE, never something to ignore. It is rejected under §7.1's strict-parse rule at §8.3 step 1, exactly as an unrecognized `channelKind` or `policyDecision` is — the value set is closed in the same sense theirs are. A verifier MUST NOT treat a purpose it does not recognize as "no status claim was made": a producer could then disable the check on any verifier simply by writing a word that verifier has never seen, which turns the closed set into an opt-out.
+
+##### 6.3.3.6 `statusListIndex` is a string, and an index is never reused
+
+`statusListIndex` is a **string** holding a base-10 integer. Producers MUST NOT emit it as a JSON number, and verifiers MUST NOT parse it through a floating-point type. In many runtimes every JSON number is an IEEE-754 double, which silently rounds integers past 2^53 — and a rounded index does not raise a parse error, it reads a **different bit**. The verifier then answers, with full confidence, a question about some other mandate. The string form makes that failure unconstructible rather than merely unlikely, which is the same reason §7.1's other identifiers are strings.
+
+**Index reuse is PROHIBITED.** Once a notary has allocated index *i* in a given status list to a Delegation Mandate, *i* MUST NOT be allocated to any other mandate — not after the first mandate expires, not after it is revoked, not when the list is re-issued, and not when the same principal and agent re-enroll. Allocation is permanent, append-only, and survives re-enrollment of an existing mandate record.
+
+The index travels inside the signed bytes of every envelope issued under that mandate, and those envelopes outlive the mandate: recipients keep them for audit and re-verify them in disputes (§1.1). Reassigning *i* silently re-points every one of those stored envelopes at an unrelated mandate. Both directions are wrong. If the replacement mandate is later revoked, envelopes whose own authority was never withdrawn become permanently refused. If it is not revoked, envelopes issued under authority that WAS withdrawn are laundered back into acceptance. Neither is detectable at the recipient: the bytes are unchanged and the signature still verifies, so nothing looks wrong.
+
+When a list is exhausted the notary publishes a NEW status list credential at a NEW path on the SAME origin and allocates from it. The old list MUST remain published and served for as long as any envelope referencing it may still be verified. Retiring a list that live envelopes still point at is the same defect one step removed: those envelopes become permanently unresolvable, which under §6.3.3.4 case 2 makes them permanently rejected.
 
 ---
 
@@ -341,6 +445,7 @@ The outermost object.
 | `validUntil` | RFC 3339 string | yes | Envelope validity end. |
 | `credentialSubject` | object | yes | The notarized claim (see §7.1.2). |
 | `linkedMandate` | object or null | no | Optional cross-protocol mandate link (see §7.1.10). Omit or set to `null` when absent. |
+| `credentialStatus` | object | no | Revocation status reference for the **parent Delegation Mandate** (see §6.3.3). **OMITTED when absent — MUST NOT be emitted as `null`**, unlike `linkedMandate` above. An envelope carrying no status reference is therefore byte-identical to a pre-revocation envelope, so extension-unaware fixtures and their signatures remain valid (the §7.5 guarantee, applied to a core field). Declared here rather than only in §6.3.3 for the same reason §7.1.9's attestation fields are: §7.1 parses strictly, so a field a notary may send MUST appear in the shape a verifier parses, or conformant verifiers would reject conformant notaries. |
 | `proof` | object OR array of objects | yes | Cryptographic proof (see §7.1.11). A single object is a notary proof. An array is a two-element W3C proof chain: the principal's proof, then the notary's countersignature. |
 
 #### 7.1.2 `CredentialSubject`
@@ -940,6 +1045,9 @@ A Recipient Endpoint MUST execute the following verification steps before accept
 6. **Validate the time window.** Confirm `validFrom <= now <= validUntil` where `now` is the verifier's current wall clock. Allow a small clock-skew tolerance (RECOMMENDED: 60 seconds).
 7. **Validate the algorithm.** Confirm the algorithm is in the supported set (`ES256` or `EdDSA`). Reject `alg: none`. Reject any vendor-specific algorithm not explicitly opted into.
 8. **Validate the body hash (RECOMMENDED).** If the recipient has access to the actual outbound body bytes (the channel transport delivered both the envelope and the payload), compute SHA-256 over the body and compare against `credentialSubject.communication.bodySha256`. Reject on mismatch with error `APH_E009`.
+
+   8a. **Validate revocation status (§6.3.3).** If the envelope carries `credentialStatus`, derive the status endpoint from the notary's `did:web` (§6.3.3.2), bind any carried `statusListCredential` same-origin against it, obtain and verify the status list credential, and reject the envelope if the bit at `statusListIndex` is set (`APH_E015`) or if status could not be established at all (`APH_E008`). If the envelope carries no `credentialStatus`, skip this step (§6.3.3.4 case 1). Placed after the local checks deliberately: this is the only step that may cost a network round-trip, so every cheap reason to reject has already been taken. Numbered `8a` rather than renumbered into the list because §8.3.1 references steps 9 and 10 by number, and the sub-numbered insertion is this section's own idiom for adding a step without moving them.
+
 9. **Emit the verified credential.** If all checks pass, the recipient MAY render a "Notarized" badge in its UI, store the verified credential for audit, and accept the message.
 
 If any step fails, the verifier MUST reject the envelope and SHOULD emit the appropriate error code from §11.
@@ -1298,7 +1406,7 @@ APH identifies both the human principal and the agent via DIDs. v0.1 implementat
 
 ## 11. Error Taxonomy
 
-APH defines a closed set of fourteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
+APH defines a closed set of fifteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
 
 | Code | Variant | Meaning | Suggested resolution |
 |---|---|---|---|
@@ -1309,19 +1417,20 @@ APH defines a closed set of fourteen error codes for v0.1. Implementations MUST 
 | `APH_E005` | `ChannelNotAllowed` | The requested channel kind was not in the Delegation Mandate's `allowedChannels` list. | Grant the channel scope on the Delegation Mandate, or re-issue under AskEveryTime. |
 | `APH_E006` | `NotarySignatureInvalid` | The notary's signature did not verify (distinct from `APH_E001`: this is the mandate-level signature, not the envelope-level signature). | Verify the notary's published JWK matches the `verificationMethod`; re-issue the mandate. |
 | `APH_E007` | `HumanAuthenticationRequired` | An AskEveryTime path was triggered but the human was not reachable for interactive prompt. | Prompt the human, or wait until the human is reachable; alternatively, fall back to a Deferred-for-Review queue. |
-| `APH_E008` | `NotaryServiceUnreachable` | A remote notary service did not respond within the configured timeout. | Check the notary endpoint's health; retry with exponential backoff. |
+| `APH_E008` | `NotaryServiceUnreachable` | A protocol-mandated fetch from a notary-hosted surface did not succeed: a remote notary service did not respond within the configured timeout, or a document the notary is contracted to serve could not be reached, parsed, or validated — a DID Document under §8.4.4, or a revocation status list credential under §6.3.3.4 case 2 (which folds TLS, parse, proof, issuer, purpose and freshness failures into this one code because the verifier's action and the operator's remedy are identical in all of them). Deliberately distinct from `APH_E014`, which means the surface answered and published nothing. | Check the notary endpoint's health and the surface it is contracted to serve; retry with exponential backoff. |
 | `APH_E009` | `EnvelopeBodyHashMismatch` | The recipient computed a SHA-256 over the actual outbound body that did not match `communication.bodySha256`. | Re-hash the body and compare against the envelope; investigate transport corruption or tampering. |
 | `APH_E010` | `UnsupportedAlgorithm` | The envelope declared a signing algorithm not in the supported set, or `alg: none`. | Use one of `ES256` or `EdDSA`; reject `alg: none`. |
 | `APH_E011` | `PrincipalSignatureInvalid` | A signature made by the HUMAN's key did not verify: the principal proof of a chain (§8.3.1 step 1c), or an embedded Delegation Mandate's `principalSignature` (step 1d). Distinct from `APH_E001` and `APH_E006`, which are both notary signatures — a verifier that conflated them would report a forged authorization as a notary misconfiguration. | Confirm the principal's key resolved from `humanPrincipalDid` matches `verificationMethod`; re-sign with the human's key. |
 | `APH_E012` | `AttestationModeRefused` | The verifier's policy requires `PrincipalSigned` and the envelope is `NotaryAttested` (§8.3.1 step 1a). Not a defect in the envelope — a refusal to accept the weaker claim. | Re-issue in `PrincipalSigned` mode, or relax the verifier's policy deliberately and in the open. |
 | `APH_E013` | `ProofChainInvalid` | The proof chain is malformed: wrong length, wrong `proofPurpose` for a position, or a `previousProof` that is missing, dangling, duplicated, or cyclic (§7.1.11, §8.3.1 step 1e). | Emit exactly two proofs, principal first, with the notary proof's `previousProof` naming the principal proof's `id`. |
 | `APH_E014` | `NotaryKeyNotPublished` | No notary key is published at the queried discovery surface: the DNS TXT name carries no APH record (or none matching the named `kid`), or a fetched DID Document names no key under the queried fragment (§8.4.5, §8.4.4). Deliberately distinct from `APH_E008`, which means the surface could not be REACHED — §8.4.6's no-downgrade rule turns on exactly this distinction (absence advances the resolution sequence; failure stops it), and a taxonomy that flattened the two would force every implementation's error surface to flatten them again. | Publish the key at the queried surface, or direct verifiers to a surface the notary actually publishes to. |
+| `APH_E015` | `MandateRevoked` | The parent Delegation Mandate's bit is SET in the revocation status list the issuing notary publishes (§6.3.3): the human withdrew the standing authority this envelope was issued under. The envelope's signatures are still valid — this is a withdrawn authorization, not a forged one, and reporting it as a signature failure would send an operator to inspect key material when the answer is a human decision. Deliberately distinct from `APH_E003`, which is authority that ran out on schedule rather than authority that was pulled. | Obtain a fresh Delegation Mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2). |
 
 ---
 
 ## 12. Security Considerations
 
-A full threat model is published as the companion document `security-considerations.md` in this repository. In summary: APH binds a human-issued credential to a specific outbound message body hash inside a bounded time window, making both replay attacks and post-issuance tampering independently detectable at the recipient boundary. Recipient Endpoints MUST validate the time window, MUST enforce the algorithm allow-list (rejecting `alg: none` and unrecognized algorithms), and SHOULD validate the body hash against the actual received payload bytes when available. Notary Service operators are responsible for protecting the notary's signing key with the same care they would apply to any production credential-issuance key.
+A full threat model is published as the companion document `security-considerations.md` in this repository. In summary: APH binds a human-issued credential to a specific outbound message body hash inside a bounded time window, making both replay attacks and post-issuance tampering independently detectable at the recipient boundary. Recipient Endpoints MUST validate the time window, MUST enforce the algorithm allow-list (rejecting `alg: none` and unrecognized algorithms), MUST resolve the revocation status of any envelope that carries a `credentialStatus` reference (§6.3.3), and SHOULD validate the body hash against the actual received payload bytes when available. Notary Service operators are responsible for protecting the notary's signing key with the same care they would apply to any production credential-issuance key.
 
 ---
 
@@ -1353,6 +1462,7 @@ The following references are normative for APH v0.1:
 - `draft-ietf-oauth-selective-disclosure-jwt-22` — Selective Disclosure JWT base spec (active IETF draft).
 - W3C Decentralized Identifiers (DIDs) v1.0 (W3C Recommendation).
 - W3C Verifiable Credential Data Integrity 1.0 (W3C Recommendation).
+- W3C Bitstring Status List v1.0 (W3C Recommendation) — the status-list vintage §6.3.3 profiles for revocation transport. The vintage is pinned, not offered as one of several: `credentialStatus.type` is signed wire content under §7.1's strict parse, so an implementation reading a different vintage of the same idea would look conformant and never interoperate.
 - W3C DID Method `did:key` — self-describing DID method (W3C Community Group spec).
 - W3C DID Method `did:web` — domain-anchored DID method (W3C Community Group spec).
 - RFC 1035 — Domain Names: Implementation and Specification.
@@ -1521,7 +1631,7 @@ during an implementation attempt. Four preconditions:
    *key material* — nothing in this specification is contracted to fetch an
    attestation document. Either §8.4.4's surface is widened or a fetch
    mechanism is named here.
-4. **An error code.** §11 is a closed taxonomy of thirteen. A failed
+4. **An error code.** §11 is a closed taxonomy of fifteen. A failed
    attestation check maps to none of them, so a conformant implementation
    cannot report it. Either a code is added at last position or §15 states
    which existing code it reuses and why.
@@ -1570,7 +1680,8 @@ The following items are deferred from v0.1 and will be addressed in subsequent v
 
 - **JSON Schema files.** Formal JSON Schema definitions for `NotarizationEnvelope`, `DelegationMandate`, and `CommunicationMandate` will be published under `spec/schemas/` and used by the conformance suite for automated validation.
 - **Conformance test vectors.** A repository-side conformance harness will publish signed test vectors for both `ES256` and `EdDSA`, both `DataIntegrityProof` and `JsonWebSignature2020` proof formats, and all seven channel kinds.
-- **Mandate revocation.** A revocation list or status-credential mechanism will be defined in v0.2 for explicit invalidation of long-lived Delegation Mandates ahead of their `validUntil`.
+- **Status for artifacts other than the Delegation Mandate.** §6.3.3 defines revocation status for Delegation Mandates only. Status for individual envelopes and for Communication Mandates is deliberately out of scope in v0.1 (§6.3.1: a Communication Mandate is single-use and consumed by issuance, and an issued envelope stays a valid record of what was authorized). Either would need its own purpose and its own list, and neither has a demonstrated use ahead of a first external adopter.
+- **A per-key proof purpose in the published DID Document.** §8.4.4's document schema records no purpose per key, so a status-only signing key would also be accepted for envelope signing (§6.3.3.3). Expressing purposes would let a notary hold a narrower key for status publication.
 - **`aph://` URI scheme registration.** Formal IANA registration of the `aph://` URI scheme will be pursued for v0.2.
 - **N Lang static-type schema.** A companion statically-typed schema (machine-readable) will be published alongside the JSON Schema for implementations that want static-type guarantees.
 - **Selective-disclosure conformance.** Full SD-JWT-VC profile conformance vectors, including key-binding JWTs and disclosed-field selection, will be added once the underlying IETF drafts stabilize.

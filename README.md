@@ -19,7 +19,7 @@ When an agent presents a notarized message, the recipient can verify, without tr
 1. A specific human authorized this specific action — proved either by the human's own signature on the envelope, or by their signature on the Delegation Mandate that authorized it, which travels embedded so the check stays offline. `policy.attestationMode` says which, so a recipient never has to guess.
 2. The action falls within the scope of the human's standing delegation.
 3. The notary that signed the license holds the private key it claims to hold (verifiable via DNS-anchored public key publication — see spec §8.4).
-4. The license has not expired and (when revocation transport is wired) has not been revoked.
+4. The license has not expired and has not been revoked (checkable against a status list the notary publishes at an endpoint derived from its own `did:web` — see spec §6.3.3).
 
 ## Where APH fits next to A2A and AP2
 
@@ -40,7 +40,7 @@ Alice's agent and Bob's agent are negotiating a meeting time over a public chann
 - Bob's agent replies with a counter-proposal under its own APH envelope, notarized by Bob's organization's notary, which Alice's agent verifies the same way.
 - Neither human is in the loop for the negotiation itself, but every action either agent takes is provably bound to a license its human issued ahead of time and can revoke at any time.
 
-If Alice decides she no longer wants her agent scheduling on her behalf, she revokes the DelegationMandate: her notary stops issuing new CommunicationMandates against it immediately, and envelopes referencing it will fail verification on Bob's side once the on-wire revocation transport lands (v0.2). In v0.1 the spec compensates by recommending short validity windows, so the revocation gap stays small.
+If Alice decides she no longer wants her agent scheduling on her behalf, she revokes the DelegationMandate: her notary stops issuing new CommunicationMandates against it immediately, and it sets the mandate's bit in the status list it publishes, so envelopes already referencing it fail verification on Bob's side too. Bob's agent resolves that status endpoint from Squillo's own `did:web` rather than from anything Alice's agent sent — an old envelope does not get to name a friendlier host to answer for it (spec §6.3.3). Short validity windows remain good practice as defense in depth: they bound the damage if Bob's agent cannot reach the status surface at all.
 
 ## What problem APH solves
 

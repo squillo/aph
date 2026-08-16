@@ -30,7 +30,7 @@ only on `serde`, `serde_json`, `thiserror`, `chrono`, `p256`, and `base64`.
 - **Flow state machines** — human-present (7 states) and human-not-present
   (5 states); illegal transitions return `APH_E002`.
 - **Roles and operations** — the §5 permission matrix.
-- **Error taxonomy** — the closed `APH_E001`–`APH_E010` set.
+- **Error taxonomy** — the closed `APH_E001`–`APH_E015` set.
 - **Signing helpers** (`crypto`) — JCS-style canonicalization, detached
   JWS, and ES256 sign/verify.
 - **Registered extensions** (spec §7.5) — `appleAurAcceptance`,

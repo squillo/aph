@@ -32,7 +32,7 @@ Run the APH conformance suite and report results.
      `ecdsa-jcs-2019`, detached JWS `aph+jws`)
    - key discovery → §8.4 (`did:key`, DNS TXT `_aph._notary`, `did:web`)
    - flow transitions → §9 (both state machines; violations are `APH_E002`)
-   - error-code mismatches → §11 (closed set `APH_E001`..`APH_E014`)
+   - error-code mismatches → §11 (closed set `APH_E001`..`APH_E015`)
    - mandate rules → §6 (validity windows, `allowedChannels`, single-use
      Communication Mandates)
    - channel-kind naming failures → `google_chat` (snake_case) is normative

@@ -53,12 +53,17 @@ cargo run -q -p aph-cli -- validate <envelope.json>
 3. **Absent `attestationMode` means `NotaryAttested`.** A `PrincipalSigned`
    label is never trusted alone: structure is checked (`APH_E013` on a forged
    label), and mode downgrades are refused (`APH_E012`).
-4. **The error taxonomy is a closed set of fourteen** (`APH_E001`–`APH_E014`).
+4. **The error taxonomy is a closed set of fifteen** (`APH_E001`–`APH_E015`).
    `APH_E014` is TERMINAL ABSENCE of a discovery surface and nothing else —
    absence advances the §8.4.6 order (`did:key` → DNS TXT → `did:web`). A
    surface that was offered and then FAILED never falls through: it refuses on
    the spot under the failure's OWN code (`APH_E008` unreachable, `APH_E003`
    validity window, `APH_E010` algorithm, …), never a blanket one.
+   `APH_E015` is a delegation mandate REVOKED per the §6.3.3 status list —
+   a withdrawn authorization over still-valid signatures, held distinct from
+   `APH_E003` (authority that ran out on schedule). `APH_E008` now covers any
+   protocol-mandated fetch from a notary-hosted surface, the status list
+   included, not only a notarization request that timed out.
 5. **Signed fixtures are never text-edited.**
    `examples/principal_signed_envelope.json` carries four real Ed25519
    signatures over its bytes. Regenerate it — the recipe is in

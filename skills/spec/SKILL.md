@@ -4,7 +4,7 @@ description: >-
   APH (Agent per Human) protocol crash course and reference. Use when working with
   APH, NotarizationEnvelope JSON, envelope validation or verification, notarization
   flows, a Delegation Mandate or Communication Mandate, the notary service, the
-  "agent driver's license" model, APH error codes (APH_E001..APH_E014), signing
+  "agent driver's license" model, APH error codes (APH_E001..APH_E015), signing
   profiles (eddsa-jcs-2022, ecdsa-jcs-2019, detached JWS), notary public-key
   discovery (did:key, did:web, DNS TXT), channel kinds, or the A2A notarization
   extension. Covers wire shape, state machines, closed enums, and how to run the
@@ -26,7 +26,7 @@ organizations via public key discovery.
 - `spec/aph-0.1.md` — the normative spec. Key sections: §1.1 mental model, §5 Roles + Operations, §6 Mandates, §7 The Notarization Envelope, §8 Signing + Verification, §8.4 Notary Key Material + Public-Key Discovery, §9 Flow State Machines, §10 Composition with Adjacent Protocols, §11 Error Taxonomy.
 - `spec/a2a-extension.md` — how agents advertise APH on an A2A AgentCard. Pins `APH_EXTENSION_URI = aph://extensions/notarization/v1` (exact byte equality, opaque, never dereferenced).
 - `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade, attestation-mode downgrade), out-of-scope (compromised notary key/device, phishing, transport security).
-- `examples/` — 8 golden envelope JSON files: one per channel kind, plus one exercising the §7.5 registered extensions. With `examples/README.md`. All 8 are `NotaryAttested` (they carry no `attestationMode`, and absent means `NotaryAttested`). Their `proof.proofValue` strings are illustrative placeholders, NOT real signatures; `bodySha256` is the SHA-256 of the empty string. They exist for shape/round-trip validation only.
+- `examples/` — 9 golden envelope JSON files (enumerated on disk): one per channel kind (7), one exercising the §7.5 registered extensions, and `principal_signed_envelope.json`. With `examples/README.md`. The first 8 are `NotaryAttested` (they carry no `attestationMode`, and absent means `NotaryAttested`) and their `proof.proofValue` strings are illustrative placeholders, NOT real signatures, with `bodySha256` the SHA-256 of the empty string — they exist for shape/round-trip validation only. `principal_signed_envelope.json` is the exception and the only one that verifies: it is `PrincipalSigned` and carries four real Ed25519 signatures made from RFC 8032 §7.1 public test seeds.
 - `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), and `aph-ts` (wasm binding).
 
 ## Envelope wire shape (spec §7.1)
@@ -43,6 +43,7 @@ Top-level fields of a `NotarizationEnvelope` (all camelCase, strict parse):
 | `validFrom` / `validUntil` | RFC 3339; verifiers enforce `validFrom <= now <= validUntil` (±60s skew) |
 | `credentialSubject` | the notarized claim (below) |
 | `linkedMandate` | optional / nullable; carries `ap2IntentMandateUri` for AP2 cross-links (§7.1.10). The reference implementation additionally accepts optional `ap2SignedPayloadB64` and `vaultMutation` extension fields not yet in the spec text (see sharp edge 3) |
+| `credentialStatus` | optional, **OMITTED when absent — never `null`** (unlike `linkedMandate`), so a status-free envelope stays byte-identical to a pre-revocation one. A W3C `BitstringStatusListEntry` naming the PARENT DELEGATION MANDATE's revocation status, not the envelope's (§6.3.3.1). `statusListIndex` is a STRING, never a number |
 | `proof` | a single object, OR a **proof chain array** — see Trust model below (§7.1.11) |
 
 `credentialSubject` contains exactly six objects per spec v0.1 (§7.1.2–§7.1.9;
@@ -85,8 +86,8 @@ A complete worked example lives at spec §7.3.
 
 ## Mandates (spec §6)
 
-- **DelegationMandate** (§6.1) — long-lived standing authority. Fields: `id` (urn:uuid), `humanPrincipalDid`, `agentDid`, `allowedChannels` (non-empty), `rateLimitPerHour?`, `validFrom` < `validUntil`, `principalSignature` (the HUMAN's own, over the JCS form minus BOTH signature fields — required, and the root of every credential issued under the mandate), `notarySignature` (over the JCS form minus `notarySignature`, so it countersigns what the human signed). Revocable by the human at any time (§6.3.1 — conceptual model normative in v0.1; on-wire transport deferred to v0.2, so keep validity windows short).
-- **CommunicationMandate** (§6.2) — per-message, single-use. Fields: `id`, `delegationMandateId?` (null for one-shot AskEveryTime), `humanPrincipalDid`, `agentDid`, `channelKind`, `recipientAddressing`, `contentClass`, `bodySha256`, `bodySize`, `policyDecision`, `issuedAt` < `expiresAt` (5 min recommended), `notarySignature`. If `delegationMandateId` is set, the parent must exist, be unexpired, and list `channelKind` in `allowedChannels`.
+- **DelegationMandate** (§6.1) — long-lived standing authority. Fields: `id` (urn:uuid), `humanPrincipalDid`, `agentDid`, `allowedChannels` (non-empty), `rateLimitPerHour?`, `validFrom` < `validUntil`, `principalSignature` (the HUMAN's own, over the JCS form minus BOTH signature fields — required, and the root of every credential issued under the mandate), `notarySignature` (over the JCS form minus `notarySignature`, so it countersigns what the human signed). Revocable by the human at any time (§6.3.1 model; §6.3.3 on-wire transport — a W3C Bitstring Status List v1.0 profile whose endpoint ORIGIN is derived from the notary's `did:web` and never read from the envelope). When an envelope carries `credentialStatus`, checking it is a verifier MUST: revoked ⇒ `APH_E015`, unresolvable ⇒ `APH_E008`, absent ⇒ skip. Short validity windows remain good practice as defense in depth.
+- **CommunicationMandate** (§6.2) — per-message, single-use. Fields: `id`, `delegationMandateId?` (null for one-shot AskEveryTime), `humanPrincipalDid`, `agentDid`, `channelKind`, `recipientAddressing`, `contentClass`, `bodySha256`, `bodySize`, `policyDecision`, `issuedAt` < `expiresAt` (5 min recommended), `notarySignature`. If `delegationMandateId` is set, the parent must exist, be unexpired at `issuedAt`, NOT be revoked at `issuedAt` (§6.3.1, §6.3.3), and list `channelKind` in `allowedChannels`.
 
 ## State machines (spec §9)
 
@@ -111,7 +112,7 @@ EnvelopeIssued -> Delivered
 
 Any other transition MUST be rejected with `APH_E002`.
 
-## Error taxonomy (spec §11) — closed set of 14
+## Error taxonomy (spec §11) — closed set of 15
 
 | Code | Variant | Meaning |
 |---|---|---|
@@ -122,13 +123,14 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E005` | `ChannelNotAllowed` | Channel kind not in the Delegation Mandate's `allowedChannels` |
 | `APH_E006` | `NotarySignatureInvalid` | Mandate-level `notarySignature` failed (distinct from envelope-level E001) |
 | `APH_E007` | `HumanAuthenticationRequired` | AskEveryTime triggered but human unreachable |
-| `APH_E008` | `NotaryServiceUnreachable` | Remote notary timed out |
+| `APH_E008` | `NotaryServiceUnreachable` | Any protocol-mandated fetch from a notary-hosted surface failed: the service timed out, or a document it is contracted to serve (DID Document §8.4.4, status list §6.3.3) could not be reached, parsed, or validated |
 | `APH_E009` | `EnvelopeBodyHashMismatch` | Recipient's SHA-256 of the body != `communication.bodySha256` |
 | `APH_E010` | `UnsupportedAlgorithm` | Algorithm outside {`ES256`, `EdDSA`}, or `alg: none` |
 | `APH_E011` | `PrincipalSignatureInvalid` | A signature made by the HUMAN's key failed: the principal proof of a chain, or an embedded mandate's `principalSignature`. Distinct from E001/E006, which are notary signatures |
 | `APH_E012` | `AttestationModeRefused` | Verifier policy requires `PrincipalSigned` and the envelope is `NotaryAttested` (§8.3.1 step 1a). A refusal of the weaker claim, not an envelope defect |
 | `APH_E013` | `ProofChainInvalid` | Malformed chain: wrong length, wrong `proofPurpose` per position, or `previousProof` missing/dangling/duplicated/cyclic (§7.1.11). Also what a forged `PrincipalSigned` label raises |
 | `APH_E014` | `NotaryKeyNotPublished` | Nothing published at the queried discovery surface: no TXT record at the name, or the DID Document names no matching key. ABSENT, held distinct from E008 (offered-and-broke) |
+| `APH_E015` | `MandateRevoked` | The parent Delegation Mandate's bit is SET in the notary's published revocation status list (§6.3.3). Signatures are still valid — a withdrawn authorization, not a forged one. Distinct from E003, which is authority that ran out on schedule |
 
 ## Trust model — WHO signs (the most important section here)
 

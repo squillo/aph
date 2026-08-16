@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E013. Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E015. Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -56,8 +56,16 @@ pub enum AphError {
   #[error("APH_E007: human authentication required")]
   HumanAuthenticationRequired,
 
-  /// `APH_E008` — the notary service could not be reached; no decision
-  /// could be made either way.
+  /// `APH_E008` — a protocol-mandated fetch from a notary-hosted surface
+  /// did not succeed, so no decision could be made either way: the service
+  /// itself could not be reached, or a document it is contracted to serve
+  /// could not be reached, parsed, or validated — a DID Document (spec
+  /// §8.4.4) or a revocation status list credential (spec §6.3.3.4 case 2,
+  /// which folds TLS, parse, proof, issuer, purpose and freshness failures
+  /// into this one code because the verifier's action and the operator's
+  /// remedy are identical in all of them; log the specific cause, do not
+  /// mint a code for it). Distinct from `APH_E014`, which means the
+  /// surface ANSWERED and published nothing.
   #[error("APH_E008: notary service unreachable")]
   NotaryServiceUnreachable,
 
@@ -120,6 +128,24 @@ pub enum AphError {
     /// Which discovery surface answered "nothing is published here".
     surface: String,
   },
+
+  /// `APH_E015` — the parent delegation mandate's bit is SET in the
+  /// revocation status list its issuing notary publishes (spec §6.3.3):
+  /// the human withdrew the standing authority this envelope was issued
+  /// under. The signatures are still valid — this is a WITHDRAWN
+  /// authorization, not a forged one, so reporting it as a signature
+  /// failure would send an operator to inspect key material when the
+  /// answer is a human decision. Deliberately distinct from `APH_E003`,
+  /// which is authority that ran out on schedule rather than authority
+  /// that was pulled.
+  ///
+  /// Carries the mandate id alone, mirroring `APH_E003`: the revocation
+  /// timestamp lives in the notary's status state, not in the refusal.
+  #[error("APH_E015: delegation mandate revoked: {mandate_id}")]
+  MandateRevoked {
+    /// Identifier of the revoked delegation mandate.
+    mandate_id: String,
+  },
 }
 
 impl AphError {
@@ -142,6 +168,7 @@ impl AphError {
       Self::AttestationModeRefused { .. } => "APH_E012",
       Self::ProofChainInvalid { .. } => "APH_E013",
       Self::NotaryKeyNotPublished { .. } => "APH_E014",
+      Self::MandateRevoked { .. } => "APH_E015",
     }
   }
 
@@ -162,6 +189,7 @@ impl AphError {
       Self::AttestationModeRefused { .. } => "Re-issue in `PrincipalSigned` mode, or relax the policy deliberately",
       Self::ProofChainInvalid { .. } => "Emit principal proof then notary proof, linked by `previousProof`",
       Self::NotaryKeyNotPublished { .. } => "Publish the key at this surface (§8.4.4/§8.4.5), or query one the notary publishes to",
+      Self::MandateRevoked { .. } => "Obtain a fresh delegation mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2)",
     }
   }
 
@@ -245,6 +273,13 @@ impl AphError {
       reason: reason.into(),
     }
   }
+
+  /// Builds an `APH_E015` naming the revoked delegation mandate.
+  pub fn mandate_revoked(mandate_id: impl std::convert::Into<String>) -> Self {
+    Self::MandateRevoked {
+      mandate_id: mandate_id.into(),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -264,17 +299,26 @@ mod tests {
       super::AphError::PrincipalSignatureInvalid,
       super::AphError::attestation_mode_refused("PrincipalSigned", "NotaryAttested"),
       super::AphError::proof_chain_invalid("previousProof does not name a proof in this chain"),
+      super::AphError::notary_key_not_published("_aph._notary.example.com"),
+      super::AphError::mandate_revoked("urn:uuid:00000000-0000-4000-8000-000000000002"),
     ]
   }
 
   #[test]
-  fn thirteen_codes_are_unique() {
-    // The spec (§11) fixes a CLOSED set of exactly thirteen codes, and
+  fn fifteen_codes_are_unique() {
+    // The spec (§11) fixes a CLOSED set of exactly fifteen codes, and
     // other implementations branch on them. A duplicate would make two
     // distinct failures indistinguishable to a remote verifier. The count
     // is pinned so that adding a code without amending §11 fails here.
+    //
+    // The guarantee in that last sentence had already failed once: this
+    // list omitted `NotaryKeyNotPublished` from the day APH_E014 landed,
+    // so the count stayed at thirteen against a §11 that said fourteen and
+    // E014 was swept by NONE of the three all_variants() tests below. Both
+    // missing entries are restored here alongside APH_E015 — the sweep is
+    // only worth its comment if the list it walks is the whole enum.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 13);
+    std::assert_eq!(errors.len(), 15);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();
@@ -417,6 +461,23 @@ mod tests {
     std::assert!(msg.contains("sha256:aaa"));
     std::assert!(msg.contains("sha256:bbb"));
     std::assert_eq!(err.code(), "APH_E009");
+  }
+
+  #[test]
+  fn revoked_is_not_expired_and_names_the_mandate() {
+    // Expiry and revocation are the two ways standing authority ends, and
+    // they call for opposite responses: an expired mandate is routine
+    // housekeeping, a revoked one is a human who changed their mind and
+    // whose decision must not be re-granted by reflex. Collapsing them
+    // into one code would hide that, and the mandate id is what lets an
+    // operator find WHICH grant was pulled — APH_E015 is unactionable
+    // without it, exactly as APH_E003 is.
+    let revoked = super::AphError::mandate_revoked("urn:uuid:def");
+    let expired = super::AphError::mandate_expired("urn:uuid:def");
+    std::assert_eq!(revoked.code(), "APH_E015");
+    std::assert_eq!(expired.code(), "APH_E003");
+    std::assert_ne!(revoked, expired);
+    std::assert!(std::string::ToString::to_string(&revoked).contains("urn:uuid:def"));
   }
 
   #[test]

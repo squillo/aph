@@ -164,10 +164,16 @@ What a leaked key always costs: availability (an attacker can flood), and
 metadata (envelopes reveal who messaged whom, when, on which channel).
 Operators MUST still run key management accordingly — hardware-backed
 storage where available, restricted signing-service attack surface, planned
-rotation (§8.4.7) — and v0.2 will specify a status / revocation mechanism
-along the lines of W3C VC Status List 2021. The design goal is not that a
-notary is never compromised; it is that a compromised notary cannot put
-words in a human's mouth.
+rotation (§8.4.7) — and §6.3.3 now specifies the revocation transport (a
+W3C Bitstring Status List v1.0 profile), so a withdrawn mandate becomes
+observable to third-party recipients without a key rotation. Note the
+limit of that transport against THIS threat: the status list is published
+by the notary and signed by the notary's key, so an attacker holding that
+key can publish a list too. Revocation status defends against a
+compromised *mandate*, not against a compromised *notary key*; for the
+latter the answer remains rotation under §8.4.7. The design goal is not
+that a notary is never compromised; it is that a compromised notary cannot
+put words in a human's mouth.
 
 ### 3.2 Compromised Human Principal device
 
@@ -288,15 +294,70 @@ Implementers SHOULD NOT rely on the body hash for confidentiality of the
 message body — the hash is a binding mechanism, not an encryption
 mechanism.
 
+### 6.1 Revocation status is a phone-home, and APH did not previously have one
+
+The revocation transport (§6.3.3) introduces a disclosure this protocol
+did not make before this revision, and it is worth naming plainly rather
+than leaving an implementer to discover it in a traffic capture.
+
+Every check in §8.3 before step 8a is offline or resolves key material
+that is cacheable for hours. Step 8a is different: a recipient checking
+status makes a TLS connection **to the issuing notary's own host**, and
+it makes that connection at the moment of verification. The notary
+therefore learns that *someone at this IP address is verifying an
+envelope right now* — a fact it previously could not observe at all,
+because a recipient with a cached key never had to contact it. Repeated
+across a correspondence, the timing series describes when a particular
+recipient reads messages from a particular principal.
+
+Two properties bound the disclosure, and one aggravates it:
+
+- **A bitstring list gives herd privacy.** The verifier fetches the WHOLE
+  list, not one mandate's entry, so the fetch does not reveal which
+  mandate is being checked. That is the reason a bitstring is preferable
+  here to a per-mandate status endpoint, and it is a reason the choice of
+  vintage is a privacy decision and not only an interoperability one.
+- **The freshness bound is short, so caching helps less than usual.**
+  §6.3.3.3 caps a cached list at five minutes and RECOMMENDS a 60-second
+  TTL. A recipient that verifies frequently therefore phones home
+  frequently. The bound is deliberate — a stale answer is the failure the
+  transport exists to remove — but it trades privacy for currency, and
+  the trade is made explicitly here rather than silently.
+- **The origin is derived, so the recipient cannot be steered.** §6.3.3.2
+  binds the fetch to an origin derived from the notary's own `did:web`
+  and refuses a cross-origin `statusListCredential` unfetched. A verifier
+  therefore cannot be turned into a probe against a host of the sender's
+  choosing — the privacy cost is paid to the notary that already knows
+  the mandate exists, and to nobody else.
+
+Mitigations available to a privacy-sensitive recipient: fetch the list on
+a schedule rather than on demand (accepting the freshness bound as an
+upper limit rather than a target), route the fetch through a shared
+egress or a caching proxy so the notary sees one aggregate client rather
+than each recipient, or decline to check status and accept the residual
+risk — which remains conformant only for envelopes carrying no
+`credentialStatus`, since §6.3.1 item 3 makes the check a MUST when one
+is present.
+
+One implementation note that is a correctness matter and not only a
+privacy one: `statusListIndex` is a **string**, never a JSON number
+(§6.3.3.6). A runtime that widens it into a floating-point value silently
+rounds indices past 2^53 and then reads the wrong bit — reporting another
+mandate's revocation state as this one's, with no parse error anywhere.
+This is the same float-widening hazard that removed structured-value
+passing from the wasm binding, and it is why the wire type is a string.
+
 ## 7. Deferred / out-of-scope
 
 The following topics are intentionally NOT addressed in APH v0.1 and are
 tracked for later drafts or for other specifications:
 
-- Revocation lists and status credentials. v0.2 will integrate a status
-  credential mechanism (W3C VC Status List 2021 or a successor) so a
-  compromised key or a withdrawn mandate can be marked unusable without
-  a key-level rotation.
+- Status for anything other than a Delegation Mandate. §6.3.3 landed the
+  revocation transport for withdrawn mandates (a W3C Bitstring Status
+  List v1.0 profile). It does NOT cover a compromised notary key: a list
+  the compromised key itself signs is worth nothing against its holder,
+  so key-level compromise is still answered by rotation (§8.4.7), and
+  a status mechanism for keys remains future work.
 - Formal cryptographic protocol analysis. v0.1 relies on the documented
   security properties of its underlying primitives (RFC 8785, RFC 7515,
   RFC 7518, RFC 8032). A formal analysis of the composed protocol
