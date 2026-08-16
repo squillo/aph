@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "aph-cli"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "aph-conformance",
  "aph-core",
@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "aph-conformance"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "aph-core",
  "ed25519-dalek",
@@ -32,7 +32,7 @@ dependencies = [
 
 [[package]]
 name = "aph-core"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "base64",
  "bs58",
@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "aph-resolver"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "aph-core",
  "futures-util",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "aph-ts"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "aph-core",
  "getrandom 0.2.17",

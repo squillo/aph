@@ -45,7 +45,7 @@
 //! notary publishing only a DID Document verifiable, without letting whoever
 //! can block DNS choose which anchor a verifier trusts.
 //!
-//! # Security posture (PRD-700 7 A2)
+//! # Security posture — the five SSRF controls
 //!
 //! The host a verifier connects to is named by the envelope being verified,
 //! which means it is chosen by an untrusted party. [`ReqwestDocumentFetch`]

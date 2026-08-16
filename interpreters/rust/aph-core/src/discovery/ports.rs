@@ -90,7 +90,8 @@ pub trait TxtRecordLookup: std::marker::Send + std::marker::Sync {
   /// timing. A verifier's result is disclosed to whoever sent the envelope,
   /// and an envelope names the DID that names the DNS name — so a port that
   /// leaked *how* a lookup failed would turn every verifier into a network
-  /// scanner steerable by an attacker (PRD-700 §7 A2 control 5). "No key was
+  /// scanner steerable by an attacker (the fifth of this crate's five
+  /// SSRF controls). "No key was
   /// obtained" is the whole of what a verifier may learn and report.
   fn lookup_txt<'a>(
     &'a self,
@@ -124,7 +125,7 @@ pub trait DidDocumentFetch: std::marker::Send + std::marker::Sync {
   /// [`TxtRecordLookup::lookup_txt`], the error MUST NOT disclose the
   /// status code, the resolved address, or how long the attempt took — that
   /// disclosure is what would make a verifier a probe for whoever chose the
-  /// DID (PRD-700 §7 A2 control 5).
+  /// DID (the fifth of this crate's five SSRF controls).
   fn fetch_did_document<'a>(
     &'a self,
     url: &'a str,

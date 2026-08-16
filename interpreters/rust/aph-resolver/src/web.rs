@@ -10,7 +10,7 @@
 //! verifier reads `proof.verificationMethod`, derives a URL from it, and
 //! connects. That is an outbound request an untrusted party specified, so
 //! without controls a verifier is a request forger with a credential-shaped
-//! excuse. The five controls of the PRD-700 7 A2 table are implemented here
+//! excuse. All five SSRF controls are implemented here
 //! in the order they must run:
 //!
 //! 1. **Address deny table over the FULL resolved set, before any connect**,
@@ -62,7 +62,7 @@ fn refused() -> aph_core::errors::AphError {
 }
 
 /// A [`aph_core::discovery::ports::DidDocumentFetch`] over `reqwest`, with
-/// the PRD-700 7 A2 controls applied.
+/// all five SSRF controls applied.
 #[derive(std::fmt::Debug, std::clone::Clone, std::marker::Copy, std::default::Default)]
 pub struct ReqwestDocumentFetch {
   // A zero-sized struct on purpose: see `fetch_did_document` for why no

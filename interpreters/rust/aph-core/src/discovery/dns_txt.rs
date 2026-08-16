@@ -255,8 +255,8 @@ mod tests {
     // garbage. Only the length check catches it at the record, where the
     // operator can see which record is malformed, rather than at signature
     // verification where it reads as a bad signature. This is the exact
-    // shape squillo_notary published before PRD-700 §9.7 settled the
-    // encoding, so the refusal is a migration pin as much as a format one.
+    // shape an early implementation published before the encoding was
+    // settled, so the refusal is a migration pin as much as a format one.
     let base58_key = "v=APHv1; alg=ed25519; k=z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy";
     std::assert!(super::parse_txt_record(base58_key).is_err());
   }

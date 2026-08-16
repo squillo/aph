@@ -717,7 +717,7 @@ mod tests {
 
   #[test]
   fn failure_classes_do_not_collapse_into_one_code() {
-    // PRD-700 §1.7: a verifier's error is what an operator acts on, and
+    // A verifier's error is what an operator acts on, and
     // these four demand four different actions — restore the service, wait
     // for or re-issue against the rotated key, publish a supported key form,
     // fix the DID method. A composer that map_err'd everything to one code

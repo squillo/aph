@@ -328,7 +328,8 @@ touch, because that boundary is deliberate:
 Most integrations want `aph-core` alone and supply their own transport by
 implementing its two fetch ports; take `aph-resolver` only if you want the
 batteries-included adapters. Depend on it either by version
-(`aph-core = "0.1"`) or, to track a specific commit,
+(`aph-core = "0.1.0-alpha.1"` — a pre-release, so cargo will not
+auto-select it and an adopter opts in on purpose while the spec reads draft) or, to track a specific commit,
 `aph-core = { git = "https://github.com/squillo/aph", rev = "<sha>" }` — pin a
 `rev`, never a bare branch, so a verifier's behaviour cannot change under it.
 

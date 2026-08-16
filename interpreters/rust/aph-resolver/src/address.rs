@@ -1,4 +1,4 @@
-//! Pure address classification — control 1 of the PRD-700 7 A2 table.
+//! Pure address classification — the first of the five SSRF controls.
 //!
 //! A `did:web` identifier is chosen by whoever wrote the envelope being
 //! verified, so its host is attacker-supplied input that this process is

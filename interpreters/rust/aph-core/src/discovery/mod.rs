@@ -290,13 +290,24 @@ pub fn https_origin(url: &str) -> std::option::Option<String> {
 /// True when two absolute URLs share an origin — identical scheme, host and
 /// port (spec §6.3.3.2).
 ///
-/// This is the crate's ONLY origin comparison, and it is deliberately
+/// This is `aph-core`'s only origin comparison, and it is deliberately
 /// public: an adapter guarding a redirect asks exactly the same question a
 /// verifier binding a `statusListCredential` asks, and two implementations
 /// of "same origin" is how one of them ends up wrong. A URL that is not an
 /// absolute `https:` URL is never same-origin with anything, which is how
 /// §6.3.3.2's "MUST use the `https:` scheme" is enforced by the same call
 /// that enforces the binding.
+///
+/// ⛔ IT IS NOT YET THE WORKSPACE'S ONLY ONE, and the earlier wording here
+/// claimed otherwise. `aph-resolver`'s `did:web` fetch adapter still guards
+/// its §8.4.4 redirect with a private `same_origin` over `reqwest::Url`
+/// fields, written before this function existed. The two agree on every
+/// input that adapter can see — both URLs there are always `https:`, and
+/// `reqwest` normalizes host case and the default port — so retiring that
+/// copy onto this call is behaviour-neutral, and it is FILED rather than
+/// done because `aph-resolver` is a separate crate outside this change's
+/// scope. Until it lands, read the sentence above as scoped to `aph-core`,
+/// and do not mint a third.
 pub fn same_origin(a: &str, b: &str) -> bool {
   match (https_origin(a), https_origin(b)) {
     (std::option::Option::Some(left), std::option::Option::Some(right)) => left == right,

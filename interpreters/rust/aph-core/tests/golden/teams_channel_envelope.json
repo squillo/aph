@@ -33,7 +33,7 @@
       "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bodySize": 2348,
       "previewLines": 4,
-      "preview": "Posting the weekly status:\n• shipped APH Phase A scaffolding\n• 7 channel adapters drafted\n• next: PRD-353 N Lang validator wiring"
+      "preview": "Posting the weekly status:\n• release candidate cut\n• 7 integrations drafted\n• next: schema validation wiring"
     },
     "policy": {
       "decision": "AskEveryTime",

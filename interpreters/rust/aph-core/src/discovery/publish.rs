@@ -735,7 +735,7 @@ mod tests {
 
   #[test]
   fn absent_optional_tags_leave_no_trace() {
-    // PRD-700 W2a.1 names `kid=;` a defect: an empty optional tag reads back
+    // `kid=;` is a defect: an empty optional tag reads back
     // as Some("") and then matches no proof's verificationMethod fragment,
     // which is worse than the tag being absent. Absent must mean absent —
     // no empty tag, no doubled or trailing separator.
@@ -953,7 +953,7 @@ mod tests {
 
   #[test]
   fn every_published_key_is_listed_for_assertion_method() {
-    // PRD-700 W2a.2: assertionMethod is the proof purpose APH envelope
+    // assertionMethod is the proof purpose APH envelope
     // proofs declare. A document that publishes a verificationMethod but
     // omits it from assertionMethod publishes a key a purpose-checking
     // verifier will refuse — the worst outcome, since the key resolves and

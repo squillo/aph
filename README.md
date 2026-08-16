@@ -193,7 +193,7 @@ aph/
 
 ```toml
 [dependencies]
-aph-core = "0.1"
+aph-core = "0.1.0-alpha.1"
 ```
 
 ### Verify an envelope you received

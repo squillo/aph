@@ -1019,6 +1019,138 @@ mod tests {
   }
 
   #[test]
+  fn envelope_round_trips_a_credential_status_under_the_camel_case_wire_key() {
+    // Why this exists: until it did, NOTHING in the repo parsed or emitted a
+    // `credentialStatus` ON THE WIRE. The §6.3.3 tests set the field in Rust
+    // and the golden test only asserts the key is ABSENT, so the camelCase
+    // spelling the field exists to produce — and `deny_unknown_fields`
+    // accepting it on `NotarizationEnvelope` at all — were pinned by nothing.
+    // A rename to `credential_status`, or the field being dropped from the
+    // struct, would have passed the entire suite while making every
+    // status-bearing envelope from a conformant notary unparseable.
+    //
+    // What it pins, in order: the key is ACCEPTED by the strict parser; the
+    // nested entry lands in the typed field with its closed enums resolved;
+    // and serializing re-emits under exactly `credentialStatus` with exactly
+    // the four required members (Pattern A drops the absent `id` — a `null`
+    // there would change the JCS bytes a proof covers).
+    let s = serde_json::json!({
+      "aphVersion": "0.1",
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/aph/v1"
+      ],
+      "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
+      "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      "validFrom": "2026-05-21T00:00:00Z",
+      "validUntil": "2026-05-22T00:00:00Z",
+      "credentialSubject": {
+        "humanPrincipal": {
+          "id": "did:key:abc",
+          "displayName": "X"
+        },
+        "agent": {
+          "id": "did:web:agent.squillo.com",
+          "displayName": "X",
+          "version": "1.0"
+        },
+        "channel": {
+          "kind": "slack",
+          "recipientAddressing": {}
+        },
+        "communication": {
+          "contentClass": "Reply",
+          "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bodySize": 0,
+          "previewLines": 0,
+          "preview": ""
+        },
+        "policy": {
+          "decision": "AskEveryTime",
+          "matchedScope": "per-channel",
+          // §6.3.3.1 forbids a status reference with no parent mandate to be
+          // the status OF, so the wire sample carries both or it is not a
+          // sample of anything a notary may emit.
+          "delegationMandateId": "urn:uuid:00000000-0000-4000-8000-0000000000d1"
+        },
+        "notarization": {
+          "notaryService": {
+            "id": "did:web:aph-notary.squillo.com",
+            "name": "Squillo Notary Service",
+            "version": "0.1.0"
+          },
+          "decisionTimestamp": "2026-05-21T00:00:01Z",
+          "decisionLatencyMs": 0
+        }
+      },
+      "credentialStatus": {
+        "type": "BitstringStatusListEntry",
+        "statusPurpose": "revocation",
+        "statusListIndex": "94567",
+        "statusListCredential": "https://aph-notary.squillo.com/.well-known/aph-status.json"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "verificationMethod": "did:key:abc#abc",
+        "created": "2026-05-21T00:00:01Z",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z..."
+      }
+    })
+    .to_string();
+    let v: super::NotarizationEnvelope = serde_json::from_str(&s)
+      .expect("deny_unknown_fields must ACCEPT the credentialStatus key");
+    let entry = v
+      .credential_status
+      .as_ref()
+      .expect("the wire key must land in the typed field");
+    std::assert_eq!(
+      entry.r#type,
+      crate::credential_status::StatusEntryType::BitstringStatusListEntry
+    );
+    std::assert_eq!(
+      entry.status_purpose,
+      crate::credential_status::StatusPurpose::Revocation
+    );
+    std::assert_eq!(entry.index().expect("the index is readable"), 94567u64);
+
+    // Re-emitted under the SAME key: compared as parsed JSON, not as a
+    // substring, so a serializer that wrote the right characters in the
+    // wrong place could not pass.
+    let back = serde_json::to_string(&v).expect("envelope serializes");
+    let reparsed: serde_json::Value = serde_json::from_str(&back).expect("round-trip is JSON");
+    let emitted = reparsed
+      .get("credentialStatus")
+      .expect("the member must be re-emitted as `credentialStatus`");
+    std::assert_eq!(
+      emitted,
+      &serde_json::json!({
+        "type": "BitstringStatusListEntry",
+        "statusPurpose": "revocation",
+        "statusListIndex": "94567",
+        "statusListCredential": "https://aph-notary.squillo.com/.well-known/aph-status.json"
+      }),
+      "the absent optional `id` must not appear, as a null or otherwise"
+    );
+    // And the member is INSIDE the bytes the notary proof covers. That is
+    // what makes the reference unstrippable in flight: an attacker who
+    // deleted `credentialStatus` to force §6.3.3.4 case 1 — the skip — would
+    // be altering the signing base, and the proof would stop verifying.
+    // Asserted on the canonical base rather than on the struct because the
+    // base is the only place the property is actually true or false.
+    let base = crate::crypto::proof_base::signing_base(
+      &v,
+      crate::crypto::proof_base::ProofRole::Notary,
+    )
+    .expect("a single notary proof builds a notary base");
+    std::assert!(
+      base.contains("\"credentialStatus\""),
+      "the status reference must be covered by the notary signature"
+    );
+  }
+
+  #[test]
   fn agent_ref_deserializes_without_agent_card_uri() {
     // Not every agent publishes an A2A AgentCard; omitting the URI must
     // stay legal rather than making those agents unable to be notarized.

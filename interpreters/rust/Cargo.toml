@@ -7,14 +7,23 @@ members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver", "aph-ts"]
 default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver"]
 
 [workspace.package]
-version = "0.1.0"
+# PRE-RELEASE while the spec still reads 0.1.0-draft. Cargo does not
+# auto-select a pre-release, so an adopter opts in explicitly — and 0.1.0
+# stays free for the cut that follows the spec leaving draft. NOTE this is the
+# CRATE version and is deliberately distinct from the PROTOCOL version
+# (`aph_config::APH_VERSION = "0.1"`, guard-tested); they move independently.
+version = "0.1.0-alpha.1"
 edition = "2024"
 license = "Apache-2.0"
 authors = ["APH Protocol Contributors"]
 repository = "https://github.com/squillo/aph"
 
 [workspace.dependencies]
-aph-core = { path = "aph-core" }
+# `version` alongside `path` is REQUIRED to publish: cargo refuses a path
+# dependency with no version ("all path dependencies must have a version"),
+# and the published crate carries the version while local builds keep using
+# the path. Keep it equal to workspace.package.version.
+aph-core = { path = "aph-core", version = "0.1.0-alpha.1" }
 aph-conformance = { path = "aph-conformance" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

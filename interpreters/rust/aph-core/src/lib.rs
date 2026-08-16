@@ -53,7 +53,10 @@
 //! byte-identical to one written before revocation had a transport, so every
 //! existing signature stays valid. [`credential_status`] holds the type, the
 //! derived-endpoint and same-origin rules, and the §6.3.3.4 trichotomy a
-//! recipient applies at §8.3 step 8a.
+//! recipient applies at §8.3 step 8a — all of it EXCEPT the status list's
+//! own §6.3.3.3 proof check, which needs a §8.4-resolved notary key this
+//! crate must not hold and is therefore the caller's step (that module's
+//! preamble and `check_envelope_status` state the obligation).
 
 pub mod a2a_extension;
 pub mod aph_config;
