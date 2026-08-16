@@ -46,11 +46,20 @@
 //! extension-free envelopes round-trip byte-identically. The
 //! `CredentialAccessNotarizationEnvelope` variant remains a spec v0.2
 //! candidate.
+//!
+//! Top-level `credentialStatus` (§6.3.3.1) is a CORE optional field rather
+//! than a registered extension, and it follows the same omit-when-absent
+//! rule for the same reason: an envelope with no status reference is
+//! byte-identical to one written before revocation had a transport, so every
+//! existing signature stays valid. [`credential_status`] holds the type, the
+//! derived-endpoint and same-origin rules, and the §6.3.3.4 trichotomy a
+//! recipient applies at §8.3 step 8a.
 
 pub mod a2a_extension;
 pub mod aph_config;
 pub mod communication_mandate;
 pub mod credential_access_envelope;
+pub mod credential_status;
 pub mod crypto;
 pub mod delegation_mandate;
 pub mod discovery;
@@ -73,6 +82,11 @@ pub use aph_config::{
   DEFAULT_MANDATE_TTL_SECONDS, MAX_BODY_PREVIEW_BYTES, MAX_PREVIEW_LINES, W3C_VC_CONTEXT_V2,
 };
 pub use communication_mandate::CommunicationMandate;
+pub use credential_status::{
+  CredentialStatusEntry, StatusCheck, StatusEntryType, StatusListCredential, StatusListSubject,
+  StatusPurpose, check_credential_status, check_envelope_status, decode_encoded_list,
+  parse_status_list_credential, revocation_bit, status_list_signing_base,
+};
 pub use delegation_mandate::DelegationMandate;
 pub use envelope::{
   AgentRef, AttestationMode, ChannelDescriptor, CommunicationDescriptor, CredentialSubject,
@@ -92,7 +106,7 @@ pub use vault_mutation::{VaultMutationKind, VaultMutationMandate};
 
 // Crypto re-exports — JCS canonicalization, detached JWS, and ECDSA
 // mandate signing/verification.
-pub use crate::discovery::{DidUrl, KeyAlgorithm, NotaryPublicKey};
+pub use crate::discovery::{DidUrl, KeyAlgorithm, NotaryPublicKey, https_origin, same_origin};
 pub use crate::crypto::did_key::{DecodedDidKey, decode as decode_did_key, encode_ed25519 as did_key_from_ed25519};
 pub use crate::crypto::eddsa_jcs::{
   countersign_as_notary, sign_as_principal, sign_envelope, signing_input, verify_envelope,

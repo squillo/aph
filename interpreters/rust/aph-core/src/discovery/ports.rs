@@ -1,18 +1,32 @@
-//! The two narrow fetch ports notary-key discovery needs.
+//! The narrow fetch ports the notary-hosted surfaces need.
 //!
 //! `aph-core` parses; it never fetches. Spec §8.4 defines two of its three
-//! publication mechanisms in terms of I/O — a DNS query (§8.4.5) and an
-//! HTTPS GET (§8.4.4) — and this module is the entire boundary across which
+//! key-publication mechanisms in terms of I/O — a DNS query (§8.4.5) and an
+//! HTTPS GET (§8.4.4) — and §6.3.3 adds a third notary-hosted surface, the
+//! revocation status list. This module is the entire boundary across which
 //! that I/O arrives. The adapters live outside this crate, so `aph-core`
 //! keeps no HTTP client, no resolver, and no async runtime, and every rule
-//! in [`crate::discovery`] stays testable against fixed strings.
+//! in [`crate::discovery`] and [`crate::credential_status`] stays testable
+//! against fixed strings.
 //!
-//! **Two traits, one method each, on purpose.** A bounded context declares
+//! **Three traits, one method each, on purpose.** A bounded context declares
 //! its OWN narrow port rather than depending on a wide shared one: reusing a
 //! host-wide `HttpPort` would widen this crate's dependency surface and tie
 //! its lifetime to the host's. One method means a test double is a struct
 //! with a canned answer, which is why [`super::composer`] is exercised
 //! end-to-end with no network at all.
+//!
+//! **[`StatusCredentialFetch`] is a SIBLING of [`DidDocumentFetch`], not a
+//! reuse of it**, and the distinction is contractual rather than cosmetic.
+//! `fetch_did_document`'s own contract hard-codes where its URL comes from —
+//! [`super::DidUrl::web_document_url`], with the percent-decode ordering
+//! that keeps a `%3A` port attached to the host — and an adapter is
+//! forbidden from rebuilding it. A status URL is derived differently
+//! (§6.3.3.2) and, uniquely in this crate, may name a DIFFERENT PATH chosen
+//! by the envelope and then bound same-origin. Hosts also cache the two
+//! bodies: a status body stored under a `did:web`-document cache key is a
+//! semantic collision, and one that returns a stale "not revoked" for a
+//! rotated document — or a DID Document for a status read.
 //!
 //! **No `async fn` in trait, deliberately.** Both methods return a boxed,
 //! pinned future — the shape `#[async_trait]` generates — written by hand
@@ -117,6 +131,57 @@ pub trait DidDocumentFetch: std::marker::Send + std::marker::Sync {
   ) -> DiscoveryFuture<'a, String>;
 }
 
+/// Fetches a revocation status list credential (spec §6.3.3.3).
+///
+/// `Send + Sync` so one adapter can be shared across concurrent
+/// verifications without wrapping.
+pub trait StatusCredentialFetch: std::marker::Send + std::marker::Sync {
+  /// Returns the document body at `url` as a UTF-8 string, unparsed.
+  ///
+  /// Parsing is [`crate::credential_status::parse_status_list_credential`]'s
+  /// job, so an adapter hands back bytes and forms no opinion about them —
+  /// in particular it MUST NOT decide from the body whether the mandate is
+  /// revoked, and MUST NOT decompress `encodedList`: which document is
+  /// authoritative is settled by rules an adapter cannot see. It MUST fetch
+  /// over TLS and MUST treat certificate validation failure as a fetch
+  /// failure (§8.4.4 step 3 applies here unchanged); it MUST NOT follow a
+  /// redirect to another origin, because the derived origin is the entire
+  /// trust anchor.
+  ///
+  /// `url` has ALREADY been bound same-origin against the endpoint derived
+  /// from the notary's own DID (§6.3.3.2) by
+  /// [`crate::credential_status::check_credential_status`], which refuses a
+  /// cross-origin value WITHOUT calling this method. An adapter MUST NOT
+  /// re-derive the URL, and MUST NOT relax the binding: the whole mechanism
+  /// rests on the envelope never getting to choose the answering host.
+  ///
+  /// A caching adapter MUST namespace these bodies apart from `did:web`
+  /// documents and MUST expire an entry at or before §6.3.3.3's freshness
+  /// bound — a cache that outlives the bound reintroduces exactly the
+  /// staleness the bound exists to cap.
+  ///
+  /// # Errors
+  ///
+  /// `APH_E008` ([`crate::errors::AphError::NotaryServiceUnreachable`]) for
+  /// every transport outcome: DNS failure, TLS failure, connection refused,
+  /// timeout, and any non-success HTTP status. Note the contrast with
+  /// [`TxtRecordLookup::lookup_txt`]: there, absence advances the §8.4.6
+  /// sequence, so a "nothing published" answer is `Ok`. Here there is no
+  /// sequence to advance — the status surface has no alternate mechanism —
+  /// so a 404 at a URL the envelope pointed at is a FAILURE (§6.3.3.4 case
+  /// 2), never an absence, and an adapter that reported it as `Ok("")` would
+  /// hand an attacker the skip that case 2 exists to deny.
+  ///
+  /// As with the other two ports, the error MUST NOT disclose the status
+  /// code, the resolved address, or how long the attempt took — that
+  /// disclosure is what would make a verifier a probe for whoever chose the
+  /// DID.
+  fn fetch_status_credential<'a>(
+    &'a self,
+    url: &'a str,
+  ) -> DiscoveryFuture<'a, String>;
+}
+
 #[cfg(test)]
 mod tests {
   /// A stub implementing BOTH ports, counting only work done *inside* the
@@ -154,8 +219,22 @@ mod tests {
     }
   }
 
+  impl super::StatusCredentialFetch for StubPorts {
+    fn fetch_status_credential<'a>(
+      &'a self,
+      _url: &'a str,
+    ) -> super::DiscoveryFuture<'a, String> {
+      std::boxed::Box::pin(async move {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let out: std::result::Result<String, crate::errors::AphError> =
+          std::result::Result::Ok(String::new());
+        out
+      })
+    }
+  }
+
   #[test]
-  fn both_ports_are_dyn_compatible() {
+  fn all_three_ports_are_dyn_compatible() {
     // The load-bearing part of this test is that it COMPILES: a port exists
     // so the adapter can be chosen at run time (a DNS adapter here, a
     // fixture adapter in a conformance run, an offline one on an air-gapped
@@ -167,13 +246,17 @@ mod tests {
     let stub = StubPorts::default();
     let lookup: &dyn super::TxtRecordLookup = &stub;
     let fetch: &dyn super::DidDocumentFetch = &stub;
+    // The §6.3.3 status port is held to the same bar: it is chosen at run
+    // time beside the other two, and a host wires all three from one place.
+    let status: &dyn super::StatusCredentialFetch = &stub;
     let shared: std::sync::Arc<dyn super::TxtRecordLookup> =
       std::sync::Arc::new(StubPorts::default());
     // A registry of adapters keyed at run time is the shape a host wiring
     // actually has, and it is exactly what an `async fn` in trait forbids.
     let lookups: std::vec::Vec<&dyn super::TxtRecordLookup> = std::vec![lookup, &*shared];
     let fetches: std::vec::Vec<&dyn super::DidDocumentFetch> = std::vec![fetch];
-    std::assert_eq!(lookups.len() + fetches.len(), 3);
+    let statuses: std::vec::Vec<&dyn super::StatusCredentialFetch> = std::vec![status];
+    std::assert_eq!(lookups.len() + fetches.len() + statuses.len(), 4);
   }
 
   #[test]

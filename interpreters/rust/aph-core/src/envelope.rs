@@ -49,6 +49,24 @@ pub struct NotarizationEnvelope {
   /// Optional link to an AP2 IntentMandate (for cross-protocol mandates).
   #[serde(default)]
   pub linked_mandate: std::option::Option<LinkedMandate>,
+  /// Revocation status reference for the **parent Delegation Mandate** named
+  /// by `credentialSubject.policy.delegationMandateId` — NOT for this
+  /// envelope (spec §6.3.3.1 narrows the W3C reading, and
+  /// [`crate::credential_status`] carries the argument).
+  ///
+  /// **`skip_serializing_if` is load-bearing, not tidiness.** Unlike
+  /// `linked_mandate` directly above — which §7.1.1 permits to appear as an
+  /// explicit `null` — this field is OMITTED when absent, so an envelope
+  /// carrying no status reference is BYTE-IDENTICAL to one written before
+  /// the field existed. That identity is what keeps every published example,
+  /// every golden fixture and all four real Ed25519 signatures valid without
+  /// regeneration: the signing base is this struct serialized and
+  /// canonicalized (`crate::crypto::proof_base::signing_base`), so a bare
+  /// `#[serde(default)]` here would emit `"credentialStatus":null`, change
+  /// those bytes, and invalidate every signature over them.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub credential_status:
+    std::option::Option<crate::credential_status::CredentialStatusEntry>,
   /// Cryptographic proof: a single notary proof, or a two-element proof
   /// chain (spec §7.1.11). See [`EnvelopeProofs`].
   pub proof: EnvelopeProofs,
@@ -629,6 +647,10 @@ mod tests {
       valid_until: "2026-05-22T00:00:00Z".to_string(),
       credential_subject: sample_credential_subject(),
       linked_mandate: std::option::Option::None,
+      // Pattern A (§7.1.1): absent here means NO `credentialStatus` key on
+      // the wire, which is what keeps this fixture byte-identical to the
+      // pre-revocation shape its signatures were made over.
+      credential_status: std::option::Option::None,
       proof: super::EnvelopeProofs::Single(sample_proof()),
     }
   }

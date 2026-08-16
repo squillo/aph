@@ -366,26 +366,14 @@ mod tests {
 
   /// Drives a future to completion on the calling thread.
   ///
-  /// `aph-core` carries no async runtime — PRD-700 §1.4 keeps this crate
-  /// I/O-free and dependency-light — so the tests supply the dozen lines of
-  /// `std` needed to poll a future rather than pulling in `tokio` to await a
-  /// fake that is already `Ready`.
+  /// The poller itself now lives in
+  /// [`crate::discovery::test_support::block_on`], because the §6.3.3 status
+  /// arm needs the same twelve lines and two hand-written wakers in one
+  /// crate is two sets of soundness assumptions. This local name is kept so
+  /// the fifteen call sites below stay about §8.4.6 rather than about test
+  /// scaffolding.
   fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    struct ThreadWaker(std::thread::Thread);
-    impl std::task::Wake for ThreadWaker {
-      fn wake(self: std::sync::Arc<Self>) {
-        self.0.unpark();
-      }
-    }
-    let waker = std::task::Waker::from(std::sync::Arc::new(ThreadWaker(std::thread::current())));
-    let mut context = std::task::Context::from_waker(&waker);
-    let mut future = std::pin::pin!(future);
-    loop {
-      match std::future::Future::poll(future.as_mut(), &mut context) {
-        std::task::Poll::Ready(value) => return value,
-        std::task::Poll::Pending => std::thread::park(),
-      }
-    }
+    crate::discovery::test_support::block_on(future)
   }
 
   /// A DNS port with canned records that records the names it was asked for.

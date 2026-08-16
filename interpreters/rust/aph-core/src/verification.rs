@@ -609,6 +609,10 @@ mod tests {
         apple_aur_acceptance: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,
+      // Pattern A (§7.1.1): absent here means NO `credentialStatus` key on
+      // the wire, which is what keeps this fixture byte-identical to the
+      // pre-revocation shape its signatures were made over.
+      credential_status: std::option::Option::None,
       proof: crate::envelope::EnvelopeProofs::Single(notary_proof()),
     }
   }
