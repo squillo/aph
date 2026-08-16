@@ -12,12 +12,21 @@
 //! absence as failure takes every `did:web` notary offline the moment it stops
 //! publishing TXT, and one that reports failure as absence hands an attacker
 //! the downgrade §8.4.6 exists to forbid: block the DNS answer, and the
-//! verifier volunteers to trust whatever the web origin serves.
+//! verifier volunteers to trust whatever the web origin serves. The port says
+//! which is which in its return type — `aph_core::discovery::DiscoveryOutcome`
+//! — so this module's job is only to decide which DNS answers land where.
 
 /// Which side of the absence/failure line a resolver error falls on.
 ///
 /// Named rather than a `bool` because the two outcomes are not degrees of
 /// the same thing: one continues the §8.4.6 sequence and the other stops it.
+///
+/// Deliberately NOT `aph_core::discovery::DiscoveryOutcome`, which is the
+/// protocol's word for the same line. This classifies an ERROR, so it can
+/// never be `Found`; reusing the port's type here would give a pure two-
+/// valued classifier a third variant it cannot produce, and would force it
+/// to construct an `AphError` it has no business owning.
+/// [`negative_answer`] is the one place the two vocabularies meet.
 #[derive(std::fmt::Debug, std::clone::Clone, std::marker::Copy, std::cmp::PartialEq, std::cmp::Eq)]
 pub(crate) enum LookupOutcome {
   /// Nothing is published at this name. The composer may advance.
@@ -79,30 +88,57 @@ impl aph_core::discovery::ports::TxtRecordLookup for HickoryTxtLookup {
   fn lookup_txt<'a>(
     &'a self,
     name: &'a str,
-  ) -> aph_core::discovery::ports::DiscoveryFuture<'a, std::vec::Vec<String>> {
+  ) -> aph_core::discovery::ports::DiscoveryFuture<
+    'a,
+    aph_core::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+  > {
     std::boxed::Box::pin(async move {
-      // Annotated because the async block's output type is pinned only by
-      // the unsizing coercion to `dyn Future`.
-      let out: std::result::Result<std::vec::Vec<String>, aph_core::errors::AphError> =
-        match self.resolver.txt_lookup(name).await {
-          std::result::Result::Ok(lookup) => {
-            let mut records: std::vec::Vec<String> = std::vec::Vec::new();
-            for txt in lookup.iter() {
-              records.push(join_character_strings(
-                txt.txt_data().iter().map(|part| &part[..]),
-              ));
-            }
-            std::result::Result::Ok(records)
+      match self.resolver.txt_lookup(name).await {
+        std::result::Result::Ok(lookup) => {
+          let mut records: std::vec::Vec<String> = std::vec::Vec::new();
+          for txt in lookup.iter() {
+            records.push(join_character_strings(
+              txt.txt_data().iter().map(|part| &part[..]),
+            ));
           }
-          std::result::Result::Err(error) => match classify_resolve_error(&error) {
-            LookupOutcome::Absence => std::result::Result::Ok(std::vec::Vec::new()),
-            LookupOutcome::Failure => {
-              std::result::Result::Err(aph_core::errors::AphError::NotaryServiceUnreachable)
-            }
-          },
-        };
-      out
+          // hickory reports the ordinary no-records answer as a
+          // `NoRecordsFound` ERROR, classified on the arm below. This guard
+          // is for the other shape — a lookup that succeeded and yielded
+          // nothing — so that the port can never answer `Found` with nothing
+          // found. Downstream it makes no difference (an empty record set
+          // selects to absence anyway); it makes the port's own answer
+          // honest, which is the whole point of the type.
+          if records.is_empty() {
+            return std::result::Result::Ok(aph_core::discovery::DiscoveryOutcome::Absent);
+          }
+          std::result::Result::Ok(aph_core::discovery::DiscoveryOutcome::Found(records))
+        }
+        std::result::Result::Err(error) => negative_answer(classify_resolve_error(&error)),
+      }
     })
+  }
+}
+
+/// The classifier's verdict expressed as the port's own answer.
+///
+/// The one place this crate's absence/failure vocabulary meets the protocol's
+/// (see [`LookupOutcome`]), split out as a pure function so the translation
+/// is testable with no network — which matters, because getting it backwards
+/// in either direction is a live outage or a silent downgrade, and neither is
+/// visible in a unit test of the classifier alone.
+fn negative_answer(
+  outcome: LookupOutcome,
+) -> std::result::Result<
+  aph_core::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+  aph_core::errors::AphError,
+> {
+  match outcome {
+    LookupOutcome::Absence => {
+      std::result::Result::Ok(aph_core::discovery::DiscoveryOutcome::Absent)
+    }
+    LookupOutcome::Failure => {
+      std::result::Result::Err(aph_core::errors::AphError::NotaryServiceUnreachable)
+    }
   }
 }
 
@@ -277,6 +313,26 @@ mod tests {
         hickory_resolver::error::ResolveErrorKind::NoConnections
       )),
       super::LookupOutcome::Failure
+    );
+  }
+
+  #[test]
+  fn the_verdict_becomes_a_typed_absent_answer_or_an_opaque_refusal() {
+    // The classifier tests above pin which DNS answers are absence; this pins
+    // what the PORT then says, which is the half a caller acts on. Both
+    // directions are load-bearing and neither is observable from the
+    // classifier alone: `Absent` is what lets the §8.4.6 sequence advance to
+    // did:web, and `Err(APH_E008)` is what stops it. Swap the two arms and
+    // every classifier test still passes while every did:web-only notary
+    // becomes unverifiable — or, the other way, whoever can block DNS picks
+    // the trust anchor.
+    std::assert_eq!(
+      super::negative_answer(super::LookupOutcome::Absence).unwrap(),
+      aph_core::discovery::DiscoveryOutcome::Absent
+    );
+    std::assert_eq!(
+      super::negative_answer(super::LookupOutcome::Failure).unwrap_err(),
+      aph_core::errors::AphError::NotaryServiceUnreachable
     );
   }
 

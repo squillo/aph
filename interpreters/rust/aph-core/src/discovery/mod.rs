@@ -19,6 +19,8 @@
 //! narrow one-method ports an adapter implements to do the fetching; and
 //! [`composer`] dispatches across mechanisms in the §8.4.6 preference order
 //! with no silent downgrade from a stronger mechanism to a weaker one.
+//! [`DiscoveryOutcome`] is the one word all of them use for "the mechanism
+//! answered, and published nothing" — the distinction §8.4.6 is built on.
 //!
 //! Two members here serve a surface that is NOT key discovery: revocation
 //! status (§6.3.3) is anchored in the same `did:web` origin, so
@@ -34,6 +36,42 @@ pub mod did_document;
 pub mod dns_txt;
 pub mod ports;
 pub mod publish;
+
+/// What a discovery step found, when the step itself completed.
+///
+/// Spec §8.4.6 turns on a distinction an empty collection can carry but
+/// cannot NAME — and while it was carried by prose alone, implementations of
+/// this protocol repeatedly got it backwards, in both directions.
+/// **Absence advances the mechanism sequence; failure stops it.** A
+/// mechanism that published nothing offered nothing to break, so advancing
+/// past it concedes nothing. A mechanism that was offered and then broke must
+/// reject, or whoever can break — or merely block — the strongest anchor gets
+/// to choose that the verifier trusts a weaker one instead, and choosing the
+/// anchor is an identity decision.
+///
+/// **Failure is deliberately NOT a variant here.** It stays in the `Err` arm
+/// of the enclosing `Result`, for two reasons. It carries a §11 code the
+/// caller acts on — `APH_E008` unreachable, `APH_E003` outside the validity
+/// window, `APH_E010` unsupported, `APH_E014` terminal absence — and those
+/// demand different remedies. And `?` then propagates a failure past every
+/// intermediate hop with nobody writing the propagation: the no-downgrade rule
+/// becomes something the compiler enforces rather than a discipline each call
+/// site has to remember, which is exactly where it was lost before.
+///
+/// This type appears only where the protocol defines a served-absence form.
+/// The two body-fetch ports have none — see [`ports`] for why inventing one
+/// there would both contradict §6.3.3.4 and make a response status readable
+/// from outside a verifier.
+#[derive(std::fmt::Debug, std::clone::Clone, std::cmp::PartialEq, std::cmp::Eq)]
+pub enum DiscoveryOutcome<T> {
+  /// The mechanism answered, and it published this.
+  Found(T),
+  /// The mechanism answered, and the answer is that nothing is published
+  /// here. An ordered chain ADVANCES to the next mechanism; a chain of one
+  /// — a pinned or terminal mechanism — has nowhere to advance to and reports
+  /// `APH_E014`.
+  Absent,
+}
 
 /// Signing algorithm a discovered key is pinned to.
 ///

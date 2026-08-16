@@ -40,7 +40,8 @@
 //! The one judgement it does make is the ABSENCE/FAILURE split, and it is
 //! made because only the adapter can see it. §8.4.6 advances the mechanism
 //! sequence on absence and refuses on failure, so a DNS answer of NXDOMAIN
-//! (or NOERROR with no TXT records) becomes `Ok(vec![])` while a timeout,
+//! (or NOERROR with no TXT records) becomes
+//! `Ok(aph_core::discovery::DiscoveryOutcome::Absent)` while a timeout,
 //! SERVFAIL or REFUSED becomes `APH_E008`. That distinction is what keeps a
 //! notary publishing only a DID Document verifiable, without letting whoever
 //! can block DNS choose which anchor a verifier trusts.

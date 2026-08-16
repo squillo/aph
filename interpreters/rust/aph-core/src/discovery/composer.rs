@@ -110,8 +110,8 @@ pub enum MechanismSelection {
 /// Both ports are taken because the `DidWeb` sequence and the pinned
 /// selections route between them; the `did:key` path uses neither. The
 /// `match` below is the no-downgrade guarantee: every error propagates with
-/// `?` or is returned, so absence (a mechanism with nothing published) is
-/// the only thing that advances — see the `DidWeb` arm's table.
+/// `?` or is returned, so [`super::DiscoveryOutcome::Absent`] is the only
+/// thing that advances.
 ///
 /// `at_rfc3339` is the instant the key must be valid at. Per §8.4.7 a
 /// verifier "accept[s] any envelope where the signing key was valid at the
@@ -140,16 +140,11 @@ pub async fn resolve(
     DiscoveryMechanism::DidKey => resolve_did_key(did_url),
     DiscoveryMechanism::DnsTxt => resolve_dns_txt(did_url, lookup, at_rfc3339).await,
     // §8.4.6 orders the network mechanisms DNS TXT then did:web, and the
-    // sequence below is NOT the downgrade that section forbids — the
-    // distinction doing the work is ABSENCE vs FAILURE (BOOK 15/140):
-    //
-    //   Ok(Some(key))  TXT published a valid key            -> use it
-    //   Ok(None)       nothing is published via TXT         -> advance;
-    //                  nothing was offered, so nothing failed
-    //   Err(_)         TXT is published-and-broken, or the  -> REJECT.
-    //                  lookup could not be completed           Advancing
-    //                  (timeout/SERVFAIL)                       here would
-    //                  let whoever can break DNS choose the trust anchor.
+    // sequence below is NOT the downgrade that section forbids: the `?` is
+    // what makes it safe. Only `DiscoveryOutcome::Absent` can reach the
+    // second arm, because every failure has already left through the `?` —
+    // so a broken TXT record can never advance to the web origin, and no
+    // future edit can make it without deleting that `?`.
     //
     // Forged absence (an on-path attacker answering with an empty record
     // set) buys nothing: it advances the verifier to did:web, which is
@@ -157,8 +152,8 @@ pub async fn resolve(
     // does not clear.
     DiscoveryMechanism::DidWeb => {
       match probe_dns_txt(did_url, lookup, at_rfc3339).await? {
-        std::option::Option::Some(key) => std::result::Result::Ok(key),
-        std::option::Option::None => resolve_did_web(did_url, fetch).await,
+        super::DiscoveryOutcome::Found(key) => std::result::Result::Ok(key),
+        super::DiscoveryOutcome::Absent => resolve_did_web(did_url, fetch).await,
       }
     }
   }
@@ -253,17 +248,15 @@ pub async fn resolve_dns_txt(
       ));
     }
   };
-  let records = lookup.lookup_txt(&name).await?;
-  match super::dns_txt::select_key(&records, parsed.fragment.as_deref(), at_rfc3339)? {
-    std::option::Option::Some(key) => std::result::Result::Ok(key),
+  match dns_txt_step(&name, parsed.fragment.as_deref(), lookup, at_rfc3339).await? {
+    super::DiscoveryOutcome::Found(key) => std::result::Result::Ok(key),
     // Terminal absence: this mechanism was explicitly chosen (named or
     // pinned), so there is no later mechanism to advance to — but absence
-    // is still not failure, and since APH_E014 joined the §11 taxonomy the
-    // boundary can finally say which one happened. A caller holding E014
-    // knows nothing is published here; a caller holding E008 knows the
-    // lookup broke. §8.4.6's no-downgrade rule is only writable downstream
-    // because these are different codes.
-    std::option::Option::None => std::result::Result::Err(
+    // is still not failure, and E014 is where the boundary says which one
+    // happened. A caller holding E014 knows nothing is published here; a
+    // caller holding E008 knows the lookup broke. §8.4.6's no-downgrade
+    // rule is only writable downstream because these are different codes.
+    super::DiscoveryOutcome::Absent => std::result::Result::Err(
       crate::errors::AphError::notary_key_not_published(std::format!(
         "DNS TXT `{}` (terminal: this mechanism was explicitly selected)",
         name
@@ -272,22 +265,47 @@ pub async fn resolve_dns_txt(
   }
 }
 
-/// The non-terminal DNS TXT probe the §8.4.6 ordered sequence uses: absence
-/// stays `Ok(None)` so the caller may advance, while an error is a REAL
-/// failure the caller must stop on.
+/// The DNS TXT mechanism as one step: query the name, then select.
+///
+/// ONE translation point from the port's answer to the mechanism's, shared by
+/// the terminal [`resolve_dns_txt`] and the non-terminal [`probe_dns_txt`],
+/// because the two differ only in what they do with absence and a second copy
+/// is how they would come to differ in more than that. The two ways of
+/// publishing nothing collapse here: an adapter answering `Absent` and an
+/// adapter answering `Found` with a record set holding no APH record are the
+/// same fact, and `select_key` reports the second as absence too.
+async fn dns_txt_step(
+  name: &str,
+  kid: std::option::Option<&str>,
+  lookup: &dyn super::ports::TxtRecordLookup,
+  at_rfc3339: &str,
+) -> std::result::Result<super::DiscoveryOutcome<super::NotaryPublicKey>, crate::errors::AphError> {
+  match lookup.lookup_txt(name).await? {
+    super::DiscoveryOutcome::Found(records) => {
+      super::dns_txt::select_key(&records, kid, at_rfc3339)
+    }
+    super::DiscoveryOutcome::Absent => {
+      std::result::Result::Ok(super::DiscoveryOutcome::Absent)
+    }
+  }
+}
+
+/// The non-terminal DNS TXT probe the §8.4.6 ordered sequence uses, where
+/// `Absent` lets the caller advance and an error must stop it.
 async fn probe_dns_txt(
   did_url: &str,
   lookup: &dyn super::ports::TxtRecordLookup,
   at_rfc3339: &str,
-) -> std::result::Result<std::option::Option<super::NotaryPublicKey>, crate::errors::AphError> {
+) -> std::result::Result<super::DiscoveryOutcome<super::NotaryPublicKey>, crate::errors::AphError> {
   let parsed = super::DidUrl::parse(did_url);
   let name = match parsed.dns_txt_name() {
     std::option::Option::Some(name) => name,
     // A DID with no derivable TXT name does not offer the mechanism at all.
-    std::option::Option::None => return std::result::Result::Ok(std::option::Option::None),
+    std::option::Option::None => {
+      return std::result::Result::Ok(super::DiscoveryOutcome::Absent);
+    }
   };
-  let records = lookup.lookup_txt(&name).await?;
-  super::dns_txt::select_key(&records, parsed.fragment.as_deref(), at_rfc3339)
+  dns_txt_step(&name, parsed.fragment.as_deref(), lookup, at_rfc3339).await
 }
 
 /// Resolves through the `did:web` DID Document mechanism (spec §8.4.4).
@@ -376,29 +394,51 @@ mod tests {
     crate::discovery::test_support::block_on(future)
   }
 
-  /// A DNS port with canned records that records the names it was asked for.
+  /// A DNS port with a canned answer that records the names it was asked for.
   ///
   /// The recorded names are what let a test assert a mechanism was NOT
   /// consulted, which is the only observable form of "did not downgrade".
+  ///
+  /// The canned answer is the port's whole return type rather than a bare
+  /// record list, so a test can distinguish the three cases the §8.4.6 rule
+  /// turns on — published, definitively-not-published, and the lookup broke —
+  /// instead of spelling two of them with the same empty `Vec`.
   struct FakeTxt {
-    records: std::vec::Vec<String>,
-    error: std::option::Option<crate::errors::AphError>,
+    answer: std::result::Result<
+      crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+      crate::errors::AphError,
+    >,
     asked: std::sync::Mutex<std::vec::Vec<String>>,
   }
 
   impl FakeTxt {
     fn with(records: &[&str]) -> Self {
-      Self {
-        records: records.iter().map(|r| String::from(*r)).collect(),
-        error: None,
-        asked: std::sync::Mutex::new(std::vec::Vec::new()),
-      }
+      Self::answering(std::result::Result::Ok(
+        crate::discovery::DiscoveryOutcome::Found(
+          records.iter().map(|r| String::from(*r)).collect(),
+        ),
+      ))
+    }
+
+    /// The name answered, and nothing is published there.
+    fn absent() -> Self {
+      Self::answering(std::result::Result::Ok(
+        crate::discovery::DiscoveryOutcome::Absent,
+      ))
     }
 
     fn failing(error: crate::errors::AphError) -> Self {
+      Self::answering(std::result::Result::Err(error))
+    }
+
+    fn answering(
+      answer: std::result::Result<
+        crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+        crate::errors::AphError,
+      >,
+    ) -> Self {
       Self {
-        records: std::vec::Vec::new(),
-        error: Some(error),
+        answer,
         asked: std::sync::Mutex::new(std::vec::Vec::new()),
       }
     }
@@ -412,21 +452,17 @@ mod tests {
     fn lookup_txt<'a>(
       &'a self,
       name: &'a str,
-    ) -> crate::discovery::ports::DiscoveryFuture<'a, std::vec::Vec<String>> {
+    ) -> crate::discovery::ports::DiscoveryFuture<
+      'a,
+      crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+    > {
       std::boxed::Box::pin(async move {
         self
           .asked
           .lock()
           .expect("test mutex poisoned")
           .push(String::from(name));
-        // Annotated because the async block's output type is pinned only by
-        // the unsizing coercion to `dyn Future`.
-        let out: std::result::Result<std::vec::Vec<String>, crate::errors::AphError> =
-          match &self.error {
-            Some(error) => Err(error.clone()),
-            None => Ok(self.records.clone()),
-          };
-        out
+        self.answer.clone()
       })
     }
   }
@@ -491,7 +527,10 @@ mod tests {
     fn lookup_txt<'a>(
       &'a self,
       _name: &'a str,
-    ) -> crate::discovery::ports::DiscoveryFuture<'a, std::vec::Vec<String>> {
+    ) -> crate::discovery::ports::DiscoveryFuture<
+      'a,
+      crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+    > {
       std::panic!("did:key resolution must perform no DNS lookup");
     }
   }
@@ -578,9 +617,9 @@ mod tests {
     // then derive the well-known URL, fetch through the port, parse, and
     // return the key the proof's fragment names. Asserting the kid pins
     // that the document answered for k1 rather than whatever it listed
-    // first; the empty TXT fake pins that advancing required absence, not
+    // first; the absent TXT fake pins that advancing required absence, not
     // an ignored error.
-    let lookup = FakeTxt::with(&[]);
+    let lookup = FakeTxt::absent();
     let fetch = FakeFetch::with(SPEC_DOC);
     let key = block_on(super::resolve(
       super::MechanismSelection::NamedByDid,
@@ -617,9 +656,8 @@ mod tests {
     // That success is the attack: whoever can expire or corrupt the TXT
     // record — the preferred anchor — gets to choose that the verifier
     // trusts the next one instead, and choosing the anchor is an identity
-    // decision (BOOK 15/140). The two assertions are one claim: the TXT
-    // failure was reported AS the outcome, and the web port was never
-    // consulted.
+    // decision. The two assertions are one claim: the TXT failure was
+    // reported AS the outcome, and the web port was never consulted.
     let expired = "v=APHv1; alg=ed25519; kid=k1; \
                    k=2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw; \
                    notAfter=2026-01-01T00:00:00Z";
@@ -750,7 +788,7 @@ mod tests {
       block_on(super::resolve(
         super::MechanismSelection::Pinned(super::DiscoveryMechanism::DnsTxt),
         "did:web:notary.example.com",
-        &FakeTxt::with(&[]),
+        &FakeTxt::absent(),
         &Exploding,
         NOW,
       ))
@@ -775,7 +813,7 @@ mod tests {
 
     // APH_E014 — the anchor answered, but publishes no such key. The TXT
     // probe that precedes the fetch sees absence (nothing published) and
-    // advances, per §8.4.6 — hence a real empty fake here rather than the
+    // advances, per §8.4.6 — hence an absent fake here rather than the
     // exploding one used on the did:key row. The fetched document exists
     // and simply lacks `#k9`, which is "not published" (E014), not "the
     // envelope's signature is invalid" (the E001 this arm reported before
@@ -784,13 +822,62 @@ mod tests {
       block_on(super::resolve(
         super::MechanismSelection::NamedByDid,
         "did:web:notary.example.com#k9",
-        &FakeTxt::with(&[]),
+        &FakeTxt::absent(),
         &FakeFetch::with(SPEC_DOC),
         NOW,
       ))
       .unwrap_err()
       .code(),
       "APH_E014"
+    );
+  }
+
+  #[test]
+  fn the_txt_ports_three_answers_advance_advance_and_refuse() {
+    // The absence/failure rule now lives in a TYPE, so this pins that the
+    // type is wired to the behaviour it names — all three answers the DNS
+    // port can give, side by side, in one place. It also proves the change
+    // that introduced the type moved NOTHING: before it, absence was spelled
+    // `Ok(vec![])`, and an adapter that still answers with an empty record
+    // set (row 2) must behave exactly as one that answers `Absent` (row 1).
+    // A future edit that made either row refuse, or made row 3 advance, is
+    // the downgrade §8.4.6 forbids and fails here.
+    //
+    //   Ok(Absent)      nothing published at the name  -> advance to did:web
+    //   Ok(Found(&[]))  the same fact, spelled by an   -> advance to did:web
+    //                   adapter that returns records
+    //   Err(APH_E008)   the lookup never answered      -> REFUSE, and the
+    //                                                     web port is never
+    //                                                     consulted
+    for lookup in [FakeTxt::absent(), FakeTxt::with(&[])] {
+      let fetch = FakeFetch::with(SPEC_DOC);
+      let key = block_on(super::resolve(
+        super::MechanismSelection::NamedByDid,
+        "did:web:notary.example.com#k1",
+        &lookup,
+        &fetch,
+        NOW,
+      ))
+      .unwrap();
+      std::assert_eq!(key.kid.as_deref(), Some("k1"));
+      std::assert_eq!(fetch.asked().len(), 1, "absence did not advance to did:web");
+    }
+
+    let failing = FakeTxt::failing(crate::errors::AphError::NotaryServiceUnreachable);
+    let fetch = FakeFetch::with(SPEC_DOC);
+    let error = block_on(super::resolve(
+      super::MechanismSelection::NamedByDid,
+      "did:web:notary.example.com#k1",
+      &failing,
+      &fetch,
+      NOW,
+    ))
+    .unwrap_err();
+    std::assert_eq!(error.code(), "APH_E008");
+    std::assert!(
+      fetch.asked().is_empty(),
+      "a failed lookup advanced to did:web: {:?}",
+      fetch.asked()
     );
   }
 

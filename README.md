@@ -54,7 +54,11 @@ A Notary Service is meaningful only if a **third party can independently verify*
 
 ## Status
 
-**v0.1.0-draft** — protocol design phase, pre-production with no external adopters, so corrections land in place rather than forking a version. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes). JSON Schema files and signed conformance test vectors are deferred to v0.2.
+**v0.1.0-draft** — protocol design phase, pre-production with no external adopters, so corrections land in place rather than forking a version. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes).
+
+Machine-readable artifacts exist for part of the surface, not all of it: `spec/schemas/` carries JSON Schemas for the two revocation shapes of §6.3.3 (there is none for the envelope itself — §7.1 plus the strict parser is the normative shape), and exactly one published envelope carries real signatures rather than placeholders. [Implementing APH in another language](#implementing-aph-in-another-language) states precisely what is and is not covered, because an implementer who over-trusts the vectors ships a verifier that passes them and fails a stranger.
+
+Two conventions to know before you adopt: `aph://` (the extension-URI scheme) and `_aph._notary.<domain>` (the DNS key-publication name) are **conventions, not IANA registrations** — registration is deferred to v0.2 (spec §13). Neither affects whether an envelope verifies, and a conformant TXT parser refuses any record whose `v` tag is not `APHv1`, so a foreign record at a colliding name is ignored rather than misread as a key. What is genuinely at risk is name ownership: if those names are later assigned elsewhere, APH moves. [`spec/operations.md` §6](spec/operations.md) enumerates every unregistered identifier with the consequence of each.
 
 ## Relationship to other protocols
 
@@ -273,6 +277,46 @@ const envelope = parseEnvelopeJson(received);  // throws on invalid shape
 ### Conformance
 
 `interpreters/rust/aph-conformance` carries golden fixtures, contract tests, and the three channel binding specs (email, chat platforms, MCP). It also validates every envelope in `examples/` against the implementation and asserts that what the implementation *emits* is value-identical to those published files — the check that catches serializer-side drift. See [interpreters/rust/README.md](interpreters/rust/README.md) for the full picture, including the two deliberate divergences from RFC 8785 and RFC 7518 that the tests deliberately pin.
+
+## Implementing APH in another language
+
+APH is only a protocol if a second implementation can be built from what is published here. This section is the entry point for that: what to point your own code at, in what order, and — just as importantly — what these artifacts do **not** prove.
+
+### The four targets, and what each one proves
+
+**1. Point your PARSER at `examples/*.json` (9 files, no toolchain required).** Every file must deserialize under a strict schema: unknown top-level or `credentialSubject`-level fields are hard errors (§7.1), and `channel.recipientAddressing` is the one exception whose sub-fields are opaque and MUST NOT fail (§7.4). If your parser accepts a field APH never defined, a producer can smuggle a claim past you.
+
+**2. Point your VERIFIER at `examples/principal_signed_envelope.json` (no toolchain required).** This is the only published envelope carrying real signatures — four of them: two envelope proofs and two mandate signatures, all Ed25519 under the RFC 8032 §7.1 TEST 2 (principal) and TEST 3 (notary) public test seeds, which authorize nothing and which anyone can re-derive. A verifier that reproduces all four has independently implemented RFC 8785 canonicalization, the per-proof signing bases of §7.2.1, the proof-chain linkage of §7.1.11, and the embedded-mandate check of §7.1.7.1. Getting §7.2.1 wrong is the likeliest failure: `proofValue` is set to the **empty string**, not removed, and the principal proof covers `proof` as a **one-element array**.
+
+**3. Point your PRODUCER at this repository's parser.** The CLI reads stdin, so nothing about your emitter has to be written in Rust:
+
+```sh
+your-implementation emit-envelope | cargo run -q -p aph-cli -- validate -
+```
+
+Exit `0` means your bytes strict-parse; `1` means they do not, with the serde error naming the field. Conversely, `cargo run -q -p aph-cli -- golden <n>` prints fixture *n* raw on stdout for piping into your own verifier. These two are the only targets that need a Rust toolchain.
+
+**4. Point your revocation code at `spec/schemas/` and the spec's own printed records.** The two schemas constrain the §6.3.3 status entry and status list credential; `spec/schemas/README.md` states the three rules no JSON Schema can express (same-origin binding, issuer binding, proof and freshness). For key discovery, both the §8.4.4 DID Document and the two §8.4.5 DNS TXT records are usable directly as parse vectors, but they are reproduced to two different standards and the difference is worth stating: the reference tests reassemble the two TXT tag-lists **byte-for-byte** — a byte comparison would pass — while the DID Document is reproduced **verbatim in content but re-indented** (2 spaces in the spec, 4 in the Rust literal that holds it). JSON whitespace is not semantic, so nothing about the vector is weaker; only the claim is.
+
+### What the vectors do NOT cover
+
+Stated in full, because overclaiming coverage is worse than admitting a gap:
+
+- **Only the Ed25519 path has a signed vector.** `ES256` / `ecdsa-jcs-2019` and the `JsonWebSignature2020` detached-JWS profile are both MUST-support in §8.1–§8.2, and neither has a published byte string anywhere in this repository to check an implementation against. Golden fixture 3 pins the `ecdsa-jcs-2019` *cryptosuite string*; its `proofValue` is a placeholder.
+- **The eight `NotaryAttested` example files exercise shape only.** Their `proofValue`s are illustrative, so §8.3's signature step cannot be exercised against them. Signature verification on those files is *expected* to fail.
+- **§8.3's body-hash binding is exercised by nothing at all — including target 2.** All *nine* examples carry `bodySha256` = the SHA-256 of the empty string next to a non-zero `bodySize`, and none publishes a message body, so there is nothing for a verifier to hash. This one is called out separately because the gap does not stop at the eight: `principal_signed_envelope.json` reproduces four real signatures and still cannot check a body hash. Target 2's four claimed properties are accurate and do not include it — but an implementer who passes target 2 has not tested §8.3's binding of an envelope to the bytes it describes.
+- **The §6.3.3 revocation vectors are Rust constants, not files.** The accept / refuse-at-parse / refuse-at-binding entry sets and the refuse-document set live in `interpreters/rust/aph-conformance/src/lib.rs`, each paired with the rule it violates. They are readable without linking anything, but a non-Rust implementer has to read them out of the source rather than load a directory.
+- **The status list vectors carry no proof.** They exercise every §6.3.3.3 rule up to the signature — issuer binding, purpose, vintage, freshness, and the MSB-first bit order — and stop there. An implementation that passes all of them may still have no proof check at all, which is the one failure that makes the whole mechanism forgeable.
+- **The §8.4.5 printed TXT example is a parse vector, not a verify vector.** Its 32 key bytes are not a valid Ed25519 curve point, so it round-trips through a parser and cannot check a signature.
+- **There is no JSON Schema for the envelope.** §7.1 and the strict parser are the shape; a schema for it would be a third expression of the same rule.
+
+### Reporting
+
+If your implementation disagrees with a published artifact, the disagreement is worth filing either way: the specification is normative, the schemas and fixtures are not, and where they conflict the fixture is the defect. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Running a notary
+
+Operating a Notary Service means holding a signing key, controlling the domain its `did:web` names, and republishing a revocation status list on a cadence tighter than the freshness bound verifiers enforce. [`spec/operations.md`](spec/operations.md) is the runbook for all three — what losing each one costs, the pre-authorized rotation that makes key loss survivable without any custodian, and the monitor that shows the republish deadline before it passes rather than after peers start refusing.
 
 ## Agent plugin
 

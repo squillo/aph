@@ -7,8 +7,11 @@ description: >-
   "agent driver's license" model, APH error codes (APH_E001..APH_E015), signing
   profiles (eddsa-jcs-2022, ecdsa-jcs-2019, detached JWS), notary public-key
   discovery (did:key, did:web, DNS TXT), channel kinds, or the A2A notarization
-  extension. Covers wire shape, state machines, closed enums, and how to run the
-  reference Rust implementation and conformance suite.
+  extension. Also covers OPERATING a Notary Service — signing-key loss, pre-authorized
+  rotation, status-list publication cadence, seed escrow, and the unregistered
+  `aph://` / `_aph` conventions. Covers wire shape, state machines, closed enums,
+  how to run the reference Rust implementation and conformance suite, and how to
+  build a non-Rust implementation against the published vectors.
 ---
 
 # APH v0.1 — working crash course
@@ -25,7 +28,8 @@ organizations via public key discovery.
 
 - `spec/aph-0.1.md` — the normative spec. Key sections: §1.1 mental model, §5 Roles + Operations, §6 Mandates, §7 The Notarization Envelope, §8 Signing + Verification, §8.4 Notary Key Material + Public-Key Discovery, §9 Flow State Machines, §10 Composition with Adjacent Protocols, §11 Error Taxonomy.
 - `spec/a2a-extension.md` — how agents advertise APH on an A2A AgentCard. Pins `APH_EXTENSION_URI = aph://extensions/notarization/v1` (exact byte equality, opaque, never dereferenced).
-- `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade, attestation-mode downgrade), out-of-scope (compromised notary key/device, phishing, transport security).
+- `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade, attestation-mode downgrade), out-of-scope (compromised notary key/device, key LOSS, publication-surface DoS, phishing, transport security).
+- `spec/operations.md` — the operator runbook, and **non-normative**: what a Notary Service operator holds, what losing each piece costs, pre-authorized rotation, the publication-cadence deadlines, and the unregistered identifiers an adopter inherits. Where it and the spec disagree, the spec wins and the runbook is the defect.
 - `examples/` — 9 golden envelope JSON files (enumerated on disk): one per channel kind (7), one exercising the §7.5 registered extensions, and `principal_signed_envelope.json`. With `examples/README.md`. The first 8 are `NotaryAttested` (they carry no `attestationMode`, and absent means `NotaryAttested`) and their `proof.proofValue` strings are illustrative placeholders, NOT real signatures, with `bodySha256` the SHA-256 of the empty string — they exist for shape/round-trip validation only. `principal_signed_envelope.json` is the exception and the only one that verifies: it is `PrincipalSigned` and carries four real Ed25519 signatures made from RFC 8032 §7.1 public test seeds.
 - `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), and `aph-ts` (wasm binding).
 
@@ -67,7 +71,7 @@ A complete worked example lives at spec §7.3.
 - **Proof types** (§7.1.11): `DataIntegrityProof` or `JsonWebSignature2020`.
 - **Roles** (§5.1): `HumanPrincipal`, `AgentSender`, `NotaryService`, `ChannelAdapter`, `RecipientEndpoint`. **Operations** (§5.2): `IssueDelegationMandate`, `IssueCommunicationMandate`, `Notarize`, `Transport`, `Verify`, `Reject`.
 
-### WARNING — two sharp edges
+### WARNING — three sharp edges
 
 1. **Strict parsing.** Envelope-level deserialization is `deny_unknown_fields` (spec §7.1, §8.3 step 1): any unknown top-level or subject-level field is a hard parse failure. The ONE exception is `channel.recipientAddressing`, whose sub-fields are opaque and MUST NOT fail verification (§7.4).
 2. **Channel-kind spelling is `google_chat`** (snake_case). Early drafts of
@@ -249,7 +253,9 @@ Key rotation requires overlapping publication windows (§8.4.7, 30-day minimum
 recommended). The overlap is expressed by dated `notBefore`/`notAfter` tags on
 the DNS TXT mechanism, and by PRESENCE on `did:web` — both keys in one
 document, then the old one removed — because the DID Document schema carries
-no per-key validity metadata.
+no per-key validity metadata. That same overlap, used defensively — a successor
+published *before* it is needed and left published — is the key-continuity
+mechanism in the operator section below.
 
 A live reference publication surface exists at
 `https://aph-notary.squillo.com/.well-known/did.json`
@@ -260,6 +266,143 @@ serve a mismatched document). While unprovisioned it answers HTTP 503 with
 the typed refusal `{"available": false, "reason": …}` — that shape is the
 normative degrade, not an outage. It publishes no DNS TXT record today, so
 resolving it also exercises absence-advances live.
+
+## Operating a notary (`spec/operations.md`)
+
+An operator holds four things, and the one that matters most is not the one
+people name first.
+
+**Domain control, not the signing key, is the root of publication authority.**
+Both discovery mechanisms are anchored in domain ownership — §8.4.4 in the TLS
+chain, §8.4.5 in DNS — and NEITHER is authenticated by the notary's signing key.
+Whoever controls the domain can publish a new key; nobody else can, whatever key
+they hold. So a lost signing key is a rotation nobody scheduled, while lost
+registrar credentials are the genuinely unrecoverable case — and no escrow scheme
+repairs that one, because the missing capability is publication, not signing.
+Keeping the two credential stores independent is the cheapest and largest
+mitigation available (runbook §2.3), and it costs no cryptography at all.
+
+**Key loss has a six-minute fuse.** Nothing already signed is invalidated, and no
+human's authority is touched — the notary never held a principal key, so a
+`PrincipalSigned` envelope's authorization layer is untouched and what stopped is
+the witness. What breaks fast is the revocation transport: the last published
+status list ages out at 360s (below), and from that moment every status-carrying
+envelope is refused `APH_E008` by every conformant verifier. Key loss is an
+incident measured in minutes, not in the days a re-publication takes.
+
+**Pre-authorized rotation is the recommended continuity mechanism** (runbook §3).
+Generate a successor keypair on media separate from the signing host, publish
+BOTH public keys continuously with distinct `kid`s, and keep signing with the
+primary. Because verifiers already accept the successor, recovery becomes a
+change to what the operator SIGNS with rather than to what the world can READ —
+no document edit, no DNS propagation, no cache to wait out, and nothing that must
+be done with a key that no longer exists.
+
+⛔ **The `kid` on the record is only half of it — the SIGNER must emit the
+`#kid` fragment in `proof.verificationMethod` BEFORE a second key is published
+anywhere** (runbook §3.4 step 3). With two keys published and no fragment to
+choose by, the two mechanisms fail differently and neither is acceptable:
+`did:web` refuses with `APH_E014`, because the document declines to guess among
+several keys rather than let its own ordering decide, while a DNS TXT verifier
+has no `kid` to filter on and takes the FIRST record valid at that instant, in
+resolver answer order — so about half of answers check a primary-signed envelope
+against the successor's key. Both fail closed, but it is a verification outage
+the continuity mechanism itself caused, and the DNS half is intermittent.
+§8.4.7 bounds this ambiguity to a 30-day overlap; a permanently published
+successor makes it permanent. Confirming that both keys RESOLVE does not detect
+it — two keys resolve fine in exactly the broken state.
+
+⛔ **Do not call the successor "pre-signed by the old key".** APH v0.1 defines no
+signed rotation statement, and neither publication surface is key-authenticated.
+The successor is pre-*authorized* by having been published under the operator's
+domain control while the primary was healthy — the same authority that publishes
+every APH key. Saying it was signed by the predecessor overstates what the wire
+carries; a signed rotation attestation is a v0.2 question. Two honest costs:
+two keys can sign for this identity for the WHOLE period rather than a 30-day
+window, and an unrehearsed successor is an untested backup (runbook §3.6 is the
+rehearsal, and it is not optional).
+
+⛔ **This repository ships no secret-sharing code, deliberately — do not add
+any.** An operator MAY split the seed *k*-of-*n* using an audited external tool
+of their own choosing, holding every share themselves; runbook §4 states what
+that buys (no single medium reconstructs the key; the SAME key is restored, so
+nothing published changes) and what it costs (reconstruction assembles the whole
+seed in one place at one moment, and share placement is the entire security of
+the scheme). Implementing one here would be hand-rolled cryptography in the
+highest-consequence place available: a subtly wrong sharing scheme does not fail
+loudly — it leaks the key to a holder of fewer than *k* shares and the operator
+never finds out. The decision to escrow at all, and in what form, is the
+operator's; nothing in APH requires it.
+
+### Publication cadence — the two deadlines
+
+The §6.3.3.3 freshness bound is correct in direction and silent in arrival: a
+publisher that quietly stops does not degrade, it works and works and then every
+verifier in the world refuses at once. Both lines are measured from the published
+document's own `validFrom`:
+
+| Line | When | Binds | What it means |
+|---|---|---|---|
+| Republish deadline | `validFrom + 120s` | the publisher | **the alarm** — you are late, nothing is refused yet |
+| Refusal cliff | `validFrom + 300s + 60s` skew | every verifier | **the outage** — `APH_E008` on every status-carrying envelope |
+
+The gap — 360s − 120s = **240 seconds, four minutes** — is the entire warning
+window, and it only helps someone looking at it. A publisher reads both distances
+off the document it is about to serve rather than re-deriving either bound:
+
+```rust
+let credential = aph_core::parse_status_list_credential(&document)?;
+let alarm = credential.seconds_until_republish_due(now)?; // negative once late
+let cliff = credential.seconds_until_stale(now)?;         // negative once refused
+```
+
+Both are pure functions of the document and the instant you pass — `aph-core`
+still reads no clock of its own, which is why `now` is an argument here exactly
+as it is for `check_envelope_status`. **Negative is a distance, not an error:** a
+monitor needs "how late am I", not only "too late", so these report a signed
+distance where `check_freshness` reports a verdict. The interval constant is
+`aph_core::credential_status::STATUS_REPUBLISH_INTERVAL_SECONDS`, so a publisher
+never copies `120` out of prose. Runbook §5.2 carries an external `curl`/`jq`
+monitor — run it from OUTSIDE the publisher's failure domain, because a monitor
+sharing that domain goes quiet at exactly the moment it is needed and silence
+reads as health. When the alarm fires, check whether the SIGNER is alive before
+the publisher: a locked key store presents identically to a broken upload.
+
+### Unregistered conventions an adopter inherits
+
+APH v0.1 uses several identifiers that are conventions rather than
+registrations. **Four of them can change what an adopter's software does**, and
+those four do NOT share one status — §13 says something different about each, so
+do not collapse them into a single "deferred to v0.2" claim when advising an
+adopter. Three bullets, four identifiers: the first bullet holds two, because
+the underscored labels and the scheme share a status exactly:
+
+- `aph://` URI scheme and the `_aph` / `_aph._notary` underscored DNS labels —
+  **the two §13 actually defers to v0.2.** Used by convention in v0.1.
+- `application/aph+ld+json` media type — **declined, not deferred.** §13 says
+  v0.1 does NOT register a new media type and names the already-registered
+  `application/vc+ld+json` as the conformant choice; the APH-specific type is
+  an optional transport-routing indicator, and conformant verifiers MUST accept
+  both. There is no v0.2 media-type registration on the roadmap to promise.
+- `https://w3id.org/aph/v1` JSON-LD context — **not mentioned in §13 at all.**
+  §7.1.1 requires it in every envelope and nothing currently serves it, so
+  tooling that dereferences contexts will fail to fetch it.
+
+Two more are unregistered and inert, which is why they sit outside the four:
+the JWS protected-header `typ` value `aph+jws`, matched as a literal, and the
+`urn:aph:schema:0.1:*` `$id`s on `spec/schemas/*.schema.json`, which are URNs
+precisely so nothing fetches them. Six in total; four with a cost.
+
+**None of them affects whether an envelope verifies.** A conformant TXT parser
+refuses any record whose `v` tag is not `APHv1`, so a foreign record at a
+colliding name is ignored rather than misread as a key. What is genuinely at risk
+is name ownership — if `_aph` is later assigned elsewhere, APH moves and every
+published record is reissued — and therefore what an adopter may promise their
+own users about stability before v0.2. The operator runbook's §6 **tabulates the
+four that carry a cost**, one row each with what a collision would cost, and
+names the other two in prose beneath the table so the enumeration is complete
+rather than convenient. It enumerates six and tabulates four; do not quote it as
+a six-row table.
 
 ## HOW-TO
 
@@ -314,6 +457,50 @@ wire-shape fixtures (one per channel kind); the conformance crate under
 `interpreters/rust` carries additional golden fixtures for its own suites.
 Remember: example `proofValue`s are placeholders, so signature verification on
 them is EXPECTED to fail — only shape validation is meaningful there.
+
+**Implement APH in another language.** README's *"Implementing APH in another
+language"* section is the entry point and states the targets in order:
+
+1. Point your PARSER at `examples/*.json` — 9 files, no toolchain. Unknown
+   top-level or `credentialSubject`-level fields must be hard errors;
+   `channel.recipientAddressing` is the one opaque exception.
+2. Point your VERIFIER at `examples/principal_signed_envelope.json` — no
+   toolchain. Four real Ed25519 signatures over RFC 8032 §7.1 TEST 2 (principal)
+   and TEST 3 (notary) PUBLIC test seeds, which authorize nothing and which
+   anyone can re-derive. Reproducing all four means you have independently
+   implemented RFC 8785, the §7.2.1 per-proof bases, §7.1.11 chain linkage, and
+   the §7.1.7.1 embedded-mandate check.
+3. Point your PRODUCER at this repo's parser — the only target needing a Rust
+   toolchain, and it does not make your emitter Rust:
+   `your-impl emit-envelope | cargo run -q -p aph-cli -- validate -` (exit 0 =
+   strict-parses; `1` names the offending field). Conversely
+   `cargo run -q -p aph-cli -- golden <n>` prints fixture *n* (1-based) raw on
+   stdout for piping into your own verifier.
+4. Point your REVOCATION code at `spec/schemas/`, plus the §8.4.4 DID Document
+   and the two §8.4.5 TXT records — both usable directly as parse vectors, to
+   two different standards: the reference tests reassemble the TXT tag-lists
+   **byte-for-byte**, while the DID Document is reproduced verbatim in content
+   but **re-indented** (2 spaces in the spec, 4 in the Rust literal). Do not
+   repeat "byte-for-byte" over both; JSON whitespace is not semantic, so the
+   vector is no weaker, but the claim would be.
+   `spec/schemas/README.md` names the three rules no JSON Schema can express.
+
+⛔ **Quote the coverage GAPS too — overclaiming coverage is worse than admitting
+one.** Only the Ed25519 path has a signed vector: `ES256`/`ecdsa-jcs-2019` and
+the `JsonWebSignature2020` detached-JWS profile are both MUST-support with no
+published byte string anywhere in this repo. The eight `NotaryAttested` examples
+exercise SHAPE only. §8.3's BODY-HASH binding is exercised by nothing, and that
+gap does not stop at the eight — all NINE examples carry `bodySha256` = the
+SHA-256 of the empty string beside a non-zero `bodySize`, so even
+`principal_signed_envelope.json`, the one that reproduces four real signatures,
+cannot check a body hash. The §6.3.3 vectors are Rust constants in
+`aph-conformance/src/lib.rs` rather than loadable files. The status-list vectors
+stop before the proof, so an implementation can pass every one of them while
+having no proof check at all — the single failure that makes the mechanism
+forgeable. The §8.4.5 printed TXT example's key bytes are not a valid curve
+point, so it is a parse vector and never a verify vector. And there is no JSON
+Schema for the envelope; §7.1 and the strict parser are the shape. README carries
+this list in full — cite it rather than re-deriving it.
 
 **Use APH in your own project.** Pick the crate by what it is allowed to
 touch, because that boundary is deliberate:
@@ -379,4 +566,8 @@ Read the actual spec files rather than trusting this summary for edge cases:
 `spec/aph-0.1.md` (wire shape §7, signing §8, key discovery §8.4, flows §9,
 errors §11), `spec/a2a-extension.md` (extension URI + AgentCard discovery flow),
 `spec/security-considerations.md` (what APH does and does not defend against),
-`examples/README.md` (what is fixed vs. varying across the 8 fixtures).
+`spec/operations.md` (running one: key loss §2, pre-authorized rotation §3,
+threshold split §4, publication cadence §5, unregistered identifiers §6,
+pre-flight checklist §7 — non-normative, the spec wins on conflict),
+`examples/README.md` (what is fixed vs. varying across the 9 fixtures — eight
+`NotaryAttested` plus the one signed `PrincipalSigned` golden).

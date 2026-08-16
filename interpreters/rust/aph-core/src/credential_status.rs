@@ -22,6 +22,13 @@
 //! declared beside the `did:web` document port. That is why every rule below
 //! is exercised against fixed strings with no network.
 //!
+//! **One producer rule lives here too**, against the "parsing and decision"
+//! framing above: [`STATUS_REPUBLISH_INTERVAL_SECONDS`] is §6.3.3.3's cadence
+//! MUST, and it is held beside the verifier's two bounds because publisher
+//! and verifier have to agree on those three numbers to the second. A
+//! publisher that re-derives the interval from prose is a second expression
+//! of a normative value, which is how the two sides drift apart.
+//!
 //! ## Two obligations this module deliberately does NOT discharge
 //!
 //! 1. **⛔ The status list credential's own proof is NOT verified here.**
@@ -77,6 +84,21 @@ pub const STATUS_MAX_AGE_SECONDS: i64 = 300;
 /// Applied in BOTH directions: it widens the staleness bound and it is the
 /// only amount by which a credential may be dated into the future.
 pub const STATUS_CLOCK_SKEW_SECONDS: i64 = 60;
+
+/// §6.3.3.3 producer cadence: a notary that publishes status MUST re-issue
+/// and republish at an interval no greater than this.
+///
+/// The verifier's two bounds above were already constants here; this one was
+/// only ever prose, which left every publisher to copy the number out of the
+/// specification — a second expression of a normative value, in the one
+/// mechanism where publisher and verifier must agree to the second.
+///
+/// It is deliberately less than half of [`STATUS_MAX_AGE_SECONDS`], and that
+/// margin is what makes the pair a system rather than a coincidence: a
+/// publisher that misses a cycle is LATE, not down, and a verifier still
+/// finds a credential inside the bound. [`StatusListCredential::seconds_until_republish_due`]
+/// is the margin read as a number an operator can watch.
+pub const STATUS_REPUBLISH_INTERVAL_SECONDS: i64 = 120;
 
 /// Multibase prefix for base64url-no-pad, the encoding `encodedList` uses.
 pub const MULTIBASE_BASE64URL_PREFIX: char = 'u';
@@ -367,6 +389,71 @@ impl StatusListCredential {
     &self,
     now_rfc3339: &str,
   ) -> std::result::Result<(), crate::errors::AphError> {
+    let age_seconds = self.age_seconds(now_rfc3339)?;
+    if age_seconds > STATUS_MAX_AGE_SECONDS + STATUS_CLOCK_SKEW_SECONDS {
+      return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
+    }
+    if age_seconds < -STATUS_CLOCK_SKEW_SECONDS {
+      return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
+    }
+    std::result::Result::Ok(())
+  }
+
+  /// Seconds remaining before this document must have been REPLACED by a
+  /// freshly issued one, per [`STATUS_REPUBLISH_INTERVAL_SECONDS`]. Negative
+  /// once the producer is late.
+  ///
+  /// This is the PUBLISHER's line, and it is the one worth alarming on. A
+  /// publication pipeline that stops fails closed — correct, and silent: the
+  /// first symptom is a stranger's verifier refusing an envelope, which is
+  /// the far end of the outage to learn at. The deadline is exposed as a
+  /// distance rather than as a verdict so an operator can watch it approach
+  /// instead of discovering it has passed.
+  ///
+  /// # Errors
+  ///
+  /// `APH_E008` for the same timestamp failures [`Self::check_freshness`]
+  /// refuses on — a missing or unparseable `validFrom`, or an unparseable
+  /// `now`. A distance is not reported from a clock that could not be read,
+  /// because a monitor would display it as time remaining.
+  pub fn seconds_until_republish_due(
+    &self,
+    now_rfc3339: &str,
+  ) -> std::result::Result<i64, crate::errors::AphError> {
+    std::result::Result::Ok(STATUS_REPUBLISH_INTERVAL_SECONDS - self.age_seconds(now_rfc3339)?)
+  }
+
+  /// Seconds remaining before a conformant verifier begins REFUSING this
+  /// document under §6.3.3.3's freshness bound. Negative once they do.
+  ///
+  /// The same bound [`Self::check_freshness`] applies, read as a distance
+  /// rather than as a verdict — the outage line, where
+  /// [`Self::seconds_until_republish_due`] is the alarm line.
+  ///
+  /// # Errors
+  ///
+  /// `APH_E008`, on the same inputs and for the same reason as
+  /// [`Self::seconds_until_republish_due`].
+  pub fn seconds_until_stale(
+    &self,
+    now_rfc3339: &str,
+  ) -> std::result::Result<i64, crate::errors::AphError> {
+    std::result::Result::Ok(
+      STATUS_MAX_AGE_SECONDS + STATUS_CLOCK_SKEW_SECONDS - self.age_seconds(now_rfc3339)?,
+    )
+  }
+
+  /// Age of this document at `now_rfc3339`, in seconds; negative when the
+  /// document is dated into the future.
+  ///
+  /// Every timestamp failure is `APH_E008` because §6.3.3.4 case 2 gives the
+  /// whole mechanism one code. Shared by the freshness verdict and the two
+  /// deadline distances so those three can never disagree about how old a
+  /// document is.
+  fn age_seconds(
+    &self,
+    now_rfc3339: &str,
+  ) -> std::result::Result<i64, crate::errors::AphError> {
     let issued = match self.valid_from.as_deref() {
       std::option::Option::Some(value) => value,
       std::option::Option::None => {
@@ -385,14 +472,7 @@ impl StatusListCredential {
         return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
       }
     };
-    let age_seconds = (now - issued).num_seconds();
-    if age_seconds > STATUS_MAX_AGE_SECONDS + STATUS_CLOCK_SKEW_SECONDS {
-      return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
-    }
-    if age_seconds < -STATUS_CLOCK_SKEW_SECONDS {
-      return std::result::Result::Err(crate::errors::AphError::NotaryServiceUnreachable);
-    }
-    std::result::Result::Ok(())
+    std::result::Result::Ok((now - issued).num_seconds())
   }
 }
 
@@ -1153,6 +1233,66 @@ mod tests {
     std::assert_eq!(
       credential
         .check_freshness("2026-05-27T23:58:00Z")
+        .unwrap_err()
+        .code(),
+      "APH_E008"
+    );
+  }
+
+  #[test]
+  fn the_republish_deadline_falls_due_long_before_the_refusal_cliff() {
+    // WHY THIS TEST EXISTS: a publisher that quietly stops fails closed, which
+    // is the correct direction and a silent arrival — the first symptom is a
+    // stranger's verifier refusing an envelope. These two distances are the
+    // earlier warning, and they are only worth exposing if the alarm line
+    // genuinely precedes the cliff by a usable margin.
+    //
+    // WHAT IT PINS: the §6.3.3.3 producer interval and the §6.3.3.3 freshness
+    // bound as measured from one issuance instant; that the producer is
+    // already late while verifiers still accept; that both distances agree
+    // with `check_freshness` on either side of the cliff; that they go
+    // NEGATIVE rather than erroring once passed, because a monitor needs "how
+    // late am I" and not only "too late"; and that an unreadable clock
+    // refuses instead of reporting a distance a dashboard would render as
+    // time remaining.
+    let document = status_document(&[0x00]);
+    let credential = super::parse_status_list_credential(&document).unwrap();
+
+    // 30s after issuance: 90s of republish budget, 330s before refusal.
+    std::assert_eq!(credential.seconds_until_republish_due(NOW).unwrap(), 90);
+    std::assert_eq!(credential.seconds_until_stale(NOW).unwrap(), 330);
+
+    // Past the producer's line and still accepted. That gap is the mitigation.
+    std::assert_eq!(
+      credential
+        .seconds_until_republish_due("2026-05-28T00:03:00Z")
+        .unwrap(),
+      -60
+    );
+    std::assert!(credential.check_freshness("2026-05-28T00:03:00Z").is_ok());
+
+    // The cliff and the verdict agree on both sides of it.
+    std::assert_eq!(
+      credential.seconds_until_stale("2026-05-28T00:05:59Z").unwrap(),
+      1
+    );
+    std::assert!(credential.check_freshness("2026-05-28T00:05:59Z").is_ok());
+    std::assert_eq!(
+      credential.seconds_until_stale("2026-05-28T00:06:01Z").unwrap(),
+      -1
+    );
+    std::assert!(credential.check_freshness("2026-05-28T00:06:01Z").is_err());
+
+    std::assert_eq!(
+      credential
+        .seconds_until_stale("not-a-timestamp")
+        .unwrap_err()
+        .code(),
+      "APH_E008"
+    );
+    std::assert_eq!(
+      credential
+        .seconds_until_republish_due("not-a-timestamp")
         .unwrap_err()
         .code(),
       "APH_E008"

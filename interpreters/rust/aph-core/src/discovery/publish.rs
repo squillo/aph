@@ -725,9 +725,14 @@ mod tests {
     .unwrap();
     let records = std::vec![old, new];
     let picked =
-      crate::discovery::dns_txt::select_key(&records, Some("k2"), "2027-03-01T00:00:00Z")
+      match crate::discovery::dns_txt::select_key(&records, Some("k2"), "2027-03-01T00:00:00Z")
         .unwrap()
-        .expect("the rendered k2 record is published and inside its window");
+      {
+        crate::discovery::DiscoveryOutcome::Found(key) => key,
+        crate::discovery::DiscoveryOutcome::Absent => {
+          std::panic!("the rendered k2 record is published and inside its window")
+        }
+      };
     std::assert_eq!(picked.key_bytes, SPEC_DID_KEY_BYTES.to_vec());
   }
 

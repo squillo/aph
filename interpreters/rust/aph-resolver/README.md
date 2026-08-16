@@ -2,11 +2,13 @@
 
 Ready-made I/O adapters for APH notary-key discovery (spec §8.4).
 
-`aph-core` parses and never fetches: it declares two narrow one-method ports
-(`discovery::ports::TxtRecordLookup`, `discovery::ports::DidDocumentFetch`)
-and keeps no HTTP client, no resolver and no async runtime. This crate is one
-implementation of those two ports, carrying `hickory-resolver` and `reqwest`
-so `aph-core` does not have to.
+`aph-core` parses and never fetches: it declares three narrow one-method ports
+(`discovery::ports::TxtRecordLookup`, `discovery::ports::DidDocumentFetch`,
+`discovery::ports::StatusCredentialFetch`) and keeps no HTTP client, no
+resolver and no async runtime. This crate is one implementation of the first
+two, carrying `hickory-resolver` and `reqwest` so `aph-core` does not have to;
+nothing here implements `StatusCredentialFetch`, so a host that checks
+revocation status supplies that one itself.
 
 ```toml
 [dependencies]
@@ -41,11 +43,11 @@ and two answers to "what did this machine connect to".
 Every parsing, selection and ordering rule stays in `aph-core`. This crate
 contributes bytes plus exactly one judgement, the ABSENCE/FAILURE split, which
 only an adapter can see: NXDOMAIN, and NOERROR with no TXT records, are
-absence (`Ok(vec![])`, and §8.4.6 advances to the next mechanism), while
-timeout, SERVFAIL and REFUSED are `APH_E008` and stop the sequence. Reporting
-absence as failure would make every `did:web`-only notary unverifiable;
-reporting failure as absence would let whoever can block DNS choose which
-anchor a verifier trusts.
+absence (`Ok(aph_core::discovery::DiscoveryOutcome::Absent)`, and §8.4.6
+advances to the next mechanism), while timeout, SERVFAIL and REFUSED are
+`APH_E008` and stop the sequence. Reporting absence as failure would make
+every `did:web`-only notary unverifiable; reporting failure as absence would
+let whoever can block DNS choose which anchor a verifier trusts.
 
 ## Security posture
 

@@ -16,6 +16,14 @@
 //! with a canned answer, which is why [`super::composer`] is exercised
 //! end-to-end with no network at all.
 //!
+//! **Exactly one of the three answers in [`super::DiscoveryOutcome`], and the
+//! asymmetry is the contract.** Only DNS TXT has a served-absence form: a
+//! name may simply hold no APH record, and §8.4.6 advances past that. The two
+//! body fetches have no such form, so their signatures do not offer one — an
+//! adapter cannot report "not published" from an HTTP status, because it
+//! would be inventing an absence the spec does not define and disclosing the
+//! status while doing it. Each port states its own reason at its own method.
+//!
 //! **[`StatusCredentialFetch`] is a SIBLING of [`DidDocumentFetch`], not a
 //! reuse of it**, and the distinction is contractual rather than cosmetic.
 //! `fetch_did_document`'s own contract hard-codes where its URL comes from —
@@ -69,22 +77,21 @@ pub trait TxtRecordLookup: std::marker::Send + std::marker::Sync {
   /// `name` is always a value derived by [`super::DidUrl::dns_txt_name`].
   /// An adapter MUST NOT re-derive it from the DID.
   ///
+  /// # Which DNS answer is which outcome
+  ///
+  /// [`super::DiscoveryOutcome`] states what each outcome MEANS; only an
+  /// adapter can see which DNS answer produces it, so that mapping is stated
+  /// here and nowhere else:
+  ///
+  /// - NXDOMAIN, and NOERROR carrying no TXT records, are
+  ///   [`super::DiscoveryOutcome::Absent`]. Live-proven, not a reading: real
+  ///   DNS reports NXDOMAIN for the `_aph._notary` name of a notary that
+  ///   publishes only a DID Document, so a verifier that called that a
+  ///   failure would refuse every such notary outright.
+  /// - Timeout, SERVFAIL and REFUSED left the question UNANSWERED and are
+  ///   `APH_E008` ([`crate::errors::AphError::NotaryServiceUnreachable`]).
+  ///
   /// # Errors
-  ///
-  /// `APH_E008` ([`crate::errors::AphError::NotaryServiceUnreachable`]) for
-  /// a transport outcome that left the question UNANSWERED: timeout,
-  /// SERVFAIL, refused.
-  ///
-  /// NXDOMAIN is NOT in that list, and neither is a NOERROR answer carrying
-  /// no records. Both are ABSENCE — the server answered, and the answer is
-  /// "nothing is published here" — so an adapter returns `Ok` with an empty
-  /// `Vec` and the §8.4.6 composer advances to the next mechanism. This is
-  /// live-proven, not a reading: real DNS reports NXDOMAIN for the
-  /// `_aph._notary` name of a notary that publishes only a DID Document, and
-  /// a verifier that reported that as `APH_E008` would refuse every such
-  /// notary outright. The distinction is the same one
-  /// [`crate::errors::AphError::NotaryKeyNotPublished`] exists for: absence
-  /// advances the fallback sequence, failure must stop it.
   ///
   /// The error MUST NOT carry a status, an address, a resolver identity, or a
   /// timing. A verifier's result is disclosed to whoever sent the envelope,
@@ -96,7 +103,7 @@ pub trait TxtRecordLookup: std::marker::Send + std::marker::Sync {
   fn lookup_txt<'a>(
     &'a self,
     name: &'a str,
-  ) -> DiscoveryFuture<'a, std::vec::Vec<String>>;
+  ) -> DiscoveryFuture<'a, super::DiscoveryOutcome<std::vec::Vec<String>>>;
 }
 
 /// Fetches a `did:web` DID Document (spec §8.4.4).
@@ -116,6 +123,17 @@ pub trait DidDocumentFetch: std::marker::Send + std::marker::Sync {
   /// [`super::DidUrl::web_document_url`], which encodes the percent-decode
   /// ordering that keeps a `%3A`-written port attached to the host instead
   /// of becoming a path segment. An adapter MUST NOT rebuild the URL.
+  ///
+  /// **No [`super::DiscoveryOutcome`] here, and its absence is the contract:**
+  /// this mechanism has no served-absence form in v0.1. A 404 is not "nothing
+  /// is published" — it is one more way the origin failed to hand over a
+  /// document, indistinguishable to a verifier from a 503. Absence at THIS
+  /// mechanism is decided after parsing, by
+  /// [`super::did_document::DidDocument::resolve_key`] finding no key under
+  /// the named fragment (`APH_E014`), which is a statement the document
+  /// itself made. Letting an adapter answer `Absent` from a status code
+  /// would also make that status readable from outside the verifier, which
+  /// is precisely what the opacity rule below forbids.
   ///
   /// # Errors
   ///
@@ -161,17 +179,19 @@ pub trait StatusCredentialFetch: std::marker::Send + std::marker::Sync {
   /// bound — a cache that outlives the bound reintroduces exactly the
   /// staleness the bound exists to cap.
   ///
+  /// **No [`super::DiscoveryOutcome`] here either, and here it is a security
+  /// property rather than a modelling choice.** There is no sequence to
+  /// advance — the status surface has no alternate mechanism — so a 404 at a
+  /// URL the envelope pointed at is a FAILURE (§6.3.3.4 case 2), never an
+  /// absence. Giving this port an `Absent` variant would hand an attacker,
+  /// in typed form, exactly the skip case 2 exists to deny: make the check
+  /// fail and thereby choose that it is not performed.
+  ///
   /// # Errors
   ///
   /// `APH_E008` ([`crate::errors::AphError::NotaryServiceUnreachable`]) for
   /// every transport outcome: DNS failure, TLS failure, connection refused,
-  /// timeout, and any non-success HTTP status. Note the contrast with
-  /// [`TxtRecordLookup::lookup_txt`]: there, absence advances the §8.4.6
-  /// sequence, so a "nothing published" answer is `Ok`. Here there is no
-  /// sequence to advance — the status surface has no alternate mechanism —
-  /// so a 404 at a URL the envelope pointed at is a FAILURE (§6.3.3.4 case
-  /// 2), never an absence, and an adapter that reported it as `Ok("")` would
-  /// hand an attacker the skip that case 2 exists to deny.
+  /// timeout, and any non-success HTTP status.
   ///
   /// As with the other two ports, the error MUST NOT disclose the status
   /// code, the resolved address, or how long the attempt took — that
@@ -185,8 +205,8 @@ pub trait StatusCredentialFetch: std::marker::Send + std::marker::Sync {
 
 #[cfg(test)]
 mod tests {
-  /// A stub implementing BOTH ports, counting only work done *inside* the
-  /// returned future so laziness is observable.
+  /// A stub implementing ALL THREE ports, counting only work done *inside*
+  /// the returned future so laziness is observable.
   #[derive(std::default::Default)]
   struct StubPorts {
     calls: std::sync::atomic::AtomicUsize,
@@ -196,14 +216,16 @@ mod tests {
     fn lookup_txt<'a>(
       &'a self,
       _name: &'a str,
-    ) -> super::DiscoveryFuture<'a, std::vec::Vec<String>> {
+    ) -> super::DiscoveryFuture<'a, crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>> {
       std::boxed::Box::pin(async move {
         self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         // Annotated rather than left to inference: the async block's output
         // type is only pinned by the unsizing coercion to `dyn Future`, and
-        // an empty `Vec` gives inference nothing to work from.
-        let out: std::result::Result<std::vec::Vec<String>, crate::errors::AphError> =
-          std::result::Result::Ok(std::vec::Vec::new());
+        // the payload-free `Absent` gives inference nothing to work from.
+        let out: std::result::Result<
+          crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+          crate::errors::AphError,
+        > = std::result::Result::Ok(crate::discovery::DiscoveryOutcome::Absent);
         out
       })
     }
@@ -283,6 +305,34 @@ mod tests {
         .join()
     });
     std::assert!(moved.is_ok());
+  }
+
+  #[test]
+  fn only_the_dns_port_offers_a_served_absence_form() {
+    // A SHAPE tripwire, and the thing it guards is a security property rather
+    // than a style. Adding `DiscoveryOutcome` to either body-fetch port would
+    // let an adapter answer `Absent` from an HTTP status — which on the
+    // §6.3.3 status path is the check-skip §6.3.3.4 case 2 exists to deny,
+    // and on both paths makes the status code readable by whoever chose the
+    // DID, defeating the opacity control. Removing it from the DNS port
+    // would put absence back to being spelled by an empty collection, which
+    // is the conflation this type was introduced to end. The annotations
+    // below are the assertion: they stop compiling if either happens.
+    let stub = StubPorts::default();
+    let txt: std::result::Result<
+      crate::discovery::DiscoveryOutcome<std::vec::Vec<String>>,
+      crate::errors::AphError,
+    > = crate::discovery::test_support::block_on(super::TxtRecordLookup::lookup_txt(&stub, "n"));
+    let document: std::result::Result<String, crate::errors::AphError> =
+      crate::discovery::test_support::block_on(super::DidDocumentFetch::fetch_did_document(
+        &stub, "u",
+      ));
+    let status_call = super::StatusCredentialFetch::fetch_status_credential(&stub, "u");
+    let status: std::result::Result<String, crate::errors::AphError> =
+      crate::discovery::test_support::block_on(status_call);
+    std::assert_eq!(txt.unwrap(), crate::discovery::DiscoveryOutcome::Absent);
+    std::assert_eq!(document.unwrap(), String::new());
+    std::assert_eq!(status.unwrap(), String::new());
   }
 
   #[test]

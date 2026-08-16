@@ -216,6 +216,65 @@ and integrity remain the responsibility of the channel adapter and its
 transport. An envelope sent over plaintext SMTP is just as readable to a
 network attacker as the message body itself.
 
+### 3.6 Loss of the Notary Service signing key
+
+§3.1 covers a key an attacker has. This covers a key nobody has: the store
+holding the private half is lost, wiped, or becomes unreadable, and no copy
+exists. APH offers no protocol-level recovery, and adding one would mean a
+custodian — which is precisely the dependency the trust model exists to
+avoid.
+
+The consequences split cleanly, and the split is worth stating because the
+frightening half is not the one operators expect:
+
+- **Nothing already signed is invalidated.** Those signatures remain genuine
+  and remain verifiable for as long as the corresponding PUBLIC key stays
+  published, which is what §8.4.7 step 4's further-visibility window is for.
+- **No human's authority is affected.** The notary never held a principal
+  key, so the authorization layer of a `PrincipalSigned` envelope is
+  untouched. What stopped is the witness.
+- **The revocation transport fails within minutes, fleet-wide.** §6.3.3.3
+  requires the status list credential to be re-issued at least every 120
+  seconds and refuses one older than 300 seconds plus 60 seconds of skew. A
+  signer that goes away therefore takes every status-carrying envelope with
+  it about six minutes later, refused with `APH_E008` by every conformant
+  verifier. This is fail-closed behaving exactly as designed, and it is the
+  reason key loss is an incident measured in minutes rather than in the days
+  a re-publication would take.
+
+**What actually determines recoverability is control of the domain, not
+possession of the key.** Both discovery mechanisms are anchored in domain
+ownership — §8.4.4 in the TLS chain, §8.4.5 in DNS — and neither is
+authenticated by the notary's signing key. An operator who retains domain
+control can publish a replacement key; an operator who loses the registrar
+credentials alongside the signing key has lost the identity outright, and no
+escrow scheme repairs that, because the missing capability is publication
+rather than signing.
+
+Two operator-side mitigations, both compatible with the trust model and
+neither required by it: a **pre-authorized rotation** (a successor key
+generated and published in advance under §8.4.7's overlap, so recovery never
+needs the lost key) and separating the domain-control credentials from the
+key store. `operations.md` §2 and §3 carry the mechanism and the procedures.
+
+### 3.7 Denial of service against a publication surface
+
+An attacker who can stop a notary's status list from being republished — or
+who can make its origin unreachable — causes every conformant verifier to
+refuse every envelope that carries a `credentialStatus` (§6.3.3.4 case 2).
+APH does not defend against this, and the exposure is deliberate: §6.3.3.4
+explains why an attacker who can make the status check *fail* must not
+thereby get to choose that it is *skipped*. Availability is traded for the
+guarantee that a revoked mandate cannot be laundered back into acceptance.
+
+What follows for an operator is that publication liveness is a security
+property and not merely an uptime one, and that its failure is silent until
+it is total. The window between the 120-second republish obligation and the
+360-second refusal cliff is the only warning, so it has to be watched
+deliberately rather than inferred from peers refusing. `operations.md` §5
+carries the two deadlines and a monitor that reads them from the published
+document itself.
+
 ## 4. Algorithm requirements
 
 Implementations of APH 0.1 MUST support the following JWS algorithms:
@@ -257,14 +316,79 @@ per DID document so a deployment can roll its signing key without a
 flag day. During rotation, recipients accept any of the currently
 published verifying keys; the Notary Service issues new envelopes under
 the new key, and after a configurable overlap window the old key is
-removed from the DID document. v0.2 will specify a formal rotation
-protocol including a maximum overlap window and a recommended
-notification mechanism for downstream recipients.
+removed from the DID document. §8.4.7 specifies the overlap normatively,
+including how it is expressed on each publication mechanism; what remains
+for v0.2 is a maximum overlap window and a recommended notification
+mechanism for downstream recipients.
 
 Verification keys on the recipient side SHOULD be cached with a TTL no
 longer than the longest plausible rotation overlap window so a
 recipient does not continue to accept envelopes signed under a key that
 the issuer has withdrawn.
+
+### 5.1 Key continuity: pre-authorized rotation
+
+Storing a key well is not the same as surviving its loss, and §3.6 shows the
+loss case has a six-minute fuse. The mitigation that fits the trust model —
+no custodian, no key leaving the operator's control, no service the protocol
+then depends on — is to use §8.4.7's overlap mechanism defensively:
+
+Generate a SUCCESSOR keypair now, on media separate from the signing host,
+and publish its public half alongside the primary's **continuously**, with a
+distinct `kid` — and configure the SIGNER to emit that `kid` as the fragment
+of `proof.verificationMethod` before publishing anything, because that is the
+half of the pairing which does the work. Two published keys and a
+fragment-less DID URL leave a verifier no way to choose, and the §8.4.6
+mechanisms resolve that differently: a DID Document declines to guess among
+several keys and the resolution refuses, while a DNS TXT verifier takes the
+first record valid at that instant, in whatever order it was answered. Both
+fail closed, so no wrong key is accepted, but the resulting verification
+outage is self-inflicted by the continuity mechanism — and §8.4.7's 30-day
+bound on that ambiguity does not apply to a successor published permanently.
+Keep signing with the primary. Because verifiers already
+resolve and accept the successor, recovery becomes a change to what the
+operator signs with rather than a change to what the world can read — no
+document edit, no DNS propagation, no cache to wait out, and nothing that
+must be done with a key that no longer exists.
+
+Two honest costs. **Two keys can sign for the identity for the whole period**,
+not just during a 30-day rotation window, so the exposure §3.1 bounds is
+doubled in duration; the discipline that answers it is keeping the successor's
+private half off the signing host until promotion. **An unexercised successor
+is an untested backup** — it must be rehearsed against the key *as published*,
+or its first use is also its first test. `operations.md` §3 carries the
+procedures, including the rehearsal.
+
+Note what this mechanism does NOT claim. APH v0.1 defines no signed rotation
+statement, and neither publication surface is authenticated by the notary's
+key (§3.6). A successor is pre-*authorized* by having been published under
+the operator's domain control while the primary was healthy — the same
+authority that publishes every APH key — and describing it as "signed by the
+old key" would overstate what the wire carries.
+
+### 5.2 Threshold split of the seed
+
+An operator MAY split the signing seed into *n* shares of which any *k*
+reconstruct it, holding every share themselves, using an audited external
+implementation of their own choosing. It buys a property rotation does not:
+no single medium reconstructs the key, loss of up to *n − k* shares is
+survivable, and because the SAME key is restored, nothing published changes
+and no verifier re-pins.
+
+It also costs what rotation does not: reconstruction assembles the whole seed
+on one machine at one moment, and the shares must be placed so they cannot be
+lost together yet cannot be gathered by one adversary — two requirements that
+pull against each other, and in which the placement is the entire security of
+the scheme. It protects the key, not the identity: if the shares are lost too,
+the operator is back to §5.1, which is why the two are complementary rather
+than alternatives.
+
+**This specification's reference implementation deliberately ships no
+secret-sharing code.** A subtly wrong sharing scheme does not fail loudly —
+it leaks the key to a holder of fewer than *k* shares and the operator never
+learns — so shipping an unaudited one inside a protocol library would make a
+threat-model decision on the operator's behalf, badly. The decision to escrow
+at all, and in what form, is the operator's; nothing in APH requires it.
 
 ## 6. Privacy considerations
 
@@ -377,3 +501,21 @@ tracked for later drafts or for other specifications:
 - Coordinated multi-party consent. v0.1 attests one human per envelope.
   Group consent (M-of-N approvals from a set of humans) is left to a
   future draft.
+- IANA registration of APH's own identifiers. Two are used by CONVENTION in
+  v0.1 with registration deferred to v0.2 (§13): the `aph://` URI scheme and
+  the `_aph` / `_aph._notary` underscored DNS labels. A distinct APH media
+  type is NOT among them — §13 declines rather than defers it, registering
+  none, naming the already-registered `application/vc+ld+json` as the
+  conformant choice, and requiring verifiers to accept the unregistered
+  `application/aph+ld+json` as well. Neither deferred name affects whether an
+  envelope verifies — a conformant TXT parser refuses any record whose `v`
+  tag is not `APHv1`, so a foreign record at a colliding name is ignored
+  rather than misread — but an adopter should know which names this protocol
+  does not yet own. `operations.md` §6 enumerates every unregistered
+  identifier, including the unserved `https://w3id.org/aph/v1` JSON-LD
+  context, with the consequence of each.
+- A signed key-rotation statement. §8.4.7 rotates by publishing two keys, and
+  the authority to publish is domain control rather than key control (§3.6).
+  A rotation attestation signed by the outgoing key — which would let a
+  verifier check that a successor was named by its predecessor rather than
+  merely served from the same origin — is a v0.2 question.
