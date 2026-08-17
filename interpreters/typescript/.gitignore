@@ -1,0 +1,13 @@
+# Build output and installed packages. Scoped to this directory rather than
+# added to the root ignore file so the second implementation carries its own
+# hygiene with it, the way the Rust workspace's `target/` rule does not have to
+# know about Node.
+dist/
+node_modules/
+
+# No lockfile is committed, and that is deliberate rather than an oversight:
+# the only dependency in the tree is the TypeScript compiler, at dev time, and
+# a lockfile would be a durable-looking record of a dependency graph this
+# package's whole claim is that it does not have. CI installs with `npm
+# install` and asserts the runtime-dependency list is empty.
+package-lock.json

@@ -227,10 +227,18 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
       },
       communication: aph_core::CommunicationDescriptor {
         content_class: std::string::String::from("Reply"),
+        // The ONE published envelope whose body-hash binding is real: these
+        // two values are the SHA-256 and exact byte length of the committed
+        // `examples/principal_signed_body.txt`, so §8.3 step 8 finally has a
+        // vector (every other fixture pairs the empty-string digest with a
+        // fictional size and is shape-only by design). The pairing is pinned
+        // by the body-hash binding test, which re-hashes the committed file —
+        // change the body and BOTH constants here must move with it, which
+        // regenerates all four signatures via this generator.
         body_sha256: std::string::String::from(
-          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "dae0b23f649c05222b955ff4752507c6d85a51e00566da4fea1867e50b3b60cb",
         ),
-        body_size: 1842,
+        body_size: 427,
         preview_lines: 1,
         preview: std::string::String::from("prod rollout finished at 14:02 UTC"),
       },

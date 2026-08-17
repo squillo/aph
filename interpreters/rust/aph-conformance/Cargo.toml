@@ -17,3 +17,21 @@ serde_json = { workspace = true }
 # The PrincipalSigned golden is regenerated from the RFC 8032 §7.1 public
 # test seeds, which requires constructing Ed25519 keys directly.
 ed25519-dalek = { workspace = true }
+# Same reason on the other curve: the two ES256 vectors are regenerated from
+# published P-256 test scalars (RFC 6979 A.2.5, RFC 7515 A.3.1), and naming a
+# key means naming its type. Already in the lockfile as an `aph-core`
+# dependency, so this widens the graph by nothing.
+p256 = { workspace = true }
+# The detached-JWS vector's protected header and signature sections are
+# base64url. `aph-core`'s helper is crate-private on purpose — a published
+# vector readable only through the reference implementation's internals would
+# not be much of a vector — so the suite decodes them the way a third-party
+# implementer would. Also already in the lockfile via `aph-core`.
+base64 = { workspace = true }
+# The body-hash binding test re-hashes the committed body file the way a
+# RECIPIENT does (§8.3 step 8) — aph-core deliberately exposes no body-hash
+# checker because the recipient owns that step, so the suite must hash for
+# itself. sha2 is already in the lockfile via ed25519-dalek: naming it here
+# widens the dependency graph by nothing (minimalism rung 5, settled
+# deliberately after an earlier lane declined to add it mid-flight).
+sha2 = { workspace = true }

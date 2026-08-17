@@ -439,9 +439,16 @@ pub struct EnvelopeProof {
   /// or `"JsonWebSignature2020"` for compact JWS detached.
   #[serde(rename = "type")]
   pub r#type: String,
-  /// Required for DataIntegrityProof. e.g., `"eddsa-jcs-2022"` or
-  /// `"ecdsa-jcs-2019"`.
-  #[serde(default)]
+  /// Required for DataIntegrityProof — `"eddsa-jcs-2022"` or
+  /// `"ecdsa-jcs-2019"` — and OMITTED, not nulled, for
+  /// `JsonWebSignature2020` (§7.1.11).
+  ///
+  /// `skip_serializing_if` is load-bearing rather than cosmetic: this member
+  /// sits inside the §7.2.1 canonicalization base, so emitting
+  /// `"cryptosuite": null` would put a member in the SIGNED bytes that an
+  /// implementer following the spec's proof table never builds, and no JWS
+  /// envelope this crate minted would verify anywhere else.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
   pub cryptosuite: std::option::Option<String>,
   /// DID URL referencing the verifying key
   /// (e.g., `did:key:z6Mk...#z6Mk...`).

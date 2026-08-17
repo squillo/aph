@@ -14,16 +14,26 @@ cargo clippy --all-targets -- -D warnings
 | [`aph-core`](aph-core/) | The protocol: envelope wire types, mandates, flow state machines, roles, error taxonomy, and signing helpers. No dependency on anything outside serde/chrono/p256/base64/thiserror. |
 | [`aph-conformance`](aph-conformance/) | Golden fixtures, contract tests, the three channel binding specs, and a suite that validates the repo's `examples/` against the implementation. |
 | [`aph-cli`](aph-cli/) | The `aph` binary — `validate`, `inspect`, `golden`. |
-| [`aph-ts`](aph-ts/) | WebAssembly binding: `parseEnvelopeJson` / `serializeEnvelope`. |
+| [`aph-ts`](aph-ts/) | WebAssembly binding: `parseEnvelopeJson`, `serializeEnvelope`, `verifyProofStructure`, `requireAttestationMode`. |
+| [`aph-py`](aph-py/) | Python binding (pyo3, module `aph`): the same four operations in snake_case — `parse_envelope_json`, `serialize_envelope`, `verify_proof_structure`, `require_attestation_mode`. |
 | [`aph-resolver`](aph-resolver/) | Ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` fetch adapters over `aph-core`'s discovery ports, for adopters with no adapter layer of their own. The ONLY crate carrying HTTP/DNS/runtime dependencies. |
 
-`aph-ts` targets `wasm32-unknown-unknown` and is excluded from default host
-builds, so `cargo test` at the workspace root does not attempt it. Build it
-explicitly:
+`aph-ts` and `aph-py` are two **bindings of this one implementation**, held at
+export parity — same operations, same semantics, same error text, each in its
+language's case convention. Neither is a second implementation. Adding an
+operation to one is unfinished until it lands in the other.
+
+Both are workspace members and both sit OUTSIDE `default-members` (6 members,
+4 default), each because building it needs a toolchain the protocol crates do
+not: `aph-ts` targets `wasm32-unknown-unknown`, and `aph-py` links a Python
+interpreter. So `cargo test` at the workspace root attempts neither — name
+them:
 
 ```sh
 cargo check -p aph-ts --target wasm32-unknown-unknown
 wasm-pack build aph-ts --target web
+
+cargo test -p aph-py     # needs a Python distribution with a shared libpython
 ```
 
 ## Runnable examples

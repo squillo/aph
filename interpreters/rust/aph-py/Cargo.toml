@@ -1,0 +1,50 @@
+[package]
+name = "aph-py"
+description = "Python bindings for the APH protocol envelope types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+# A pyo3 extension ships as a wheel, not as a source crate: a Python consumer
+# installs it with pip, and cargo is not where they would look. Same reason
+# aph-ts is unpublished.
+publish = false
+
+[lib]
+# The Python module is `aph`, and CPython derives the initialiser symbol it
+# calls (`PyInit_aph`) from the file name — so the shared object must be
+# `aph.<ext-suffix>` and the lib target must be named `aph`. The `rlib`
+# beside `cdylib` is what lets `cargo test -p aph-py` link the same code into
+# a Rust test binary; without it the tests would have nothing to call.
+name = "aph"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aph-core = { workspace = true }
+# The Python boundary is JSON text in BOTH directions (see src/lib.rs module
+# docs); envelopes never cross as Python objects, so there is deliberately no
+# `pythonize` dependency here — the same absence, for the same reason, as
+# aph-ts's missing serde-wasm-bindgen.
+serde_json = { workspace = true }
+# pyo3 is declared HERE and NOT in [workspace.dependencies]: this is the only
+# member that may link a Python interpreter, and a workspace-level entry is an
+# invitation for a second member to acquire that edge with one line.
+#
+# `abi3-py39` builds against CPython's stable ABI, so ONE wheel serves 3.9 and
+# every later version instead of one wheel per minor release.
+#
+# `auto-initialize` is what lets `Python::attach` start an interpreter inside
+# `cargo test`; it requires a Python distribution shipping a shared libpython
+# (pyo3's build script refuses otherwise), which is what the CI job installs.
+#
+# `extension-module` is deliberately ABSENT and must stay absent by default:
+# it tells pyo3 to leave libpython unlinked — correct for a wheel, where the
+# host interpreter supplies those symbols, and fatal for a test binary, which
+# has no host. Wheel builds opt in through the feature below.
+pyo3 = { version = "0.29", features = ["abi3-py39", "auto-initialize"] }
+
+[features]
+# Turned on by maturin for wheel builds and by nothing else. See the pyo3
+# comment above for why `cargo test` must never see it.
+extension-module = ["pyo3/extension-module"]

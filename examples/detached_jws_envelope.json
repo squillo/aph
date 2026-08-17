@@ -1,0 +1,67 @@
+{
+  "aphVersion": "0.1",
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/aph/v1"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "AgentSendAuthorizationCredential"
+  ],
+  "id": "urn:uuid:00000000-0000-4000-8000-000000000009",
+  "issuer": "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov",
+  "validFrom": "2026-05-21T00:00:00Z",
+  "validUntil": "2026-05-22T00:00:00Z",
+  "credentialSubject": {
+    "humanPrincipal": {
+      "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+      "displayName": "Scott Wyatt"
+    },
+    "agent": {
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
+      "displayName": "Squillo Concierge",
+      "version": "1.0"
+    },
+    "channel": {
+      "kind": "email",
+      "recipientAddressing": {
+        "inReplyTo": "<CA+abc123@mail.example.com>",
+        "subject": "Re: Q3 rollout timeline",
+        "to": [
+          "ops@example.com"
+        ]
+      }
+    },
+    "communication": {
+      "contentClass": "Reply",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodySize": 947,
+      "previewLines": 1,
+      "preview": "Confirming the Thursday freeze window."
+    },
+    "policy": {
+      "decision": "AlwaysAllow",
+      "matchedScope": "per-channel",
+      "delegationMandateId": null,
+      "actChain": []
+    },
+    "notarization": {
+      "notaryService": {
+        "id": "did:web:notary.squillo.com",
+        "name": "Squillo Notary Service",
+        "version": "0.1.0"
+      },
+      "decisionTimestamp": "2026-05-21T00:00:00Z",
+      "decisionLatencyMs": 31
+    }
+  },
+  "linkedMandate": null,
+  "proof": {
+    "type": "JsonWebSignature2020",
+    "verificationMethod": "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov",
+    "created": "2026-05-21T00:00:01Z",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il0sImN0eSI6InZjK2xkK2pzb24iLCJraWQiOiJkaWQ6a2V5OnpEbmFlckdCRDdaeHphdTJmZGZFRmFhYVREWUJ1NVhFQllkR1YyQm1FUnAzTURTb3YjekRuYWVyR0JEN1p4emF1MmZkZkVGYWFhVERZQnU1WEVCWWRHVjJCbUVScDNNRFNvdiIsInR5cCI6ImFwaCtqd3MifQ..MEYCIQD_Kg_3WK6ULFF0bM6fK0n-QcmiubgmndMQlR0HtV8RnwIhAL5rCKSs4U_Km7tnDnf6qNhc8d1nCEbv4crroFjLKwMT"
+  }
+}

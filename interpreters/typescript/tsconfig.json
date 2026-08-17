@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    // "dom" supplies the UNIVERSAL globals this implementation uses — WebCrypto
+    // (Crypto, SubtleCrypto, CryptoKey), TextEncoder/TextDecoder, URL and
+    // structuredClone — none of which are Node-specific. `src/` imports no
+    // node: module at all, which is what keeps the protocol code runnable
+    // wherever WebCrypto is.
+    "lib": ["es2022", "dom"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "declaration": true,
+    "sourceMap": false,
+    "skipLibCheck": true,
+    // No ambient @types packages: the only dev dependency is the compiler
+    // itself, and the Node builtins the tests and the mint script use are
+    // declared in `types/node-builtins.d.ts`.
+    "types": []
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "testkit/**/*.ts", "scripts/**/*.ts", "types/**/*.d.ts"]
+}

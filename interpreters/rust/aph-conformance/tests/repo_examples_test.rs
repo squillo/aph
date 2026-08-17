@@ -41,14 +41,24 @@ fn example_json_files() -> std::vec::Vec<std::path::PathBuf> {
 }
 
 #[test]
-fn examples_directory_carries_at_least_seven_envelopes() {
-  // Guards against a silently vacuous suite: if the path resolution broke
-  // or the directory emptied, the per-file tests below would iterate zero
-  // files and pass while proving nothing.
+fn examples_directory_carries_every_published_envelope() {
+  // Guards against a silently vacuous suite: if the path resolution broke or
+  // the directory emptied, the per-file tests below would iterate zero files
+  // and pass while proving nothing.
+  //
+  // The floor is the ENUMERATED corpus, not a remembered number. Twelve
+  // files: seven channel kinds (slack_reply, email_reply, discord_dm,
+  // teams_channel, whatsapp, google_chat, imessage), one §7.5 extensions
+  // example (slack_new_with_extensions), three signed vectors — one per
+  // §8.1/§8.2 path this implementation supports: `principal_signed`
+  // (eddsa-jcs-2022), `es256_signed` (ecdsa-jcs-2019) and `detached_jws`
+  // (JsonWebSignature2020) — and `ts_minted`, the same eddsa-jcs-2022 shape
+  // minted by the TypeScript implementation rather than by this one. A
+  // thirteenth file is fine and passes; a lost one is not.
   let files = example_json_files();
   std::assert!(
-    files.len() >= 7,
-    "expected at least 7 example envelope JSON files in {:?}, found {}: {:?}",
+    files.len() >= 12,
+    "expected at least the 12 enumerated example envelope JSON files in {:?}, found {}: {:?}",
     examples_dir(),
     files.len(),
     files
@@ -104,12 +114,18 @@ fn every_repo_example_declares_the_mode_its_proof_structure_supports() {
   // mode each resolves to must match its wire shape: the single-object
   // corpus is `NotaryAttested` — the claim a notary alone can make; if
   // absence ever resolved to `PrincipalSigned`, those envelopes would start
-  // asserting a human signature nobody produced. Exactly ONE example — the
-  // signed §7.3.1 golden — carries a chain and resolves to
-  // `PrincipalSigned`; its cryptographic verification lives in
-  // `principal_signed_example_test.rs`. Issuance order (§7.2.1) is also
-  // checked corpus-wide here: vacuous for a single proof, load-bearing for
-  // the chain.
+  // asserting a human signature nobody produced. THREE examples carry a chain
+  // and resolve to `PrincipalSigned`, and they are NAMED rather than counted,
+  // so a fourth chain arriving unannounced fails here with its own file name
+  // instead of behind an off-by-one: the same §7.3.1 credential under each
+  // Data Integrity cryptosuite (`principal_signed`, `es256_signed`) plus
+  // `ts_minted`, which the TypeScript implementation mints in that same shape.
+  // Their cryptographic verification lives in
+  // `principal_signed_example_test.rs`, `es256_signed_example_test.rs` and
+  // `ts_minted_cross_verify.rs`; `detached_jws_envelope.json` is signed too
+  // but is `NotaryAttested`, which is why it is absent from this list.
+  // Issuance order (§7.2.1) is also checked corpus-wide here: vacuous for a
+  // single proof, load-bearing for the chains.
   let mut principal_signed: std::vec::Vec<std::path::PathBuf> = std::vec::Vec::new();
   for path in example_json_files() {
     let json = std::fs::read_to_string(&path)
@@ -138,16 +154,19 @@ fn every_repo_example_declares_the_mode_its_proof_structure_supports() {
       }
     }
   }
+  let mut found: std::vec::Vec<&str> = principal_signed
+    .iter()
+    .filter_map(|path| path.file_name().and_then(std::ffi::OsStr::to_str))
+    .collect();
+  found.sort();
   std::assert_eq!(
-    principal_signed.len(),
-    1,
-    "exactly one published example is PrincipalSigned, got {:?}",
-    principal_signed
-  );
-  std::assert_eq!(
-    principal_signed[0].file_name().and_then(std::ffi::OsStr::to_str),
-    std::option::Option::Some("principal_signed_envelope.json"),
-    "the PrincipalSigned example must be the signed §7.3.1 golden"
+    found,
+    std::vec![
+      "es256_signed_envelope.json",
+      "principal_signed_envelope.json",
+      "ts_minted_envelope.json"
+    ],
+    "the PrincipalSigned examples are exactly the signed §7.3.1 chains: one per Data Integrity cryptosuite, plus the TypeScript-minted artifact"
   );
 }
 

@@ -150,8 +150,10 @@ rotation statement, and neither publication surface is key-authenticated
 under the operator's domain control while the primary was healthy — which is
 the same authority that publishes every APH key. Saying it is "signed by the
 old key" would overstate what the wire actually carries. A signed rotation
-attestation is a reasonable v0.2 question; it is not something to assume in
-v0.1.
+attestation is a reasonable v0.2 question — `spec/rotation-attestation-v02-draft.md`
+is the non-normative design draft that answers it, including what such a
+statement would and would not buy — but it is not something to assume in v0.1,
+and nothing in that draft changes any procedure on this page.
 
 ### 3.3 What it costs, stated plainly
 
@@ -426,17 +428,19 @@ the `kid` you are signing with.
 APH v0.1 uses several identifiers that are **conventions rather than
 registrations**. Four of them can change what an adopter's software does, and
 each carries a different kind of risk. Their statuses differ and the
-difference matters when you tell your own users what is coming: §13 defers
-exactly **two** to v0.2 — the `aph://` scheme and the `_aph` / `_aph._notary`
-labels. The media type it declines outright rather than defers, naming the
-registered `application/vc+ld+json` as the conformant choice. The JSON-LD
-context §13 does not mention at all; §7.1.1 requires it and nothing currently
-serves it.
+difference matters when you tell your own users what is coming: §13 carries
+exactly **two** as far as a written request — the `aph://` scheme and the
+`_aph` / `_aph._notary` labels, drafted in `spec/registrations/` with
+submission pending. Drafted is not registered, and nothing in the risk column
+below moves until IANA acts: neither name is APH's yet. The media type §13
+declines outright rather than drafts, naming the registered
+`application/vc+ld+json` as the conformant choice. The JSON-LD context §13
+does not mention at all; §7.1.1 requires it and nothing currently serves it.
 
 | Identifier | Status | What a collision would cost |
 |---|---|---|
-| `_aph._notary.<domain>` DNS label | Reserved by convention; IANA underscored-node-name registration deferred to v0.2 | A foreign record at the same name is **not** a misparse risk — a conformant parser refuses any record whose `v` tag is not `APHv1`, so it is ignored rather than read as a key. The real cost is name ownership: if `_aph` is later assigned elsewhere, APH moves and every published record is reissued. |
-| `aph://` URI scheme | Used by convention; registration deferred to v0.2 | APH itself is safe by construction: §13 requires these URIs be treated as opaque and never dereferenced. The risk is local — registering a system-wide handler for `aph://` may collide with unrelated software. |
+| `_aph._notary.<domain>` DNS label | Reserved by convention; IANA underscored-node-name request drafted (`spec/registrations/dns-underscored-aph.md`), not submitted. That draft registers `_notary` — the label closest to the root — and carries `_aph` derivatively; it also leaves one wire-shape question open for the specification owner | A foreign record at the same name is **not** a misparse risk — a conformant parser refuses any record whose `v` tag is not `APHv1`, so it is ignored rather than read as a key. The real cost is name ownership: if `_aph` is later assigned elsewhere, APH moves and every published record is reissued. |
+| `aph://` URI scheme | Used by convention; provisional registration request drafted (`spec/registrations/uri-scheme-aph.md`), not submitted | APH itself is safe by construction: §13 requires these URIs be treated as opaque and never dereferenced. The risk is local — registering a system-wide handler for `aph://` may collide with unrelated software. |
 | `application/aph+ld+json` media type | Unregistered; the registered `application/vc+ld+json` is the conformant choice | Low. Conformant verifiers MUST accept both, so an operator who emits only the registered type carries no risk at all. |
 | `https://w3id.org/aph/v1` JSON-LD context | Required in every envelope's `@context` (§7.1.1), and not currently served | Tooling that dereferences JSON-LD contexts will fail to fetch it. Verifiers that treat `@context` as a pinned literal — the shape APH expects — are unaffected. |
 

@@ -502,20 +502,27 @@ tracked for later drafts or for other specifications:
   Group consent (M-of-N approvals from a set of humans) is left to a
   future draft.
 - IANA registration of APH's own identifiers. Two are used by CONVENTION in
-  v0.1 with registration deferred to v0.2 (§13): the `aph://` URI scheme and
-  the `_aph` / `_aph._notary` underscored DNS labels. A distinct APH media
-  type is NOT among them — §13 declines rather than defers it, registering
-  none, naming the already-registered `application/vc+ld+json` as the
-  conformant choice, and requiring verifiers to accept the unregistered
-  `application/aph+ld+json` as well. Neither deferred name affects whether an
-  envelope verifies — a conformant TXT parser refuses any record whose `v`
-  tag is not `APHv1`, so a foreign record at a colliding name is ignored
-  rather than misread — but an adopter should know which names this protocol
-  does not yet own. `operations.md` §6 enumerates every unregistered
-  identifier, including the unserved `https://w3id.org/aph/v1` JSON-LD
-  context, with the consequence of each.
+  v0.1, with complete registration requests drafted and submission pending
+  (§13; `spec/registrations/`): the `aph://` URI scheme and the `_aph` /
+  `_aph._notary` underscored DNS labels. This stays an open item because
+  drafted is not registered — neither name is APH's until IANA acts, and the
+  exposure below is exactly what it was before the drafts existed. A distinct
+  APH media type is NOT among them — §13 declines it outright rather than
+  drafting one, registering none, naming the already-registered
+  `application/vc+ld+json` as the conformant choice, and requiring verifiers
+  to accept the unregistered `application/aph+ld+json` as well. Neither
+  unregistered name affects whether an envelope verifies — a conformant TXT
+  parser refuses any record whose `v` tag is not `APHv1`, so a foreign record
+  at a colliding name is ignored rather than misread — but an adopter should
+  know which names this protocol does not yet own. `operations.md` §6
+  enumerates every unregistered identifier, including the unserved
+  `https://w3id.org/aph/v1` JSON-LD context, with the consequence of each.
 - A signed key-rotation statement. §8.4.7 rotates by publishing two keys, and
   the authority to publish is domain control rather than key control (§3.6).
   A rotation attestation signed by the outgoing key — which would let a
   verifier check that a successor was named by its predecessor rather than
-  merely served from the same origin — is a v0.2 question.
+  merely served from the same origin — is a v0.2 question, and now has a
+  non-normative design draft: `spec/rotation-attestation-v02-draft.md`. The
+  draft's own honesty notes apply here too — a stolen current key signs a
+  rotation as readily as the operator does, and the mechanism upgrades
+  continuity, not genesis.

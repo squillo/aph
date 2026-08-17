@@ -40,6 +40,15 @@
 //! verifier must make the same choice. §7.2.1 settles it as the empty string.
 //! Mandate bases are the documented exception — see [`mandate_signing_base`].
 
+/// `proof.type` of the Data Integrity carriage — the value both
+/// JCS cryptosuites (`eddsa-jcs-2022`, `ecdsa-jcs-2019`) declare (§7.1.11).
+///
+/// The other carriage is `JsonWebSignature2020`; see
+/// [`crate::crypto::jws_envelope::PROOF_TYPE`]. Naming both makes the choice
+/// between them a match on constants rather than on string literals scattered
+/// across three modules.
+pub const DATA_INTEGRITY_PROOF_TYPE: &str = "DataIntegrityProof";
+
 /// Which signature's base is being built (spec §7.2.1).
 #[derive(
   std::fmt::Debug,
@@ -163,6 +172,73 @@ pub(crate) fn proof_mut(
   }
 }
 
+/// Refuses to countersign unless the envelope is a two-element chain whose
+/// principal proof already carries a signature (§7.1.11).
+///
+/// This is the whole point of a countersignature: signing a chain whose
+/// principal proof is an empty placeholder would attest to nothing while
+/// producing an artifact that looks exactly like a valid `PrincipalSigned`
+/// envelope. Shared by every cryptosuite's `countersign_as_notary`, because
+/// the rule is about the proof CHAIN and not about the curve — two suites
+/// each carrying their own copy is how the two come to disagree about what a
+/// notary may sign.
+pub(crate) fn require_signed_principal(
+  envelope: &crate::envelope::NotarizationEnvelope,
+) -> std::result::Result<(), crate::errors::AphError> {
+  let principal_is_signed = match envelope.proof.principal() {
+    std::option::Option::Some(proof) => !proof.proof_value.is_empty(),
+    std::option::Option::None => {
+      return std::result::Result::Err(crate::errors::AphError::proof_chain_invalid(
+        "a notary countersignature requires a two-element proof chain (§7.1.11)",
+      ));
+    }
+  };
+  if !principal_is_signed {
+    return std::result::Result::Err(crate::errors::AphError::proof_chain_invalid(
+      "the principal proof carries no proofValue; a countersignature over an unsigned principal proof attests nothing (§7.1.11)",
+    ));
+  }
+  std::result::Result::Ok(())
+}
+
+/// The error a failed proof earns, by role (§11).
+///
+/// `APH_E011` and `APH_E001` are different codes on purpose: only the first
+/// means the authorization itself is forged, and an operator reading
+/// `APH_E001` would go looking at notary configuration instead. Shared by
+/// every cryptosuite and both proof carriages — the code a verifier reports
+/// must not depend on which algorithm happened to fail.
+pub(crate) fn signature_failure(role: ProofRole) -> crate::errors::AphError {
+  match role {
+    ProofRole::Principal => crate::errors::AphError::PrincipalSignatureInvalid,
+    ProofRole::Notary => crate::errors::AphError::InvalidEnvelopeSignature,
+  }
+}
+
+/// The proof a role owns, or `APH_E013` when the envelope carries none there.
+///
+/// The read-only twin of [`proof_mut`], shared by every verifier so that
+/// "there is no proof in that position" is a chain problem with one message
+/// rather than a per-suite paraphrase.
+pub(crate) fn proof_of(
+  envelope: &crate::envelope::NotarizationEnvelope,
+  role: ProofRole,
+) -> std::result::Result<&crate::envelope::EnvelopeProof, crate::errors::AphError> {
+  let proof = match role {
+    ProofRole::Principal => envelope.proof.principal(),
+    ProofRole::Notary => envelope.proof.notary(),
+  };
+  match proof {
+    std::option::Option::Some(proof) => std::result::Result::Ok(proof),
+    // No proof in that position: a chain problem, not a bad signature.
+    std::option::Option::None => {
+      std::result::Result::Err(crate::errors::AphError::proof_chain_invalid(
+        "the envelope carries no proof in the requested chain position (§7.1.11)",
+      ))
+    }
+  }
+}
+
 /// The only chain length §7.1.11 permits: principal proof, notary proof.
 const CHAIN_LENGTH: usize = 2;
 
@@ -261,13 +337,52 @@ fn role_label(role: ProofRole) -> &'static str {
   }
 }
 
-/// Fixtures shared by this module's tests and [`crate::crypto::eddsa_jcs`]'s.
+/// Fixtures shared by this module's tests and those of the three suites
+/// ([`crate::crypto::eddsa_jcs`], [`crate::crypto::ecdsa_jcs`],
+/// [`crate::crypto::jws_envelope`]).
 ///
-/// Both modules must exercise the SAME chain shape: a base built here and a
-/// signature produced there that disagreed about the fixture would hide the
-/// very mismatch these tests exist to catch.
+/// Every module must exercise the SAME chain shape and the SAME identities: a
+/// base built here and a signature produced there that disagreed about the
+/// fixture would hide the very mismatch these tests exist to catch, and four
+/// modules each carrying their own copy of a P-256 scalar is how "the
+/// principal's key" comes to mean two different keys in one repository.
 #[cfg(test)]
 pub(crate) mod test_support {
+  /// The PRINCIPAL's published P-256 test key: the RFC 6979 Appendix A.2.5
+  /// sample private key for curve P-256 with SHA-256.
+  ///
+  /// ⛔ A P-256 scalar cannot be a repeated-byte fake the way an Ed25519 seed
+  /// can — it must lie in `1..n` — which is why these constants cite a
+  /// document instead of using `[9u8; 32]`. Both authorize nothing, and anyone
+  /// can re-derive every byte from the RFC that publishes them.
+  /// `crate::crypto::ecdsa_jcs`'s
+  /// `the_shared_p256_scalars_reproduce_their_published_documents` is the
+  /// tripwire that proves each really is the vector it claims.
+  ///
+  /// The same role split the published vectors use:
+  /// `examples/es256_signed_envelope.json` signs its principal proof with this
+  /// key and its countersignature with [`NOTARY_P256_SCALAR`].
+  pub(crate) const PRINCIPAL_P256_SCALAR: [u8; 32] = [
+    0xc9, 0xaf, 0xa9, 0xd8, 0x45, 0xba, 0x75, 0x16, 0x6b, 0x5c, 0x21, 0x57, 0x67, 0xb1, 0xd6, 0x93,
+    0x4e, 0x50, 0xc3, 0xdb, 0x36, 0xe8, 0x9b, 0x12, 0x7b, 0x8a, 0x62, 0x2b, 0x12, 0x0f, 0x67, 0x21,
+  ];
+
+  /// The NOTARY's published P-256 test key: the `d` value of the ES256 example
+  /// JWK in RFC 7515 Appendix A.3.1.
+  ///
+  /// A DIFFERENT published vector from [`PRINCIPAL_P256_SCALAR`] on purpose —
+  /// a suite test that used one key for both roles could not tell a
+  /// countersignature from an authorization.
+  pub(crate) const NOTARY_P256_SCALAR: [u8; 32] = [
+    0x8e, 0x9b, 0x10, 0x9e, 0x71, 0x90, 0x98, 0xbf, 0x98, 0x04, 0x87, 0xdf, 0x1f, 0x5d, 0x77, 0xe9,
+    0xcb, 0x29, 0x60, 0x6e, 0xbe, 0xd2, 0x26, 0x3b, 0x5f, 0x57, 0xc2, 0x13, 0xdf, 0x84, 0xf4, 0xb2,
+  ];
+
+  /// Builds a P-256 signing key from one of the published scalars above.
+  pub(crate) fn p256_key(scalar: &[u8; 32]) -> p256::ecdsa::SigningKey {
+    p256::ecdsa::SigningKey::from_slice(scalar).expect("a published P-256 test scalar is in 1..n")
+  }
+
   /// The golden single-proof (lone notary) envelope every crypto test starts
   /// from.
   pub(crate) fn single_proof_envelope() -> crate::envelope::NotarizationEnvelope {

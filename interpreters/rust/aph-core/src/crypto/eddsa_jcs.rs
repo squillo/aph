@@ -1,9 +1,11 @@
 //! `eddsa-jcs-2022` — envelope signing and verification.
 //!
-//! This is the cryptosuite every published APH example declares and the
-//! default for the protocol: Ed25519 over the JCS-canonical form of the
-//! envelope, with the signature carried as multibase base58btc in
-//! `proof.proofValue`.
+//! The protocol's DEFAULT cryptosuite, and the one the channel examples and
+//! the §7.3.1 signed golden declare: Ed25519 over the JCS-canonical form of
+//! the envelope, with the signature carried as multibase base58btc in
+//! `proof.proofValue`. The other two MUST-support paths live in
+//! [`crate::crypto::ecdsa_jcs`] and [`crate::crypto::jws_envelope`] and each
+//! has its own published vector under `examples/`.
 //!
 //! # One proof or two
 //!
@@ -101,11 +103,9 @@ pub fn sign_as_principal(
 /// Countersigns as the NOTARY over a chain whose principal proof is already
 /// present and complete.
 ///
-/// Refuses (`APH_E013`) when the envelope is not a two-element chain, or when
-/// the principal proof carries no `proofValue`. That second check is the point
-/// of the countersignature: signing a chain whose principal proof is an empty
-/// placeholder would attest to nothing while looking exactly like a valid
-/// `PrincipalSigned` envelope.
+/// Refuses (`APH_E013`) per
+/// [`crate::crypto::proof_base::require_signed_principal`], which every suite
+/// shares because the rule is about the proof CHAIN and not about the curve.
 ///
 /// Setting the notary proof's own `cryptosuite` here cannot disturb the
 /// principal's signature: the principal's base discards the notary proof
@@ -114,19 +114,7 @@ pub fn countersign_as_notary(
   envelope: &mut crate::envelope::NotarizationEnvelope,
   key: &ed25519_dalek::SigningKey,
 ) -> std::result::Result<(), crate::errors::AphError> {
-  let principal_is_signed = match envelope.proof.principal() {
-    std::option::Option::Some(proof) => !proof.proof_value.is_empty(),
-    std::option::Option::None => {
-      return std::result::Result::Err(crate::errors::AphError::proof_chain_invalid(
-        "a notary countersignature requires a two-element proof chain (§7.1.11)",
-      ));
-    }
-  };
-  if !principal_is_signed {
-    return std::result::Result::Err(crate::errors::AphError::proof_chain_invalid(
-      "the principal proof carries no proofValue; a countersignature over an unsigned principal proof attests nothing (§7.1.11)",
-    ));
-  }
+  super::proof_base::require_signed_principal(envelope)?;
   sign_envelope(envelope, key)
 }
 
@@ -147,28 +135,31 @@ pub fn verify_proof(
   role: super::proof_base::ProofRole,
   key: &ed25519_dalek::VerifyingKey,
 ) -> std::result::Result<(), crate::errors::AphError> {
-  let proof = match role {
-    super::proof_base::ProofRole::Principal => envelope.proof.principal(),
-    super::proof_base::ProofRole::Notary => envelope.proof.notary(),
-  };
-  let proof = match proof {
-    std::option::Option::Some(p) => p,
-    // No proof in that position: a chain problem, not a bad signature.
-    std::option::Option::None => {
-      return std::result::Result::Err(crate::errors::AphError::proof_chain_invalid(
-        "the envelope carries no proof in the requested chain position (§7.1.11)",
-      ));
-    }
-  };
+  let proof = super::proof_base::proof_of(envelope, role)?;
+
+  // §8.2's other carriage, reached here only with an Ed25519 key in hand.
+  // `JsonWebSignature2020` IS implemented — in [`crate::crypto::jws_envelope`]
+  // — but for ES256 alone, because the vendored JWS primitive takes a P-256
+  // key. `alg: EdDSA` in a JWS is MUST-support in §8.1 and is the remaining
+  // hole; naming it as APH_E010 is the honest answer. Without this arm the JWS
+  // string would fall through to the base58 decoder and the omission would
+  // surface as a bad Ed25519 signature.
+  if proof.r#type == super::jws_envelope::PROOF_TYPE {
+    return std::result::Result::Err(crate::errors::AphError::unsupported_algorithm(
+      "JsonWebSignature2020 with an EdDSA key (§8.2; this implementation carries the JWS format for ES256 only)",
+    ));
+  }
 
   // An absent proof value is an unsigned envelope, not a failed signature.
   if proof.proof_value.is_empty() {
-    return std::result::Result::Err(failure_for(role));
+    return std::result::Result::Err(super::proof_base::signature_failure(role));
   }
 
   // Refuse to verify under an algorithm the proof does not claim: silently
   // checking Ed25519 against a proof labelled otherwise would let a
-  // downgrade pass unnoticed.
+  // downgrade pass unnoticed. An ABSENT `cryptosuite` is tolerated here and
+  // refused by the ES256 suite, because envelopes minted before the member
+  // was written are already deployed on this curve and on no other.
   if let std::option::Option::Some(suite) = proof.cryptosuite.as_deref() {
     if suite != crate::aph_config::APH_DI_CRYPTOSUITE {
       return std::result::Result::Err(crate::errors::AphError::unsupported_algorithm(suite));
@@ -179,19 +170,25 @@ pub fn verify_proof(
     std::result::Result::Ok(bytes) => bytes,
     // A proofValue that is not decodable is a failure of THIS proof, so it
     // must carry this role's code rather than the notary default.
-    std::result::Result::Err(_) => return std::result::Result::Err(failure_for(role)),
+    std::result::Result::Err(_) => {
+      return std::result::Result::Err(super::proof_base::signature_failure(role));
+    }
   };
   let bytes: [u8; 64] = match raw.as_slice().try_into() {
     std::result::Result::Ok(b) => b,
     // Ed25519 signatures are exactly 64 bytes; anything else is malformed.
-    std::result::Result::Err(_) => return std::result::Result::Err(failure_for(role)),
+    std::result::Result::Err(_) => {
+      return std::result::Result::Err(super::proof_base::signature_failure(role));
+    }
   };
   let signature = ed25519_dalek::Signature::from_bytes(&bytes);
   let canonical = super::proof_base::signing_base(envelope, role)?;
 
   match ed25519_dalek::Verifier::verify(key, canonical.as_bytes(), &signature) {
     std::result::Result::Ok(()) => std::result::Result::Ok(()),
-    std::result::Result::Err(_) => std::result::Result::Err(failure_for(role)),
+    std::result::Result::Err(_) => {
+      std::result::Result::Err(super::proof_base::signature_failure(role))
+    }
   }
 }
 
@@ -212,10 +209,14 @@ pub fn verify_envelope(
 }
 
 /// Verifies an envelope whose `issuer` is a `did:key` identifier, resolving
-/// the key from the DID itself.
+/// the key from the DID itself, on EITHER of §8.1's two curves.
 ///
 /// This is the whole offline path: no network, no prior trust relationship —
-/// the property that makes an APH credential checkable by a stranger.
+/// the property that makes an APH credential checkable by a stranger. It lives
+/// in this module rather than in a neutral one because `issuer`-based
+/// resolution is a §8.4.6 discovery concern, not a suite concern: the DID
+/// names the algorithm, and this function's only job is to route to the suite
+/// that algorithm belongs to.
 ///
 /// Only sound for a lone notary proof. In `PrincipalSigned` mode `issuer` is
 /// the PRINCIPAL (§7.1.7), and §7.1.11 forbids inferring a signer from that
@@ -231,23 +232,19 @@ pub fn verify_envelope_did_key(
   }
   match super::did_key::decode(&envelope.issuer)? {
     super::did_key::DecodedDidKey::Ed25519(key) => verify_envelope(envelope, &key),
-    super::did_key::DecodedDidKey::P256(_) => std::result::Result::Err(
-      crate::errors::AphError::unsupported_algorithm("ecdsa-jcs-2019 (P-256 issuer)"),
-    ),
-  }
-}
-
-/// The error a failed proof earns, by role.
-///
-/// `APH_E011` and `APH_E001` are different codes on purpose: only the first
-/// means the authorization itself is forged, and an operator reading
-/// `APH_E001` would go looking at notary configuration instead.
-fn failure_for(role: super::proof_base::ProofRole) -> crate::errors::AphError {
-  match role {
-    super::proof_base::ProofRole::Principal => {
-      crate::errors::AphError::PrincipalSignatureInvalid
+    // A compressed SEC1 point, parsed to a curve point here and checked by
+    // whichever ES256 carriage the proof declares. `did:key` has always
+    // decoded P-256; until `ecdsa_jcs` and `jws_envelope` existed there was
+    // simply nothing to hand the point to, and this arm refused outright.
+    super::did_key::DecodedDidKey::P256(point) => {
+      let key = super::ecdsa_jcs::verifying_key_from_sec1(&point)?;
+      let proof = super::proof_base::proof_of(envelope, super::proof_base::ProofRole::Notary)?;
+      if proof.r#type == super::jws_envelope::PROOF_TYPE {
+        super::jws_envelope::verify_envelope(envelope, &key)
+      } else {
+        super::ecdsa_jcs::verify_envelope(envelope, &key)
+      }
     }
-    super::proof_base::ProofRole::Notary => crate::errors::AphError::InvalidEnvelopeSignature,
   }
 }
 
@@ -431,6 +428,64 @@ mod tests {
     super::sign_envelope(&mut envelope, &sk).unwrap();
     envelope.issuer = crate::crypto::did_key::encode_ed25519(&impostor);
     std::assert!(super::verify_envelope_did_key(&envelope).is_err());
+  }
+
+  #[test]
+  fn a_p256_did_key_issuer_is_routed_to_the_es256_suite_it_names() {
+    // ⛔ REWRITTEN, not new. This slot used to pin the OPPOSITE behaviour: a
+    // P-256 `did:key` issuer was refused outright with APH_E010, because the
+    // crate could decode the point (`did:key` always could) and then had no
+    // ES256 envelope verifier to hand it to. `crypto::ecdsa_jcs` and
+    // `crypto::jws_envelope` discharge that refusal, so the arm now routes,
+    // and this test pins the routing. Both ES256 carriages are exercised
+    // because `verify_envelope_did_key` chooses between them on `proof.type`:
+    // a Data Integrity proof and a detached JWS reaching the wrong verifier
+    // would each fail as a bad signature rather than as a dispatch mistake.
+    let signing =
+      crate::crypto::proof_base::test_support::p256_key(
+        &crate::crypto::proof_base::test_support::NOTARY_P256_SCALAR,
+      );
+    let issuer = crate::crypto::did_key::encode_p256(signing.verifying_key());
+
+    let mut data_integrity = fixture();
+    data_integrity.issuer = issuer.clone();
+    crate::crypto::ecdsa_jcs::sign_envelope(&mut data_integrity, &signing)
+      .expect("the notary signs under ecdsa-jcs-2019");
+    super::verify_envelope_did_key(&data_integrity)
+      .expect("an ecdsa-jcs-2019 envelope from a P-256 did:key issuer verifies offline");
+
+    let mut detached_jws = fixture();
+    detached_jws.issuer = issuer;
+    crate::crypto::jws_envelope::sign_envelope(&mut detached_jws, &signing)
+      .expect("the notary signs under JsonWebSignature2020");
+    super::verify_envelope_did_key(&detached_jws)
+      .expect("a detached-JWS envelope from a P-256 did:key issuer verifies offline");
+  }
+
+  #[test]
+  fn a_p256_did_key_issuer_still_refuses_a_substituted_key() {
+    // The routing must not have widened into acceptance. Same envelope, same
+    // suite, an issuer DID naming the OTHER published P-256 key: the point
+    // decodes, the suite dispatches, and the signature check refuses.
+    let signing =
+      crate::crypto::proof_base::test_support::p256_key(
+        &crate::crypto::proof_base::test_support::NOTARY_P256_SCALAR,
+      );
+    let impostor =
+      crate::crypto::proof_base::test_support::p256_key(
+        &crate::crypto::proof_base::test_support::PRINCIPAL_P256_SCALAR,
+      );
+    let mut envelope = fixture();
+    envelope.issuer = crate::crypto::did_key::encode_p256(signing.verifying_key());
+    crate::crypto::ecdsa_jcs::sign_envelope(&mut envelope, &signing)
+      .expect("the notary signs under ecdsa-jcs-2019");
+    envelope.issuer = crate::crypto::did_key::encode_p256(impostor.verifying_key());
+    std::assert_eq!(
+      super::verify_envelope_did_key(&envelope)
+        .expect_err("a substituted P-256 issuer must not verify")
+        .code(),
+      "APH_E001"
+    );
   }
 
   // -------- proof chains (§7.1.11, §7.2.1) --------

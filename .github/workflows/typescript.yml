@@ -1,0 +1,71 @@
+name: TypeScript interpreter
+
+# The independent implementation runs BESIDE the Rust suite, never inside it.
+# Neither stack invokes the other: both read committed bytes, which is what
+# keeps the cross-verification a protocol result rather than a build-pipeline
+# result. `examples/**` is in the path filter because a new or regenerated
+# vector changes what this suite must admit — the corpus harness fails on any
+# example file it has no expectation for.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "interpreters/typescript/**"
+      - "examples/**"
+      - ".github/workflows/typescript.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "interpreters/typescript/**"
+      - "examples/**"
+      - ".github/workflows/typescript.yml"
+
+# Least privilege: this workflow only reads the tree.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tsc + node --test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor: it is the first release where SubtleCrypto exposes
+        # Ed25519, which every signature in this implementation goes through.
+        # 22 is the current LTS. Both are run because a platform crypto change
+        # is exactly the kind of thing one version would hide.
+        node: ["20", "22"]
+    defaults:
+      run:
+        working-directory: interpreters/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # `npm install` rather than `npm ci`: there is no lockfile to install
+      # from, and there is no lockfile because there is nothing to lock — the
+      # only dependency in the tree is the TypeScript compiler, and it is a
+      # dev-time one. The dependency claim is checked below rather than
+      # trusted.
+      - name: Install the compiler (the only dependency)
+        run: npm install --no-audit --no-fund
+      - name: Assert the dependency claim
+        # A runtime dependency appearing here would quietly break the
+        # implementation's central claim: spec in, verdict out, on the
+        # platform's own crypto and nothing else.
+        run: |
+          set -euo pipefail
+          if node -e 'const p=require("./package.json");process.exit(p.dependencies&&Object.keys(p.dependencies).length?1:0)'; then
+            echo "runtime dependencies: none"
+          else
+            echo "::error::package.json declares runtime dependencies; this package must have none"
+            exit 1
+          fi
+      - name: Type-check and build
+        run: npm run build
+      - name: Run the suite
+        run: npm test

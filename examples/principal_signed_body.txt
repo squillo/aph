@@ -1,0 +1,5 @@
+prod rollout finished at 14:02 UTC
+
+All six regions completed the rolling restart and the error budget is untouched: no elevated 5xx rate in the first hour, p99 latency flat against last week, and the two canary tenants report normal webhook delivery.
+
+Dashboards stay in the usual place. The rollback window closes at 18:00 UTC; after that the migration is one-way. Ping the on-call channel if anything looks off before then.

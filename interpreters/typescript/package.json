@@ -1,0 +1,19 @@
+{
+  "name": "aph-typescript",
+  "version": "0.1.0-draft",
+  "private": true,
+  "description": "An independent TypeScript implementation of the APH v0.1 notarization protocol: strict parse, RFC 8785 canonicalization, mint and verify. Runtime dependencies: none.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test dist/test/",
+    "mint": "node dist/scripts/mint_ts_envelope.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

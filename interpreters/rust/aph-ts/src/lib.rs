@@ -19,6 +19,19 @@
 //! const mode     = verifyProofStructure(text);          // §7.1.11 gate
 //! requireAttestationMode(text, "PrincipalSigned");      // §8.3.1 step 1a
 //! ```
+//!
+//! # Export parity with `aph-py`
+//!
+//! This crate and the sibling Python binding expose the SAME four
+//! envelope-facing operations — parse, serialize, verify-structure,
+//! require-mode — with the same semantics and the same error identity (an
+//! APH code a caller can match exactly). That parity is a CONTRACT, stated
+//! in both crates so it cannot drift silently: a function added to one
+//! binding is owed to the other in the same change, or the divergence is
+//! justified where it happens. Both bindings cross envelopes as JSON TEXT
+//! in both directions for the reason the boundary note above states; the
+//! parity contract exists so the two bindings also cannot drift in WHAT
+//! they teach.
 
 /// Strict-parses `json` into the canonical envelope type, stringifying the
 /// parse error. Shared by every export so the boundary has ONE parse path.
@@ -162,8 +175,13 @@ mod tests {
       second.proof.is_chain(),
       "the golden's two-element chain must survive as the chain arm"
     );
+    // The literal is the point: comparing against a constant the test knows
+    // INDEPENDENTLY of the parse is what detects a widened integer, so it is
+    // pinned by hand and MOVES WITH THE GOLDEN — 427 is the byte length of
+    // `examples/principal_signed_body.txt`, the published body this golden
+    // attests since the body-hash vector landed.
     std::assert_eq!(
-      second.credential_subject.communication.body_size, 1842,
+      second.credential_subject.communication.body_size, 427,
       "an integer field must cross the boundary without widening"
     );
   }

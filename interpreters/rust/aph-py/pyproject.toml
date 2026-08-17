@@ -1,0 +1,31 @@
+# Wheel-build metadata for maturin. This file exists so the README's build
+# command is a real instruction rather than an aspiration; NOTHING in CI reads
+# it. The gate for this crate is `cargo test -p aph-py`, which needs no wheel.
+#
+# The distribution name below is the import name (`import aph`). It has NOT
+# been claimed on PyPI and nothing here publishes to it — this repository has
+# no Python release channel, and the sibling `aph-cli` crate name being
+# somebody else's on crates.io is the standing reminder that an unclaimed name
+# is not a reserved one.
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "aph"
+description = "Python bindings for the APH (Agent per Human) v0.1 protocol envelope types"
+# abi3-py39 in Cargo.toml is what makes one wheel serve every version from
+# here up; keep the two floors equal or the wheel claims a range it cannot
+# actually load on.
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+dynamic = ["version"]
+
+[tool.maturin]
+# The import name, which must equal the `[lib] name` in Cargo.toml so the
+# `PyInit_aph` symbol maturin packages is the one CPython looks for.
+module-name = "aph"
+# The crate's own feature, which forwards to `pyo3/extension-module`: a wheel
+# must NOT link libpython (the host interpreter supplies it). See the Cargo
+# manifest for why this must never be on during `cargo test`.
+features = ["extension-module"]

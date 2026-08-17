@@ -40,6 +40,24 @@ pub fn encode_ed25519(key: &ed25519_dalek::VerifyingKey) -> String {
   std::format!("{}{}", DID_KEY_PREFIX, super::multibase::base58btc_encode(&payload))
 }
 
+/// Builds the `did:key` identifier for a P-256 public key.
+///
+/// The point is COMPRESSED (33 bytes, `0x02`/`0x03` parity prefix), which is
+/// what [`decode`] expects and what the `0x1200` multicodec names. The
+/// uncompressed form would decode to a different identifier for the same key,
+/// so an issuer and a verifier that disagreed here would never resolve each
+/// other's DIDs.
+///
+/// The Ed25519 sibling is [`encode_ed25519`]; both exist so a notary derives
+/// the DID it publishes rather than transcribing one.
+pub fn encode_p256(key: &p256::ecdsa::VerifyingKey) -> String {
+  let point = key.to_encoded_point(true);
+  let mut payload = std::vec::Vec::with_capacity(2 + 33);
+  payload.extend_from_slice(&P256_MULTICODEC);
+  payload.extend_from_slice(point.as_bytes());
+  std::format!("{}{}", DID_KEY_PREFIX, super::multibase::base58btc_encode(&payload))
+}
+
 /// Decodes a `did:key` identifier into the public key it names.
 ///
 /// Every failure path returns `APH_E001`: a verifier that cannot decode the
@@ -141,6 +159,33 @@ mod tests {
       super::decode(did).unwrap(),
       super::DecodedDidKey::Ed25519(_)
     ));
+  }
+
+  #[test]
+  fn p256_encode_decode_round_trip() {
+    // The ES256 half of the same weld: a notary on a P-256 device key derives
+    // its issuer DID here, and a verifier reverses that derivation. The
+    // COMPRESSED point is the load-bearing detail — the uncompressed form is
+    // 65 bytes and would produce a different identifier for the same key,
+    // which no other implementation would resolve.
+    let signing = p256::ecdsa::SigningKey::from_slice(&[
+      0xc9, 0xaf, 0xa9, 0xd8, 0x45, 0xba, 0x75, 0x16, 0x6b, 0x5c, 0x21, 0x57, 0x67, 0xb1, 0xd6,
+      0x93, 0x4e, 0x50, 0xc3, 0xdb, 0x36, 0xe8, 0x9b, 0x12, 0x7b, 0x8a, 0x62, 0x2b, 0x12, 0x0f,
+      0x67, 0x21,
+    ])
+    .expect("the RFC 6979 A.2.5 sample key is a valid P-256 scalar");
+    let key = *signing.verifying_key();
+    let did = super::encode_p256(&key);
+    // The 0x1200 multicodec plus base58btc always yields "zDn..." for a
+    // compressed P-256 point; pinning it catches a wrong prefix, which would
+    // otherwise produce identifiers no other implementation can resolve.
+    std::assert!(did.starts_with("did:key:zDn"), "got {}", did);
+    match super::decode(&did).unwrap() {
+      super::DecodedDidKey::P256(bytes) => {
+        std::assert_eq!(bytes, key.to_encoded_point(true).as_bytes().to_vec());
+      }
+      other => std::panic!("expected P256, got {:?}", other),
+    }
   }
 
   #[test]

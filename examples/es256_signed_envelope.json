@@ -1,0 +1,80 @@
+{
+  "aphVersion": "0.1",
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/aph/v1"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "AgentSendAuthorizationCredential"
+  ],
+  "id": "urn:uuid:00000000-0000-4000-8000-0000000000e3",
+  "issuer": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+  "validFrom": "2026-05-21T00:00:00Z",
+  "validUntil": "2026-05-22T00:00:00Z",
+  "credentialSubject": {
+    "humanPrincipal": {
+      "id": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+      "displayName": "Scott Wyatt"
+    },
+    "agent": {
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
+      "displayName": "Squillo Concierge",
+      "version": "1.0"
+    },
+    "channel": {
+      "kind": "slack",
+      "recipientAddressing": {
+        "channelId": "C01234567",
+        "parentTs": "1716249600.000100",
+        "teamId": "T01234567"
+      }
+    },
+    "communication": {
+      "contentClass": "Reply",
+      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bodySize": 1842,
+      "previewLines": 1,
+      "preview": "prod rollout finished at 14:02 UTC"
+    },
+    "policy": {
+      "decision": "AlwaysAllow",
+      "matchedScope": "per-channel",
+      "delegationMandateId": null,
+      "actChain": [],
+      "attestationMode": "PrincipalSigned"
+    },
+    "notarization": {
+      "notaryService": {
+        "id": "did:web:notary.squillo.com",
+        "name": "Squillo Notary Service",
+        "version": "0.1.0"
+      },
+      "decisionTimestamp": "2026-05-21T00:00:00Z",
+      "decisionLatencyMs": 12
+    }
+  },
+  "linkedMandate": null,
+  "proof": [
+    {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "ecdsa-jcs-2019",
+      "verificationMethod": "did:key:zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP",
+      "created": "2026-05-21T00:00:01Z",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z5v8NFX9SMoF52s9rMDayN9oTq9RCjSq17cC7bGW2Z4KzzApxFotwS6Mti2XZTa7rbNc3tvns5sLubDHm1jruvc6N",
+      "id": "urn:uuid:00000000-0000-4000-8000-0000000000e1"
+    },
+    {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "ecdsa-jcs-2019",
+      "verificationMethod": "did:web:notary.squillo.com#key-1",
+      "created": "2026-05-21T00:00:02Z",
+      "proofPurpose": "authentication",
+      "proofValue": "z2dvCyC797iTHkGQuYb4SKePWGntqzPR3UimywoynoBdgTVQJb2baDpatYbWHNZgCXN6WmQyHepQYSi4v57ZMFXCc",
+      "id": "urn:uuid:00000000-0000-4000-8000-0000000000e2",
+      "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000e1"
+    }
+  ]
+}

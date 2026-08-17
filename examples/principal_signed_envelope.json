@@ -33,8 +33,8 @@
     },
     "communication": {
       "contentClass": "Reply",
-      "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bodySize": 1842,
+      "bodySha256": "dae0b23f649c05222b955ff4752507c6d85a51e00566da4fea1867e50b3b60cb",
+      "bodySize": 427,
       "previewLines": 1,
       "preview": "prod rollout finished at 14:02 UTC"
     },
@@ -76,7 +76,7 @@
       "verificationMethod": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT#z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
       "created": "2026-05-21T00:00:01Z",
       "proofPurpose": "assertionMethod",
-      "proofValue": "z5St5vZMXAxoAC8vX48N3qae1a8rFtwZbS5BsFMiiy8S4PwSqTjZtPd62oyKp96gNhX4NyUz5nYpbdDS585yZwKxY",
+      "proofValue": "zmTawgu3JsywRoYEDuKTtWfYakg6KEymF4MNeFikZpWnvoc8Qpc5dTKNB8gTe7PXwqp2b1yHrGyagAKiCC8HQHxN",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f1"
     },
     {
@@ -85,7 +85,7 @@
       "verificationMethod": "did:web:notary.squillo.com#key-1",
       "created": "2026-05-21T00:00:02Z",
       "proofPurpose": "authentication",
-      "proofValue": "z5SZPcWUMxXpaYMX7hGvui4WyNfjbyEFQSJqcTQVYjB7Km46FmVfKkzP9o1yHwQLY3tDacM6tMFwmAdYi76N4xqU8",
+      "proofValue": "z4TvqsaiwuoeX6c4qKxhioofJgSXvKy73Q48hr2hgAvUFdpjgQbvugy7gvPdtk5iFDzdG7hFNUchoVjYiYmT8dtY3",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f2",
       "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000f1"
     }

@@ -13,14 +13,39 @@
 //! than the raw 64-byte R||S concatenation RFC 7518 specifies. This is
 //! the deployed wire behavior and must not be changed.
 
+/// The protected header of a Delegation Mandate JWS — the DEPLOYED header,
+/// byte for byte.
+///
+/// Three members and no more. Spec §8.2's six-member ENVELOPE header is a
+/// different construction with a different history (see
+/// [`crate::crypto::jws_envelope`]); widening this one would change the
+/// signing input of every mandate token already in the wild.
+const MANDATE_PROTECTED_HEADER: &str = r#"{"alg":"ES256","b64":false,"crit":["b64"]}"#;
+
 /// Creates a JWS detached signature (header..signature, payload omitted).
 ///
-/// Returns the compact serialization with an empty payload section.
+/// Returns the compact serialization with an empty payload section, under the
+/// deployed mandate header.
 pub fn create_detached_jws(payload: &[u8], signing_key: &p256::ecdsa::SigningKey) -> String {
+  create_detached_jws_with_protected_header(MANDATE_PROTECTED_HEADER, payload, signing_key)
+}
+
+/// Creates a JWS detached signature under a caller-supplied protected header.
+///
+/// The header text participates VERBATIM in the signing input — it is never
+/// re-serialized — so the exact bytes a caller passes are the bytes covered,
+/// and [`verify_detached_jws`] can check a token without knowing which header
+/// dialect produced it. That is what lets §8.2's envelope header share this
+/// construction with the mandate header above instead of copying it: one
+/// signing input, two vocabularies.
+pub fn create_detached_jws_with_protected_header(
+  protected_header_json: &str,
+  payload: &[u8],
+  signing_key: &p256::ecdsa::SigningKey,
+) -> String {
   use p256::ecdsa::signature::Signer;
 
-  let header = r#"{"alg":"ES256","b64":false,"crit":["b64"]}"#;
-  let header_b64 = crate::crypto::base64url::encode(header.as_bytes());
+  let header_b64 = crate::crypto::base64url::encode(protected_header_json.as_bytes());
   let payload_b64 = crate::crypto::base64url::encode(payload);
 
   let signing_input = format!("{header_b64}.{payload_b64}");
@@ -201,6 +226,40 @@ mod tests {
       p256::ecdsa::signature::Signer::sign(&sk, signing_input.as_bytes());
     let raw = crate::crypto::base64url::encode(&sig.to_bytes());
     assert!(!verify_detached_jws(&format!("{}..{}", h, raw), b"data", &vk));
+  }
+
+  #[test]
+  fn test_the_deployed_mandate_header_is_unchanged_by_the_header_parameter() {
+    // The extraction that let §8.2's envelope header reuse this construction
+    // must leave the DEPLOYED mandate token byte-identical: every mandate JWS
+    // already signed covers this exact three-member header, and a widened one
+    // would be a different signing input under the same function name.
+    let (sk, _) = test_keypair();
+    assert_eq!(
+      create_detached_jws(b"mandate payload bytes", &sk),
+      create_detached_jws_with_protected_header(
+        r#"{"alg":"ES256","b64":false,"crit":["b64"]}"#,
+        b"mandate payload bytes",
+        &sk
+      )
+    );
+  }
+
+  #[test]
+  fn test_a_custom_header_is_covered_verbatim() {
+    // The property the parameter rests on: the header text is signed as
+    // given, not re-serialized. If this function ever normalized the header,
+    // a caller that built §8.2's six-member header would sign one byte string
+    // and a verifier reading the token would reconstruct another.
+    let (sk, vk) = test_keypair();
+    let header = r#"{"alg":"ES256","b64":false,"crit":["b64"],"typ":"aph+jws"}"#;
+    let jws = create_detached_jws_with_protected_header(header, b"data", &sk);
+    assert!(verify_detached_jws(&jws, b"data", &vk));
+    let encoded = jws.split('.').next().expect("header section");
+    assert_eq!(
+      crate::crypto::base64url::decode(encoded).expect("header is base64url"),
+      header.as_bytes()
+    );
   }
 
   #[test]

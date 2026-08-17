@@ -30,8 +30,9 @@ organizations via public key discovery.
 - `spec/a2a-extension.md` — how agents advertise APH on an A2A AgentCard. Pins `APH_EXTENSION_URI = aph://extensions/notarization/v1` (exact byte equality, opaque, never dereferenced).
 - `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade, attestation-mode downgrade), out-of-scope (compromised notary key/device, key LOSS, publication-surface DoS, phishing, transport security).
 - `spec/operations.md` — the operator runbook, and **non-normative**: what a Notary Service operator holds, what losing each piece costs, pre-authorized rotation, the publication-cadence deadlines, and the unregistered identifiers an adopter inherits. Where it and the spec disagree, the spec wins and the runbook is the defect.
-- `examples/` — 9 golden envelope JSON files (enumerated on disk): one per channel kind (7), one exercising the §7.5 registered extensions, and `principal_signed_envelope.json`. With `examples/README.md`. The first 8 are `NotaryAttested` (they carry no `attestationMode`, and absent means `NotaryAttested`) and their `proof.proofValue` strings are illustrative placeholders, NOT real signatures, with `bodySha256` the SHA-256 of the empty string — they exist for shape/round-trip validation only. `principal_signed_envelope.json` is the exception and the only one that verifies: it is `PrincipalSigned` and carries four real Ed25519 signatures made from RFC 8032 §7.1 public test seeds.
-- `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), and `aph-ts` (wasm binding).
+- `examples/` — 12 golden envelope JSON files (enumerated on disk): one per channel kind (7), one exercising the §7.5 registered extensions, THREE signed vectors — one per signing path §8.1/§8.2 make MUST-support — and `ts_minted_envelope.json`, minted by the second implementation. With `examples/README.md`. Eight carry illustrative placeholder `proof.proofValue` strings, NOT real signatures, with `bodySha256` the SHA-256 of the empty string — they exist for shape/round-trip validation only, and they are `NotaryAttested` because they carry no `attestationMode` and absent means `NotaryAttested`. ⛔ Do NOT read "NotaryAttested" as "unsigned": NINE files are `NotaryAttested` and one of those nine, `detached_jws_envelope.json`, verifies. The four that verify: `principal_signed_envelope.json` (`PrincipalSigned`, four real Ed25519 `eddsa-jcs-2022` signatures from RFC 8032 §7.1 public test seeds, plus the embedded mandate), `es256_signed_envelope.json` (the same `PrincipalSigned` chain under `ecdsa-jcs-2019`, from the published RFC 6979 A.2.5 and RFC 7515 A.3.1 P-256 scalars), `detached_jws_envelope.json` (`NotaryAttested`, a `JsonWebSignature2020` compact detached JWS, verifiable offline from its own P-256 `did:key` issuer), and `ts_minted_envelope.json` (`PrincipalSigned`, four real Ed25519 signatures minted by `interpreters/typescript/` and verified by the Rust conformance suite; BOTH parties are `did:key` so it needs no supplied key, and it is the ONE example whose body binding is real — the complete body travels in `preview`).
+- `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), `aph-resolver` (the optional DNS TXT + `did:web` adapters, the only crate carrying HTTP/DNS deps), `aph-ts` (wasm binding) and `aph-py` (pyo3 binding; Python module `aph`). The two bindings sit outside `default-members` — each needs a toolchain the protocol crates do not — and are held at export parity with each other.
+- `interpreters/typescript/` — the SECOND implementation: full mint + verify, sharing no code with the Rust. Its own RFC 8785 canonicalizer, strict parser, §7.2.1 bases, base58btc and `did:key` codecs; every signature through WebCrypto. Node ≥ 20, zero runtime dependencies, `typescript` the only dev-time one. ⛔ It is NOT a binding and NOT wasm — do not confuse it with `aph-ts`. Independence of CODE, not of TEAM: same authors, so it proves the spec is implementable twice and not that it survives a stranger.
 
 ## Envelope wire shape (spec §7.1)
 
@@ -373,12 +374,18 @@ the publisher: a locked key store presents identically to a broken upload.
 APH v0.1 uses several identifiers that are conventions rather than
 registrations. **Four of them can change what an adopter's software does**, and
 those four do NOT share one status — §13 says something different about each, so
-do not collapse them into a single "deferred to v0.2" claim when advising an
-adopter. Three bullets, four identifiers: the first bullet holds two, because
-the underscored labels and the scheme share a status exactly:
+do not collapse them into a single "unregistered, coming in v0.2" claim when
+advising an adopter. Three bullets, four identifiers: the first bullet holds
+two, because the underscored labels and the scheme share a status exactly:
 
 - `aph://` URI scheme and the `_aph` / `_aph._notary` underscored DNS labels —
-  **the two §13 actually defers to v0.2.** Used by convention in v0.1.
+  **the two §13 has written requests for**, drafted in `spec/registrations/`
+  with submission pending. Used by convention in v0.1. Do not round this up to
+  "registered" when advising: a draft is not a registration, neither name is
+  APH's until IANA acts, and the name-ownership exposure is exactly what it was
+  before the drafts existed. The DNS draft additionally leaves a wire-shape
+  question open for the specification owner, so even its final label is not
+  settled.
 - `application/aph+ld+json` media type — **declined, not deferred.** §13 says
   v0.1 does NOT register a new media type and names the already-registered
   `application/vc+ld+json` as the conformant choice; the APH-specific type is
@@ -427,7 +434,7 @@ cargo test
 ```
 
 This exercises the workspace default members (`aph-core`, `aph-conformance`,
-`aph-cli`): golden envelope fixtures, contract tests, channel-binding specs,
+`aph-cli`, `aph-resolver`): golden envelope fixtures, contract tests, channel-binding specs,
 round-trips of the repo `examples/*.json`, and the multi-party exchange e2e
 below.
 
@@ -485,31 +492,129 @@ is exactly where a widened integer could flip which arm deserializes. Exports:
 mode the STRUCTURE proves; forged `PrincipalSigned` label throws `APH_E013`),
 `requireAttestationMode` (no-downgrade gate; throws `APH_E012`).
 
-**Signed fixtures are never text-edited.** `examples/principal_signed_envelope.json`
-carries four REAL Ed25519 signatures (RFC 8032 test seeds). To change it,
-update the generator at
-`interpreters/rust/aph-conformance/tests/principal_signed_example_test.rs`,
-run its byte-identity test, and materialize the bytes it prints between the
-`----8<----` cut lines — then re-run the suite green.
+**Test the Python binding** (`aph-py` sits OUTSIDE default-members for the
+same reason — name it, and note it needs a Python distribution shipping a
+shared libpython):
+
+```
+cargo test -p aph-py          # native tests of the JSON-text boundary, run under a live interpreter
+```
+
+Same boundary, same reason: envelopes cross as `str`, never as `dict`, because
+a Python `float` is an IEEE-754 double exactly like a JS `number` and an
+object route hands arm selection to a second deserializer. The exports are the
+`aph-ts` four in snake_case — `parse_envelope_json`, `serialize_envelope`,
+`verify_proof_structure`, `require_attestation_mode` — raising one exception,
+`aph.AphError`, whose message leads with the `APH_E*` code so a Python caller
+matches `APH_E013` exactly as a TS caller matches it. That parity is a
+contract, not a coincidence: an addition to either binding is unfinished until
+it lands in the other, because two bindings teaching different things is how
+one protocol acquires two meanings. Neither is a second implementation — that
+question is answered by `interpreters/typescript/`, which shares no code with
+this workspace.
+
+**The second implementation, and its honest scope.**
+`interpreters/typescript/` is a full mint + verify implementation written from
+`spec/aph-0.1.md` and the published examples: its own RFC 8785 canonicalizer,
+strict parser, §7.2.1 bases, base58btc and `did:key` codecs, with every
+signature through the runtime's WebCrypto. Run it with `cd
+interpreters/typescript && npm install && npm run build && npm test`. It
+cross-verifies with the Rust in BOTH directions as committed bytes — it admits
+`examples/principal_signed_envelope.json`, and
+`interpreters/rust/aph-conformance/tests/ts_minted_cross_verify.rs` fully
+verifies `examples/ts_minted_envelope.json`, which it minted. Neither stack
+invokes the other. ⛔ Two limits to state whenever it is cited: it is
+independence of CODE and not of TEAM (same authors, so it does not prove the
+document survives a stranger), and the committed cross-artifact is Ed25519
+ONLY, because WebCrypto's ECDSA is randomized and exposes no RFC 6979 mode —
+a TypeScript-minted ES256 envelope cannot be byte-pinned, so that path is
+covered by verifying the Rust vector plus a mint-then-verify self-test.
+
+**A specification contradiction the second implementation surfaced.** §6.1's
+field table says a Delegation Mandate signature covers the canonical form
+"MINUS" the signature members; §7.2.1 closes with "In every case the signer
+sets the field to the empty string rather than removing the member". Those are
+different JCS bytes and cannot both be right. The published bytes select
+REMOVAL, pinned by
+`interpreters/typescript/test/mandate_base_ambiguity.test.ts`, which also shows
+the emptying reading does not verify. §7.2.1's closing sentence is correct for
+`proofValue` and overreaches into the mandate bullet above it. Filed, not
+fixed: the artifacts are what anyone has actually signed.
+
+**Signed fixtures are never text-edited.** Three published examples carry REAL
+signatures, each with its own generator under
+`interpreters/rust/aph-conformance/tests/`:
+`principal_signed_envelope.json` ← `principal_signed_example_test.rs`,
+`es256_signed_envelope.json` ← `es256_signed_example_test.rs`,
+`detached_jws_envelope.json` ← `detached_jws_example_test.rs` (the last two
+share `tests/generator_support/mod.rs`). To change any of them, edit its
+generator, run its byte-identity test, and materialize the bytes it prints
+between the `----8<----` cut lines — then re-run the suite green.
+
+`examples/ts_minted_envelope.json` is the fourth signed file and the one
+exception to that recipe, because its generator is not Rust: it is minted by
+`interpreters/typescript/scripts/mint_ts_envelope.ts`, so changing it means
+editing `interpreters/typescript/testkit/ts_minted.ts` and running `npm run
+build && npm run mint`, which rewrites the file in place. Its byte-identity
+tripwire is `test/ts_minted_artifact.test.ts` on the TypeScript side, and
+`ts_minted_cross_verify.rs` on the Rust side must stay green afterwards — that
+is the whole point of the artifact.
 
 **Golden fixtures:** the repo-level `examples/*.json` files are the canonical
-wire-shape fixtures (one per channel kind); the conformance crate under
-`interpreters/rust` carries additional golden fixtures for its own suites.
-Remember: example `proofValue`s are placeholders, so signature verification on
-them is EXPECTED to fail — only shape validation is meaningful there.
+wire-shape fixtures; the conformance crate under `interpreters/rust` carries
+additional golden fixtures for its own suites. Remember which is which: the
+EIGHT shape-only examples (seven channel kinds plus the §7.5 extensions file)
+carry placeholder `proofValue`s, so signature verification on them is EXPECTED
+to fail and only shape validation is meaningful there. The FOUR signed vectors
+are the opposite — verification on them is expected to SUCCEED, and a failure
+there is a real defect.
 
 **Implement APH in another language.** README's *"Implementing APH in another
 language"* section is the entry point and states the targets in order:
 
-1. Point your PARSER at `examples/*.json` — 9 files, no toolchain. Unknown
+1. Point your PARSER at `examples/*.json` — 12 files, no toolchain. Unknown
    top-level or `credentialSubject`-level fields must be hard errors;
    `channel.recipientAddressing` is the one opaque exception.
-2. Point your VERIFIER at `examples/principal_signed_envelope.json` — no
-   toolchain. Four real Ed25519 signatures over RFC 8032 §7.1 TEST 2 (principal)
-   and TEST 3 (notary) PUBLIC test seeds, which authorize nothing and which
-   anyone can re-derive. Reproducing all four means you have independently
-   implemented RFC 8785, the §7.2.1 per-proof bases, §7.1.11 chain linkage, and
-   the §7.1.7.1 embedded-mandate check.
+2. Point your VERIFIER at the FOUR signed examples — no toolchain, three of
+   them one per signing path §8.1/§8.2 make MUST-support and the fourth minted
+   by a different implementation, every key a PUBLISHED test vector that
+   authorizes nothing and that anyone can re-derive:
+   - `principal_signed_envelope.json` — four real Ed25519 `eddsa-jcs-2022`
+     signatures over RFC 8032 §7.1 TEST 2 (principal) and TEST 3 (notary)
+     seeds. Reproducing all four means you have independently implemented
+     RFC 8785, the §7.2.1 per-proof bases, §7.1.11 chain linkage, and the
+     §7.1.7.1 embedded-mandate check.
+   - `es256_signed_envelope.json` — the same `PrincipalSigned` chain under
+     `ecdsa-jcs-2019`, from the RFC 6979 A.2.5 (principal) and RFC 7515 A.3.1
+     (notary) P-256 scalars. `proofValue` is P1363 `r‖s`, multibase — never
+     DER. Diff it against the Ed25519 file to see exactly what the second
+     algorithm changes.
+   - `detached_jws_envelope.json` — `JsonWebSignature2020`, a compact detached
+     JWS over the SAME §7.2.1 base, `NotaryAttested`, verifiable offline from
+     its own P-256 `did:key` issuer. Its protected header carries the six
+     members §8.2 requires and a verifier MUST check them (§8.3 step 7) — that
+     is what rejects `alg: none`. ⛔ Two deployed quirks are preserved
+     deliberately: `"b64":false` + `"crit":["b64"]` while the payload IS
+     base64url-encoded into the signing input, and a **DER** ES256 signature
+     inside the token rather than RFC 7518's raw `r‖s`. Encoding follows the
+     carriage, not the algorithm — the same crate emits `r‖s` for
+     `ecdsa-jcs-2019`.
+   - `ts_minted_envelope.json` — the same `PrincipalSigned` Ed25519 shape as
+     the first file, but minted by `interpreters/typescript/` rather than by
+     the Rust, so a third implementer checking against it is checking a
+     document two independent codebases already agree on. Two properties make
+     it the easiest first target: BOTH parties are `did:key`, so it verifies
+     with no supplied key and no network, and its body binding is REAL — the
+     complete body travels in `preview`, with `bodySize` its UTF-8 length and
+     `bodySha256` its digest, so §8.3 step 8 is checkable from this one file.
+     Same principal as the Ed25519 golden (RFC 8032 §7.1 TEST 2).
+
+   ⛔ **Say why byte comparison is legitimate on the ES256 vectors**, because
+   it looks wrong: most ECDSA is randomized, so a reader assumes two runs
+   cannot match. The reference uses RFC 6979 DETERMINISTIC ECDSA — the nonce
+   comes from the key and the message — which is the only reason those files
+   can be byte-reproducible goldens. An implementer whose ES256 signer is
+   randomized should compare by VERIFYING, not by diffing.
 3. Point your PRODUCER at this repo's parser — the only target needing a Rust
    toolchain, and it does not make your emitter Rust:
    `your-impl emit-envelope | cargo run -q -p aph-cli -- validate -` (exit 0 =
@@ -526,14 +631,22 @@ language"* section is the entry point and states the targets in order:
    `spec/schemas/README.md` names the three rules no JSON Schema can express.
 
 ⛔ **Quote the coverage GAPS too — overclaiming coverage is worse than admitting
-one.** Only the Ed25519 path has a signed vector: `ES256`/`ecdsa-jcs-2019` and
-the `JsonWebSignature2020` detached-JWS profile are both MUST-support with no
-published byte string anywhere in this repo. The eight `NotaryAttested` examples
-exercise SHAPE only. §8.3's BODY-HASH binding is exercised by nothing, and that
-gap does not stop at the eight — all NINE examples carry `bodySha256` = the
-SHA-256 of the empty string beside a non-zero `bodySize`, so even
-`principal_signed_envelope.json`, the one that reproduces four real signatures,
-cannot check a body hash. The §6.3.3 vectors are Rust constants in
+one.** Every algorithm §8.1 requires now has a signed vector EXCEPT `alg: EdDSA`
+carried inside a detached JWS — the fourth algorithm/carriage combination, which
+the reference does not implement and refuses by name (`APH_E010`) rather than
+mis-reporting as a bad signature, so there is nothing to publish for it. Eight
+of the twelve examples exercise SHAPE only (the seven channel files plus the
+§7.5 extensions file); the other four are the signed vectors above. §8.3's
+BODY-HASH binding is exercised by TWO files, one end to end: the signed golden
+attests the SHA-256 and exact byte length of the committed
+`examples/principal_signed_body.txt` (the suite re-hashes it recipient-style,
+and a one-byte-different body refuses with `APH_E009` — the refusal is the
+test), and `ts_minted_envelope.json` binds the body it carries in `preview`.
+TEN of the twelve still pair the empty-string digest with a fictional
+`bodySize` and are shape-only on this axis — including the ES256 and
+detached-JWS vectors, which prove signatures, not bodies. The second implementation is also not an independent TEAM — same authors
+as the Rust — so it closes "implementable twice" and not "survives a
+stranger". The §6.3.3 vectors are Rust constants in
 `aph-conformance/src/lib.rs` rather than loadable files. The status-list vectors
 stop before the proof, so an implementation can pass every one of them while
 having no proof check at all — the single failure that makes the mechanism
@@ -554,6 +667,8 @@ touch, because that boundary is deliberate:
 | `aph-resolver` | ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` adapters over `aph-core`'s ports | yes — the ONLY crate that may carry them |
 | `aph-cli` | the `aph` binary: `validate | inspect | golden` | no |
 | `aph-ts` | the wasm/TS binding (JSON text in both directions) | no |
+| `aph-py` | the pyo3/Python binding, module `aph` (same surface, same JSON-text boundary) | no |
+| `interpreters/typescript` | not a crate: the SECOND implementation, mint + verify on WebCrypto | **never** — parses bytes handed to it |
 
 Most integrations want `aph-core` alone and supply their own transport by
 implementing its two fetch ports; take `aph-resolver` only if you want the
@@ -612,5 +727,7 @@ errors §11), `spec/a2a-extension.md` (extension URI + AgentCard discovery flow)
 `spec/operations.md` (running one: key loss §2, pre-authorized rotation §3,
 threshold split §4, publication cadence §5, unregistered identifiers §6,
 pre-flight checklist §7 — non-normative, the spec wins on conflict),
-`examples/README.md` (what is fixed vs. varying across the 9 fixtures — eight
-`NotaryAttested` plus the one signed `PrincipalSigned` golden).
+`examples/README.md` (what is fixed vs. varying across the 12 fixtures — eight
+shape-only `NotaryAttested` files plus four signed ones: three vectors, one per
+MUST-support signing path, and `ts_minted_envelope.json` from the second
+implementation).
