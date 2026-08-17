@@ -296,6 +296,21 @@ your-implementation emit-envelope | cargo run -q -p aph-cli -- validate -
 
 Exit `0` means your bytes strict-parse; `1` means they do not, with the serde error naming the field. Conversely, `cargo run -q -p aph-cli -- golden <n>` prints fixture *n* raw on stdout for piping into your own verifier. These two are the only targets that need a Rust toolchain.
 
+**A worked recipient, when the vectors are not enough.** The four targets above
+hand you artifacts; the multi-party exchange tests hand you the ALGORITHM.
+`interpreters/rust/aph-conformance/tests/multi_party/mod.rs` assembles the §8.3
+recipient procedure end to end in `verify_inbound` — mode gate, proof
+structure, principal key and proof, notary key through the §8.4.6 chain at the
+envelope's own `decisionTimestamp`, notary proof, issuance order,
+embedded-mandate binding, both mandate signatures, validity window, and the
+step-8a revocation check — driven by three suites in which two parties with
+fully separate keys, notary origins, and stores exchange envelopes as JSON
+text over a wire that carries nothing else. The refusal tests each assert a
+specific error code, so they double as a map from "what an attacker changed"
+to "which check refuses it". If you are implementing a verifier in another
+language, read that harness the way you would read pseudocode in the spec —
+except this copy compiles, and `cargo test -p aph-conformance` proves it.
+
 **4. Point your revocation code at `spec/schemas/` and the spec's own printed records.** The two schemas constrain the §6.3.3 status entry and status list credential; `spec/schemas/README.md` states the three rules no JSON Schema can express (same-origin binding, issuer binding, proof and freshness). For key discovery, both the §8.4.4 DID Document and the two §8.4.5 DNS TXT records are usable directly as parse vectors, but they are reproduced to two different standards and the difference is worth stating: the reference tests reassemble the two TXT tag-lists **byte-for-byte** — a byte comparison would pass — while the DID Document is reproduced **verbatim in content but re-indented** (2 spaces in the spec, 4 in the Rust literal that holds it). JSON whitespace is not semantic, so nothing about the vector is weaker; only the claim is.
 
 ### What the vectors do NOT cover
@@ -306,7 +321,7 @@ Stated in full, because overclaiming coverage is worse than admitting a gap:
 - **The eight `NotaryAttested` example files exercise shape only.** Their `proofValue`s are illustrative, so §8.3's signature step cannot be exercised against them. Signature verification on those files is *expected* to fail.
 - **§8.3's body-hash binding is exercised by nothing at all — including target 2.** All *nine* examples carry `bodySha256` = the SHA-256 of the empty string next to a non-zero `bodySize`, and none publishes a message body, so there is nothing for a verifier to hash. This one is called out separately because the gap does not stop at the eight: `principal_signed_envelope.json` reproduces four real signatures and still cannot check a body hash. Target 2's four claimed properties are accurate and do not include it — but an implementer who passes target 2 has not tested §8.3's binding of an envelope to the bytes it describes.
 - **The §6.3.3 revocation vectors are Rust constants, not files.** The accept / refuse-at-parse / refuse-at-binding entry sets and the refuse-document set live in `interpreters/rust/aph-conformance/src/lib.rs`, each paired with the rule it violates. They are readable without linking anything, but a non-Rust implementer has to read them out of the source rather than load a directory.
-- **The status list vectors carry no proof.** They exercise every §6.3.3.3 rule up to the signature — issuer binding, purpose, vintage, freshness, and the MSB-first bit order — and stop there. An implementation that passes all of them may still have no proof check at all, which is the one failure that makes the whole mechanism forgeable.
+- **The status list vectors carry no proof.** They exercise every §6.3.3.3 rule up to the signature — issuer binding, purpose, vintage, freshness, and the MSB-first bit order — and stop there. An implementation that passes all of them may still have no proof check at all, which is the one failure that makes the whole mechanism forgeable. (The reference implementation's own proof check *is* pinned end to end by the cross-notary exchange test, forged-list case included — but that is Rust exercising Rust. A non-Rust implementer still has no proof vector to check against, so for them the gap stands.)
 - **The §8.4.5 printed TXT example is a parse vector, not a verify vector.** Its 32 key bytes are not a valid Ed25519 curve point, so it round-trips through a parser and cannot check a signature.
 - **There is no JSON Schema for the envelope.** §7.1 and the strict parser are the shape; a schema for it would be a third expression of the same rule.
 

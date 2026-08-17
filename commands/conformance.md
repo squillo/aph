@@ -21,6 +21,12 @@ Run the APH conformance suite and report results.
    - contract tests (validation rules, closed enums, strict parsing)
    - channel-binding specs (per-channel `recipientAddressing` shapes)
    - repo examples round-trip (`examples/*.json` parsed with strict schema)
+   - two-party exchange (a stranger admitted through the §8.4.6 chain, then
+     four refusals each asserting its own error code)
+   - three-party relay (verifier-identity independence across Alice → Bob →
+     Carol, with Bob in both roles)
+   - cross-notary revocation (the published, signature-verified status list
+     across a trust boundary; forged and replayed lists refused)
 
    Give totals per suite (passed/failed/ignored) and name each failing test.
 
@@ -37,6 +43,14 @@ Run the APH conformance suite and report results.
      Communication Mandates)
    - channel-kind naming failures → `google_chat` (snake_case) is normative
      per the §7.1.5 erratum; `googleChat` in stale spec copies is superseded
+   - multi-party exchange failures → §8.3/§8.3.1 (the recipient verification
+     order) and §8.4.6 (discovery order — absence ADVANCES the chain, failure
+     REFUSES on the spot; a downgrade past a failing mechanism is the exact
+     defect the two-party no-downgrade test exists to catch)
+   - cross-notary revocation failures → §6.3.3 (status endpoint derived from
+     the issuer's own `did:web` host, same-origin binding, the signed list,
+     freshness) — a `not_revoked` verdict from an unverified or foreign list
+     is a security failure, never a fixture problem
 
 4. **Report** an overall verdict (all green / N failures), the per-suite
    breakdown, and for each failure: test name, likely root cause, and the spec

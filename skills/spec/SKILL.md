@@ -427,8 +427,48 @@ cargo test
 ```
 
 This exercises the workspace default members (`aph-core`, `aph-conformance`,
-`aph-cli`): golden envelope fixtures, contract tests, channel-binding specs, and
-round-trips of the repo `examples/*.json`.
+`aph-cli`): golden envelope fixtures, contract tests, channel-binding specs,
+round-trips of the repo `examples/*.json`, and the multi-party exchange e2e
+below.
+
+**The multi-party exchange e2e** (`aph-conformance/tests/`) is the only place
+in this repository where two parties exchange anything — every other test is
+one party validating fixtures. Nineteen tests across three suites plus a shared
+harness (`tests/multi_party/mod.rs`), runnable alone with
+`cargo test -p aph-conformance --test two_party_exchange --test
+three_party_relay --test cross_notary_revocation`:
+
+- **`two_party_exchange` (8)** — Bob's verifier resolves a stranger's key
+  through the §8.4.6 chain and admits; then FOUR refusals, each proving a
+  different gate and asserting its CODE: a foreign key at Alice's own DNS name
+  resolves fine and dies at the signature check (`APH_E001`), the same bytes
+  refuse when only the evaluation instant moves (`APH_E003`), a re-issued
+  status list refuses (`APH_E015`), edited covered fields refuse (`APH_E011`).
+  Plus: a broken DNS anchor never downgrades to the web origin (and the
+  document is proven never fetched), and a key published in DNS preempts the
+  document fetch.
+- **`three_party_relay` (4)** — Alice → Bob → Carol with Bob verifying inbound
+  AND issuing outbound: a verifier's own identity provably never enters what it
+  admits, and Carol's verdict on Bob is independent of Bob's verdict on Alice
+  in both directions.
+- **`cross_notary_revocation` (7)** — Bob refuses by reading Alice's PUBLISHED,
+  signature-verified status list, never her store. A forged list is rejected
+  even when served from Alice's own origin, naming Alice as issuer, signed by a
+  real published resolvable notary that simply is not Alice; replaying Alice's
+  own older list cannot roll a revocation back; a status URL on another
+  notary's origin is refused WITHOUT a fetch.
+
+The harness is worth reading in its own right: `verify_inbound` is the §8.3 /
+§8.3.1 recipient algorithm assembled end to end (mode gate → proof structure →
+principal key and proof → notary key through the §8.4.6 chain at the
+envelope's `decisionTimestamp` → notary proof → issuance order → embedded-
+mandate binding → both §6.1 mandate signatures → validity window → step-8a
+revocation), so an implementer building a verifier in any language can follow
+it step for step. Party separation is structural, not asserted: each party has
+its own keys, notary origin, and status index; the wire is two maps of TEXT;
+an envelope crosses only as a JSON string the recipient re-parses. Every seed
+is a single byte repeated 32 times and a tripwire test pins that, so real key
+material substituted into the cast fails immediately.
 
 **Test the wasm/TS binding** (`aph-ts` sits OUTSIDE default-members, so plain
 `cargo test` never reaches it — name it):
@@ -497,7 +537,10 @@ cannot check a body hash. The §6.3.3 vectors are Rust constants in
 `aph-conformance/src/lib.rs` rather than loadable files. The status-list vectors
 stop before the proof, so an implementation can pass every one of them while
 having no proof check at all — the single failure that makes the mechanism
-forgeable. The §8.4.5 printed TXT example's key bytes are not a valid curve
+forgeable. (The REFERENCE implementation's proof check is pinned end to end by
+the cross-notary exchange test, forged-list case included — but that is Rust
+exercising Rust; a non-Rust implementer still has no proof VECTOR to check
+against, so the gap stands for them.) The §8.4.5 printed TXT example's key bytes are not a valid curve
 point, so it is a parse vector and never a verify vector. And there is no JSON
 Schema for the envelope; §7.1 and the strict parser are the shape. README carries
 this list in full — cite it rather than re-deriving it.

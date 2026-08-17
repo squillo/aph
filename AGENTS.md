@@ -21,7 +21,11 @@ break; it deliberately does not duplicate the skill.
 - `examples/` — golden envelope fixtures, one per channel kind, plus
   `principal_signed_envelope.json` (the only really-signed fixture).
 - `interpreters/rust/` — cargo workspace: `aph-core` (types + validation),
-  `aph-conformance` (suite + fixture generator), `aph-cli` (binary `aph`:
+  `aph-conformance` (suite + fixture generator; its `tests/` also carry the
+  multi-party exchange e2e — two-party admit-plus-refusals, three-party relay,
+  cross-notary revocation — the only tests where two parties exchange
+  anything, and the assembled §8.3 recipient algorithm lives in their shared
+  harness), `aph-cli` (binary `aph`:
   `validate | inspect | golden`), `aph-resolver` (optional §8.4.5 DNS TXT +
   §8.4.4 `did:web` adapters over `aph-core`'s ports; the ONLY crate that may
   carry HTTP/DNS/runtime deps — never add an edge to it from the other
