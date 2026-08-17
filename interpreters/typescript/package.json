@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --test dist/test/",
+    "test": "node --test dist/test/*.test.js",
     "mint": "node dist/scripts/mint_ts_envelope.js"
   },
   "devDependencies": {

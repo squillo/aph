@@ -39,7 +39,11 @@ fn the_golden_crosses_the_real_wasm_boundary_intact() {
     "parse and serialize must agree on canonical compact text"
   );
   assert!(
-    parsed.contains("\"bodySize\":1842"),
+    // 427 is the byte length of `examples/principal_signed_body.txt`, the
+    // golden's published body since the body-hash vector landed. Pinned as a
+    // literal for the same reason as the native twin: a constant the test
+    // knows independently of the parse is what detects a widened integer.
+    parsed.contains("\"bodySize\":427"),
     "bodySize must survive the boundary as a bare integer"
   );
   aph_ts::require_attestation_mode(&parsed, "PrincipalSigned")
