@@ -30,7 +30,7 @@
 //! function added to one binding is owed to the other two in the same change,
 //! or the divergence is justified where it happens. All three cross envelopes
 //! as JSON TEXT in both directions for the reason the boundary note above
-//! states; the parity contract exists so the three bindings also cannot drift
+//! states; the parity contract exists so the four bindings also cannot drift
 //! in WHAT they teach.
 //!
 //! The Elixir member is spelled in BEAM idiom — `{:ok, result} | {:error,

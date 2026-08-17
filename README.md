@@ -318,7 +318,10 @@ its `APH_E*` code, so a caller matches `APH_E013` there exactly as a TypeScript
 caller matches it on the thrown message. Not published to hex.pm: see
 [interpreters/elixir/README.md](interpreters/elixir/README.md).
 
-`aph-ts`, `aph-py` and the Elixir binding are three **bindings of this one
+`aph-ts`, `aph-py`, the Elixir binding and the Go binding (`interpreters/go` —
+pure Go, running the reference as WebAssembly under wazero with no cgo; its
+committed wasm artifact is byte-diffed against a pinned-toolchain rebuild on
+every push) are four **bindings of this one
 reference implementation**, held at export parity — the same four operations,
 the same semantics, the same error identity, each in its language's idiom —
 under a standing rule that an addition to any one is unfinished until it lands

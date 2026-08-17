@@ -8,8 +8,9 @@ members = [
   "aph-ts",
   "aph-py",
   "aph-js-harness",
+  "aph-wasm-abi",
 ]
-# Three members sit outside the default set, each because RUNNING it needs
+# FOUR members sit outside the default set, each because RUNNING it needs
 # something the protocol crates do not: aph-ts targets wasm32 and is built
 # explicitly (wasm-pack / --target wasm32-unknown-unknown); aph-py links a
 # Python interpreter and is named explicitly (`cargo test -p aph-py`);
@@ -17,7 +18,18 @@ members = [
 # second ECMAScript engine, so its tests need `interpreters/typescript/dist`
 # on disk — plain `cargo test` must never require a Node toolchain to have
 # run, and its tests say so out loud rather than failing with a module error.
-# None of the three may become a prerequisite for testing the protocol itself.
+#
+# aph-wasm-abi is the fourth, and it is outside for a reason the other three
+# only half-share: it is not a testable crate at all from here. It compiles to
+# a `wasm32-unknown-unknown` artifact with a raw pointer ABI, and the only
+# thing that can call that ABI is a WebAssembly runtime — the Go binding under
+# `interpreters/go` embeds the compiled module and `go test` is the sole gate
+# on it. Building it into a default `cargo test` would produce a cdylib for the
+# HOST that nothing ever loads, which is worse than not building it: it looks
+# like coverage. It is also the one member whose output must be built with a
+# specific flag set to stay byte-reproducible, so it is always built by the
+# recipe that owns those flags and never by an incidental workspace build.
+# None of the four may become a prerequisite for testing the protocol itself.
 # aph-resolver is a native crate and IS in the default set, so plain
 # `cargo test` covers it.
 default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver"]

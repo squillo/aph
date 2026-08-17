@@ -79,6 +79,7 @@ cargo test                    # workspace default members
 cargo test -p aph-ts          # the wasm binding's native tests (NOT in the default set)
 wasm-pack test --node aph-ts  # wasm32 smoke over the signed golden
 cargo test -p aph-py          # the Python binding (NOT in the default set; needs a shared libpython)
+(cd ../go && go test ./...)   # the Go binding (wazero; committed wasm is CI-byte-diffed)
 cargo test -p aph-js-harness  # the TypeScript core under a second ECMAScript engine (NOT in the default set)
 cargo run -q -p aph-cli -- validate <envelope.json>
 ```

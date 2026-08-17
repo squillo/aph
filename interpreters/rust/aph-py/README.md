@@ -16,19 +16,25 @@ a parsed envelope can hand `bodySize` back as a float, or as an integer past
 2^53 that a double cannot hold, without noticing either. Text in, text out:
 the only number parser that runs is `serde_json`'s.
 
-## Parity with the other two bindings, and what this crate is not
+## Parity with the other three bindings, and what this crate is not
 
-`aph-py`, `aph-ts` and the Elixir binding under `interpreters/elixir` are three
-**bindings of one reference implementation**, not three implementations. They
+`aph-py`, `aph-ts`, the Elixir binding under `interpreters/elixir`, and the Go
+binding under `interpreters/go` are four
+**bindings of one reference implementation**, not four implementations. They
 export the same operations, with the same semantics and the same error text, in
 each language's idiom:
 
-| `aph-ts` (JS)            | `aph` (Python)             | `aph` (Elixir)                   |
-|--------------------------|----------------------------|----------------------------------|
-| `parseEnvelopeJson`      | `parse_envelope_json`      | `APH.parse_envelope_json/1`      |
-| `serializeEnvelope`      | `serialize_envelope`       | `APH.serialize_envelope/1`       |
-| `verifyProofStructure`   | `verify_proof_structure`   | `APH.verify_proof_structure/1`   |
-| `requireAttestationMode` | `require_attestation_mode` | `APH.require_attestation_mode/2` |
+| `aph-ts` (JS)            | `aph` (Python)             | `aph` (Elixir)                   | `aph` (Go, on `*Runtime`)          |
+|--------------------------|----------------------------|----------------------------------|------------------------------------|
+| `parseEnvelopeJson`      | `parse_envelope_json`      | `APH.parse_envelope_json/1`      | `ParseEnvelopeJSON(ctx, s)`        |
+| `serializeEnvelope`      | `serialize_envelope`       | `APH.serialize_envelope/1`       | `SerializeEnvelope(ctx, s)`        |
+| `verifyProofStructure`   | `verify_proof_structure`   | `APH.verify_proof_structure/1`   | `VerifyProofStructure(ctx, s)`     |
+| `requireAttestationMode` | `require_attestation_mode` | `APH.require_attestation_mode/2` | `RequireAttestationMode(ctx, s, m)`|
+
+The Go column is methods on a `*Runtime` handle (`New`/`Close`) rather than
+package-level functions — the one idiom divergence in the set, and a justified
+one: the wasm instance has a lifecycle the other three runtimes manage
+implicitly, and Go's convention is to make such a lifecycle explicit.
 
 None may grow an operation the others lack. Bindings that teach different
 things about one protocol are how a protocol acquires several meanings — so a

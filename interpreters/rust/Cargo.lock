@@ -104,6 +104,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aph-wasm-abi"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "aph-core",
+ "getrandom 0.2.17",
+ "serde_json",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"

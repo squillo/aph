@@ -1,0 +1,74 @@
+name: Go binding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "interpreters/go/**"
+      - "interpreters/rust/aph-wasm-abi/**"
+      - "interpreters/rust/aph-core/**"
+      - "interpreters/rust/Cargo.toml"
+      - "interpreters/rust/Cargo.lock"
+      - "examples/**"
+      - ".github/workflows/go.yml"
+  pull_request:
+    paths:
+      - "interpreters/go/**"
+      - "interpreters/rust/aph-wasm-abi/**"
+      - "interpreters/rust/aph-core/**"
+      - "interpreters/rust/Cargo.toml"
+      - "interpreters/rust/Cargo.lock"
+      - "examples/**"
+      - ".github/workflows/go.yml"
+
+jobs:
+  verify-artifact-and-test:
+    name: rebuild wasm, byte-diff, go test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # PINNED, not @stable, and the pin is load-bearing: this job's whole
+      # point is to rebuild the shim and BYTE-DIFF it against the committed
+      # `interpreters/go/internal/wasm/aph.wasm`, which makes the one binary
+      # in this repository VERIFIED rather than trusted. Byte-identity only
+      # means something when both builds ran the same compiler — a floating
+      # `stable` would fail this job on every rustc release with no change in
+      # the repository. When this pin moves, the artifact is regenerated in
+      # the same commit (the recipe is in the Go README).
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          targets: wasm32-unknown-unknown
+
+      # The remap flags are half of reproducibility: rustc embeds source
+      # paths (panic locations, registry paths) in the artifact, so without
+      # canonicalizing them a macOS build and this Linux build could never be
+      # byte-identical — and the committed binary would carry developer paths,
+      # which the name-hygiene job refuses. Every builder maps the same three
+      # roots to the same three canonical prefixes; the recipe in the Go
+      # README uses identical flags.
+      - name: Rebuild the wasm shim (canonicalized paths)
+        working-directory: interpreters/rust
+        run: |
+          RUSTFLAGS="--remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$HOME/.rustup=/rustup --remap-path-prefix=$(pwd)=/build" \
+            cargo build --release --target wasm32-unknown-unknown -p aph-wasm-abi
+
+      - name: Byte-diff against the committed artifact
+        run: |
+          cmp interpreters/rust/target/wasm32-unknown-unknown/release/aph_wasm_abi.wasm \
+              interpreters/go/internal/wasm/aph.wasm \
+            && echo "committed wasm is byte-identical to the pinned-toolchain rebuild" \
+            || { echo "::error::committed aph.wasm does not match a pinned-toolchain rebuild — regenerate it in this commit (recipe in interpreters/go/README.md)"; exit 1; }
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: interpreters/go/go.sum
+
+      - name: Run the Go suite
+        working-directory: interpreters/go
+        run: go test ./...

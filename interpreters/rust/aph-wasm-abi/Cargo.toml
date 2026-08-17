@@ -1,0 +1,46 @@
+[package]
+name = "aph-wasm-abi"
+description = "A plain wasm32 C ABI over aph-core: JSON text in, JSON text out, over pointer/length pairs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+# The deliverable of this crate is a `.wasm` FILE, not a source package: a
+# consumer loads the compiled module under its own WebAssembly runtime and
+# never links Rust at all. Publishing the source would advertise a library
+# whose only useful output cargo does not ship. Same reason `aph-ts` and
+# `aph-py` are unpublished.
+publish = false
+
+[lib]
+# `cdylib` ONLY, and the absence of `rlib` is load-bearing twice over.
+#
+# First: nothing in this workspace may depend on this crate. Its exports are a
+# raw pointer ABI meant for a foreign runtime; a Rust caller that reached them
+# would be taking the long way round `aph-core`, which it can call directly.
+#
+# Second, and the reason this is a rule rather than a preference: the entropy
+# registration below is a `#[no_mangle]` symbol that overrides `getrandom` for
+# the WHOLE final artifact. An `rlib` route would let a Rust binary link this
+# crate and silently inherit an always-fail random source. `cdylib` makes that
+# unreachable — a cdylib is a leaf, never a link input.
+crate-type = ["cdylib"]
+
+[dependencies]
+aph-core = { workspace = true }
+# The wasm boundary is JSON text in BOTH directions (see src/lib.rs module
+# docs); envelopes never cross as a decoded structure, so there is deliberately
+# no host-object bridge here — the same absence, for the same reason, as
+# `aph-ts`'s missing serde-wasm-bindgen and `aph-py`'s missing pythonize.
+serde_json = { workspace = true }
+
+# `aph-core`'s p256 dependency pulls getrandom transitively, and on
+# wasm32-unknown-unknown getrandom refuses to compile without a backend chosen
+# by hand. `aph-ts` picks `js` because a browser or Node host supplies
+# `crypto.getRandomValues`. This module has no such host BY DESIGN — it runs
+# under a plain WebAssembly runtime with zero imports — so `js` would emit
+# JavaScript imports nothing can satisfy. `custom` lets the crate supply the
+# backend itself; see the `entropy` module for what it supplies and why.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }

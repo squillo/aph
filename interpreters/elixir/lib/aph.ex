@@ -40,7 +40,7 @@ defmodule APH do
       {:ok, mode} = APH.verify_proof_structure(received)
       :ok = APH.require_attestation_mode(received, "PrincipalSigned")
 
-  ## Export parity, a three-way contract
+  ## Export parity, a four-way contract
 
   This binding, the wasm/TS binding and the Python binding expose the SAME
   four envelope-facing operations, with the same semantics and the same error
@@ -62,7 +62,7 @@ defmodule APH do
   What none of them is: independent evidence. A binding that agrees with the
   reference agrees with itself. "Can a stranger build this from the
   specification alone?" is answered by an implementation that shares no code
-  with the reference, and none of the three bindings is or claims to be one.
+  with the reference, and none of the four bindings is or claims to be one.
 
   ## Errors
 
@@ -127,7 +127,7 @@ defmodule APH do
   The input must conform to the canonical envelope shape; any deviation is
   `{:error, message}`. This is the same operation as `parse_envelope_json/1`
   approached from the other direction — both exist so the surface reads the
-  same in all three bindings, and both reduce to one parse and one re-emit.
+  same in all four bindings, and both reduce to one parse and one re-emit.
   """
   @spec serialize_envelope(envelope_json()) :: {:ok, envelope_json()} | {:error, refusal()}
   defdelegate serialize_envelope(json), to: APH.Native
