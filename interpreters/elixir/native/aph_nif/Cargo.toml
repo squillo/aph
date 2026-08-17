@@ -1,0 +1,64 @@
+[package]
+name = "aph_nif"
+description = "Native half of the APH Elixir binding: the term boundary over aph-core"
+version = "0.1.0-alpha.1"
+# Edition 2021 while the reference crates are on 2024, and the reason is
+# mechanical rather than conservative: the NIF entry point is produced by a
+# macro that emits C-ABI export attributes, and edition 2024 changed how those
+# attributes must be spelled. Pinning this crate to 2021 keeps the pinned
+# rustler's macro output valid no matter which edition it was written against.
+# The binding gains nothing from the newer edition — there is no async, no
+# closure capture subtlety, and barely any code.
+edition = "2021"
+license = "Apache-2.0"
+authors = ["APH Protocol Contributors"]
+repository = "https://github.com/squillo/aph"
+# A NIF ships inside an OTP application, not as a source crate: a BEAM
+# consumer installs the Elixir package and mix builds this. Same reason the
+# wasm and pyo3 bindings are unpublished.
+publish = false
+
+# ⛔ An OWN workspace root, deliberately empty. Without this table, a cargo
+# invocation inside this directory walks UP looking for a workspace and can be
+# absorbed by whatever manifest it finds above the repository — a machine-
+# dependent failure that would appear on one checkout and not another. One
+# empty table makes the crate self-rooted everywhere. It does NOT pull the
+# reference crates in with it: a path dependency becomes an automatic member
+# only when it lives inside the workspace directory, and aph-core does not.
+[workspace]
+
+[lib]
+# The shared object mix loads is `libaph_nif`, and the Elixir side names the
+# crate `aph_nif` — the two must agree or the load fails at runtime rather
+# than at build time.
+name = "aph_nif"
+# `cdylib` and nothing else, ON PURPOSE. Adding `rlib` would invite a
+# `#[cfg(test)]` module here, and such a test binary cannot link: the `enif_*`
+# symbols it would need are supplied by the BEAM at load time and exist
+# nowhere a Rust test runner can reach them. That absence is what forces the
+# rule the module docs state — no logic lives here, so nothing here needs a
+# Rust test.
+crate-type = ["cdylib"]
+
+[dependencies]
+# See mix.exs for why this exact release, and why the bound is tight: the
+# installed BEAM toolchain, not the newest release number, decides it.
+rustler = "0.30.0"
+# PINNED BELOW ITS SEMVER RANGE, deliberately: rustler 0.30.0 declares a
+# floating rustler_sys requirement, and rustler_sys 2.3.2 changed the
+# GENERATED `enif_term_type` signature from pointer to by-value — which makes
+# rustler 0.30.0 itself fail to compile (E0308 in its own `term.rs`). The
+# newest sys release that still generates the signature 0.30.0 was written
+# against is what this pin names. A floating minor under a pinned major is
+# how a build that compiled yesterday stops compiling with no change here.
+rustler_sys = "=2.3.1"
+# The reference implementation. A path dependency with no `version` because
+# this crate is never published; the shape of the dependency is what makes
+# this a BINDING — all protocol behaviour is over there, already under
+# `cargo test`.
+aph-core = { path = "../../../rust/aph-core" }
+# The boundary is JSON text in BOTH directions (see src/lib.rs), so envelopes
+# never cross as Elixir terms. That is why there is no term-bridge dependency
+# here — the same deliberate absence as the wasm binding's missing
+# serde-wasm-bindgen and the pyo3 binding's missing pythonize.
+serde_json = "1"

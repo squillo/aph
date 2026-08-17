@@ -99,6 +99,30 @@ Each file opens with why it exists and what it pins; the short version:
   failure for any example nobody classified.
 - `ts_minted_artifact.test.ts` — byte identity of the (←) artifact.
 
+**A second ECMAScript engine runs the same code, from cargo.** RFC 8785
+§3.2.2.3 does not define number serialization — it *defers* to ECMAScript
+`Number::toString`, so the bytes a signature covers are decided by whatever
+engine this canonicalizer runs on, and a suite that exercises one engine cannot
+tell a correct canonicalizer from one that quietly inherited a host assumption.
+So `interpreters/rust/aph-js-harness` loads this package's **compiled output**
+into Boa — an ECMAScript engine written from scratch in Rust — and drives it
+from the same expectation table the Node suite reads,
+`testkit/jcs_vectors.json`: one table, two engines, including the
+float-formatting edge set that exists for this purpose (integer-valued doubles,
+both zeroes, both exponent boundaries, the 2^53 neighbourhood). A row that
+disagrees between the engines fails with both outputs printed, as a conformance
+finding about this code rather than something to branch around. What it
+deliberately does **not** cover is cryptography: a language engine has no
+WebCrypto, every hash and signature here goes through SubtleCrypto by design,
+and so the second-engine scope is the crypto-free core — canonicalization,
+strict parse, proof structure and mode, and the §11 codes reachable without a
+signature. A Rust-backed SubtleCrypto shim would extend it to the full verifier
+and is named as future work, not smuggled in; until then the signature paths are
+proven under Node alone, and this paragraph is the honest boundary. Build first
+(`npm run build`), then `cd ../rust && cargo test -p aph-js-harness` — the
+harness sits outside the workspace's default members precisely so that testing
+the protocol crates never requires a Node toolchain to have run.
+
 ## What writing this found
 
 A second implementation earns its keep by disagreeing. One disagreement was

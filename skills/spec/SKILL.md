@@ -31,7 +31,8 @@ organizations via public key discovery.
 - `spec/security-considerations.md` — threat model: in-scope (replay, body tampering, mandate forgery, channel impersonation, alg downgrade, attestation-mode downgrade), out-of-scope (compromised notary key/device, key LOSS, publication-surface DoS, phishing, transport security).
 - `spec/operations.md` — the operator runbook, and **non-normative**: what a Notary Service operator holds, what losing each piece costs, pre-authorized rotation, the publication-cadence deadlines, and the unregistered identifiers an adopter inherits. Where it and the spec disagree, the spec wins and the runbook is the defect.
 - `examples/` — 12 golden envelope JSON files (enumerated on disk): one per channel kind (7), one exercising the §7.5 registered extensions, THREE signed vectors — one per signing path §8.1/§8.2 make MUST-support — and `ts_minted_envelope.json`, minted by the second implementation. With `examples/README.md`. Eight carry illustrative placeholder `proof.proofValue` strings, NOT real signatures, with `bodySha256` the SHA-256 of the empty string — they exist for shape/round-trip validation only, and they are `NotaryAttested` because they carry no `attestationMode` and absent means `NotaryAttested`. ⛔ Do NOT read "NotaryAttested" as "unsigned": NINE files are `NotaryAttested` and one of those nine, `detached_jws_envelope.json`, verifies. The four that verify: `principal_signed_envelope.json` (`PrincipalSigned`, four real Ed25519 `eddsa-jcs-2022` signatures from RFC 8032 §7.1 public test seeds, plus the embedded mandate), `es256_signed_envelope.json` (the same `PrincipalSigned` chain under `ecdsa-jcs-2019`, from the published RFC 6979 A.2.5 and RFC 7515 A.3.1 P-256 scalars), `detached_jws_envelope.json` (`NotaryAttested`, a `JsonWebSignature2020` compact detached JWS, verifiable offline from its own P-256 `did:key` issuer), and `ts_minted_envelope.json` (`PrincipalSigned`, four real Ed25519 signatures minted by `interpreters/typescript/` and verified by the Rust conformance suite; BOTH parties are `did:key` so it needs no supplied key, and it is the ONE example whose body binding is real — the complete body travels in `preview`).
-- `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), `aph-resolver` (the optional DNS TXT + `did:web` adapters, the only crate carrying HTTP/DNS deps), `aph-ts` (wasm binding) and `aph-py` (pyo3 binding; Python module `aph`). The two bindings sit outside `default-members` — each needs a toolchain the protocol crates do not — and are held at export parity with each other.
+- `interpreters/rust/` — the reference Rust implementation, a cargo workspace with members: `aph-core` (protocol types + validation), `aph-conformance` (conformance suite), `aph-cli` (CLI; the binary is named `aph`), `aph-resolver` (the optional DNS TXT + `did:web` adapters, the only crate carrying HTTP/DNS deps), `aph-ts` (wasm binding), `aph-py` (pyo3 binding; Python module `aph`) and `aph-js-harness` (a TEST harness and NOT a fourth binding: it runs the TypeScript implementation's compiled crypto-free core under a second ECMAScript engine inside the cargo process). `aph-ts`, `aph-py` and `aph-js-harness` all sit outside `default-members` — the two bindings each need a toolchain the protocol crates do not, and the harness needs the TypeScript build output on disk — so plain `cargo test` reaches none of the three and each must be named with `-p`. The two bindings are held at export parity with each other and with the Elixir binding.
+- `interpreters/elixir/` — the THIRD binding (`aph-ex`): a mix app `aph` wrapping a rustler NIF at `native/aph_nif` that path-depends on `aph-core`. Its crate is EXCLUDED from the cargo workspace outright, not merely from `default-members`, because mix drives NIF builds and two build drivers on one member is a reliability defect. ⛔ Not an implementation and not a fourth verifier: zero cryptography on the Elixir side, every signature-touching operation across the NIF. `mix test` is the ONLY gate that exercises the term boundary — a NIF is Rust embedded in the BEAM, so `cargo test` never sees a term — which is why every NIF function is decode-string/call-core/encode-result and nothing more.
 - `interpreters/typescript/` — the SECOND implementation: full mint + verify, sharing no code with the Rust. Its own RFC 8785 canonicalizer, strict parser, §7.2.1 bases, base58btc and `did:key` codecs; every signature through WebCrypto. Node ≥ 20, zero runtime dependencies, `typescript` the only dev-time one. ⛔ It is NOT a binding and NOT wasm — do not confuse it with `aph-ts`. Independence of CODE, not of TEAM: same authors, so it proves the spec is implementable twice and not that it survives a stranger.
 
 ## Envelope wire shape (spec §7.1)
@@ -506,12 +507,34 @@ object route hands arm selection to a second deserializer. The exports are the
 `aph-ts` four in snake_case — `parse_envelope_json`, `serialize_envelope`,
 `verify_proof_structure`, `require_attestation_mode` — raising one exception,
 `aph.AphError`, whose message leads with the `APH_E*` code so a Python caller
-matches `APH_E013` exactly as a TS caller matches it. That parity is a
-contract, not a coincidence: an addition to either binding is unfinished until
-it lands in the other, because two bindings teaching different things is how
-one protocol acquires two meanings. Neither is a second implementation — that
-question is answered by `interpreters/typescript/`, which shares no code with
-this workspace.
+matches `APH_E013` exactly as a TS caller matches it.
+
+**Test the Elixir binding** (a separate toolchain and a separate job; run it
+from `interpreters/elixir/`, and note this is the ONLY gate that ever sees the
+NIF term boundary — a rustler NIF is Rust embedded in the BEAM, so nothing
+under `cargo test` can reach it):
+
+```
+mix deps.get                  # rustler, pinned tight to what the installed BEAM can build
+mix test                      # compiles the NIF through cargo, then runs ExUnit
+```
+
+Same boundary, third time, and the BEAM is where the reasoning has to be
+restated rather than reused: Erlang integers are arbitrary precision, so the
+number-widening argument does not apply and a term route LOOKS safe — but a
+map/list encoder still has to pick an arm of the untagged `proof` union with no
+schema to consult. The exports are the same four in BEAM idiom —
+`APH.parse_envelope_json/1`, `APH.serialize_envelope/1`,
+`APH.verify_proof_structure/1`, `APH.require_attestation_mode/2` — answering
+`{:ok, result} | {:error, code}` rather than raising, because a refused
+envelope is an ordinary outcome there; the `APH_E*` code travels as the wire
+string, so `APH_E013` is matched exactly as it is in the other two.
+
+That parity is a contract, not a coincidence: an addition to any one binding is
+unfinished until it lands in the other two, because bindings teaching different
+things is how one protocol acquires several meanings. None is a second
+implementation — that question is answered by `interpreters/typescript/`, which
+shares no code with this workspace.
 
 **The second implementation, and its honest scope.**
 `interpreters/typescript/` is a full mint + verify implementation written from
@@ -668,6 +691,7 @@ touch, because that boundary is deliberate:
 | `aph-cli` | the `aph` binary: `validate | inspect | golden` | no |
 | `aph-ts` | the wasm/TS binding (JSON text in both directions) | no |
 | `aph-py` | the pyo3/Python binding, module `aph` (same surface, same JSON-text boundary) | no |
+| `interpreters/elixir` | not a workspace member: the rustler/BEAM binding, app `aph` (same surface, same JSON-text boundary, `{:ok, _} \| {:error, code}`) | no |
 | `interpreters/typescript` | not a crate: the SECOND implementation, mint + verify on WebCrypto | **never** — parses bytes handed to it |
 
 Most integrations want `aph-core` alone and supply their own transport by

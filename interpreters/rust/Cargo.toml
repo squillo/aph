@@ -1,13 +1,41 @@
 [workspace]
 resolver = "3"
-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver", "aph-ts", "aph-py"]
-# Two members sit outside the default set, each because building it needs a
-# toolchain the protocol crates do not: aph-ts targets wasm32 and is built
+members = [
+  "aph-core",
+  "aph-conformance",
+  "aph-cli",
+  "aph-resolver",
+  "aph-ts",
+  "aph-py",
+  "aph-js-harness",
+]
+# Three members sit outside the default set, each because RUNNING it needs
+# something the protocol crates do not: aph-ts targets wasm32 and is built
 # explicitly (wasm-pack / --target wasm32-unknown-unknown); aph-py links a
-# Python interpreter and is named explicitly (`cargo test -p aph-py`). Neither
-# may become a prerequisite for testing the protocol itself. aph-resolver is a
-# native crate and IS in the default set, so plain `cargo test` covers it.
+# Python interpreter and is named explicitly (`cargo test -p aph-py`);
+# aph-js-harness runs the TypeScript implementation's BUILD OUTPUT under a
+# second ECMAScript engine, so its tests need `interpreters/typescript/dist`
+# on disk — plain `cargo test` must never require a Node toolchain to have
+# run, and its tests say so out loud rather than failing with a module error.
+# None of the three may become a prerequisite for testing the protocol itself.
+# aph-resolver is a native crate and IS in the default set, so plain
+# `cargo test` covers it.
 default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver"]
+# The Elixir binding's NIF crate is not a member and is not merely outside the
+# default set: mix (through rustler) is the build driver for a NIF, and two
+# build drivers pointed at one workspace member is a reliability defect — they
+# disagree about target directory, profile and feature unification, and cargo
+# would produce an artifact mix then rebuilds anyway. Excluding it only from
+# `default-members` — the shape aph-ts and aph-py use — half-solves that,
+# because an explicit `-p` or a `--workspace` flag still reaches a member.
+#
+# Enforcement is layered because no single mechanism covers every entry point:
+# the crate lives outside this directory tree, so cargo never discovers it from
+# here; it declares its own empty `[workspace]`, so a cargo run started inside
+# it cannot be absorbed by an ancestor manifest either; and this entry states
+# the intent where the members list is read, so relocating the crate under this
+# directory cannot quietly make it a member.
+exclude = ["../elixir/native/aph_nif"]
 
 [workspace.package]
 # PRE-RELEASE while the spec still reads 0.1.0-draft. Cargo does not

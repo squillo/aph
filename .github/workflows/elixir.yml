@@ -1,0 +1,80 @@
+name: Elixir binding
+
+# Path filter = the actual inputs to this job, which is why it is wider than
+# the binding's own directory. The NIF crate path-depends on `aph-core`, and
+# the suite reads the published envelopes off disk, so a change to either
+# changes what this job proves. `interpreters/rust/Cargo.toml` is an input for
+# a less obvious reason: `aph-core` inherits `[workspace.package]` and
+# `[workspace.dependencies]` from it, so a dependency bump there changes what
+# this NIF compiles even though the NIF is not a member of that workspace.
+#
+# The Rust lockfile that governs THIS job is `native/aph_nif/Cargo.lock` —
+# the NIF crate is its own workspace root, so it resolves independently of
+# `interpreters/rust/Cargo.lock` — and it is already covered by the first
+# pattern, as is `mix.lock`. Both are written by the first successful build and
+# belong in the same commit as the code; without them CI re-resolves every run
+# and the versions this was tested against are nowhere on record.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "interpreters/elixir/**"
+      - "interpreters/rust/aph-core/**"
+      - "interpreters/rust/Cargo.toml"
+      - "examples/**"
+      - ".github/workflows/elixir.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "interpreters/elixir/**"
+      - "interpreters/rust/aph-core/**"
+      - "interpreters/rust/Cargo.toml"
+      - "examples/**"
+      - ".github/workflows/elixir.yml"
+
+# Least privilege: this workflow only reads the tree.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: mix test (the NIF term boundary)
+    # Pinned rather than `ubuntu-latest`: the BEAM setup action installs
+    # PRECOMPILED Erlang builds keyed by runner OS, so a runner image rolling
+    # forward can remove the OTP release this job asks for. A named image fails
+    # loudly at retirement instead of silently on a missing build.
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: interpreters/elixir
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # ONE pair, and deliberately NOT the pair the local floor runs.
+      # `mix.exs` declares `~> 1.13` because Elixir 1.13 / OTP 24 is the oldest
+      # pair this binding has been run and passed on — but there is no OTP 24
+      # build for this runner image, and the images old enough to have one are
+      # retired. So the floor is proven where it is installed, and CI proves a
+      # current pair; the two together are the evidence, and neither alone is.
+      - name: Install Erlang/OTP and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      # Mix drives the NIF build through cargo, so this job needs both
+      # toolchains. A missing Rust toolchain would surface as a mix compile
+      # error rather than as what it is.
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: interpreters/elixir/native/aph_nif
+      - name: Fetch dependencies
+        run: mix deps.get
+      # `mix test` compiles the NIF as a side effect of compiling the module
+      # that loads it, then runs ExUnit. It is one command on purpose: ExUnit
+      # is the ONLY gate that ever exercises the term boundary, because a
+      # rustler NIF is Rust embedded in the BEAM and nothing under `cargo test`
+      # can see a term. See the binding's README for what follows from that.
+      - name: Run the suite
+        run: mix test

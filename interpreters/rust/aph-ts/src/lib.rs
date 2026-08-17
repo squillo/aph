@@ -20,18 +20,25 @@
 //! requireAttestationMode(text, "PrincipalSigned");      // §8.3.1 step 1a
 //! ```
 //!
-//! # Export parity with `aph-py`
+//! # Export parity with `aph-py` and the Elixir binding
 //!
-//! This crate and the sibling Python binding expose the SAME four
-//! envelope-facing operations — parse, serialize, verify-structure,
-//! require-mode — with the same semantics and the same error identity (an
-//! APH code a caller can match exactly). That parity is a CONTRACT, stated
-//! in both crates so it cannot drift silently: a function added to one
-//! binding is owed to the other in the same change, or the divergence is
-//! justified where it happens. Both bindings cross envelopes as JSON TEXT
-//! in both directions for the reason the boundary note above states; the
-//! parity contract exists so the two bindings also cannot drift in WHAT
-//! they teach.
+//! This crate, the sibling Python binding and the Elixir binding under
+//! `interpreters/elixir` expose the SAME four envelope-facing operations —
+//! parse, serialize, verify-structure, require-mode — with the same semantics
+//! and the same error identity (an APH code a caller can match exactly). That
+//! parity is a CONTRACT, stated in all three so it cannot drift silently: a
+//! function added to one binding is owed to the other two in the same change,
+//! or the divergence is justified where it happens. All three cross envelopes
+//! as JSON TEXT in both directions for the reason the boundary note above
+//! states; the parity contract exists so the three bindings also cannot drift
+//! in WHAT they teach.
+//!
+//! The Elixir member is spelled in BEAM idiom — `{:ok, result} | {:error,
+//! code}` rather than a thrown value, with the APH code as the wire string —
+//! and its NIF crate is excluded from this workspace outright rather than
+//! merely from `default-members`, because mix drives that build. Neither
+//! difference is a divergence in the surface: same four operations, same
+//! semantics, same code strings.
 
 /// Strict-parses `json` into the canonical envelope type, stringifying the
 /// parse error. Shared by every export so the boundary has ONE parse path.

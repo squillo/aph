@@ -17,23 +17,30 @@ cargo clippy --all-targets -- -D warnings
 | [`aph-ts`](aph-ts/) | WebAssembly binding: `parseEnvelopeJson`, `serializeEnvelope`, `verifyProofStructure`, `requireAttestationMode`. |
 | [`aph-py`](aph-py/) | Python binding (pyo3, module `aph`): the same four operations in snake_case — `parse_envelope_json`, `serialize_envelope`, `verify_proof_structure`, `require_attestation_mode`. |
 | [`aph-resolver`](aph-resolver/) | Ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` fetch adapters over `aph-core`'s discovery ports, for adopters with no adapter layer of their own. The ONLY crate carrying HTTP/DNS/runtime dependencies. |
+| [`aph-js-harness`](aph-js-harness/) | A TEST harness — not a binding, not published: it runs the [TypeScript implementation](../typescript/)'s compiled crypto-free core (canonicalization, strict parse, proof structure, the §11 codes) under a second ECMAScript engine inside the cargo process, against the same expectation table that implementation's own suite reads. Needs `../typescript/dist` on disk. |
 
 `aph-ts` and `aph-py` are two **bindings of this one implementation**, held at
 export parity — same operations, same semantics, same error text, each in its
 language's case convention. Neither is a second implementation. Adding an
 operation to one is unfinished until it lands in the other.
 
-Both are workspace members and both sit OUTSIDE `default-members` (6 members,
-4 default), each because building it needs a toolchain the protocol crates do
-not: `aph-ts` targets `wasm32-unknown-unknown`, and `aph-py` links a Python
-interpreter. So `cargo test` at the workspace root attempts neither — name
-them:
+Every crate in the table above is a workspace member. `default-members` names
+four of them — `aph-core`, `aph-conformance`, `aph-cli`, `aph-resolver` — and
+the remaining three sit OUTSIDE it, each because RUNNING it needs something
+the protocol crates deliberately do not: `aph-ts` targets
+`wasm32-unknown-unknown`, `aph-py` links a Python interpreter, and
+`aph-js-harness` reads build output produced by a Node toolchain. So `cargo
+test` at the workspace root attempts none of the three — name them:
 
 ```sh
 cargo check -p aph-ts --target wasm32-unknown-unknown
 wasm-pack build aph-ts --target web
 
 cargo test -p aph-py     # needs a Python distribution with a shared libpython
+
+# Build the TypeScript first; without dist/ this stops with a BUILD FIRST
+# message naming the file it looked for, not a module-resolution error.
+cargo test -p aph-js-harness
 ```
 
 ## Runnable examples

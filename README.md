@@ -180,6 +180,9 @@ aph/
       aph-ts/           wasm binding (parse/serialize for JS hosts)
       aph-py/           pyo3 binding (the same surface, for Python hosts)
       aph-core/examples/  Runnable, self-narrating usage examples
+    elixir/             rustler binding (the same surface, for BEAM hosts); its
+                        NIF crate lives at native/aph_nif and is excluded from
+                        the cargo workspace, because mix drives that build
     typescript/         SECOND implementation: mint + verify, from the spec alone
                         (no wasm, no binding — Node >= 20, WebCrypto, zero runtime deps)
   APH Spec/
@@ -195,6 +198,7 @@ aph/
       validate-examples.yml   JSON validity + sanitization checks
       rust-interpreter.yml    cargo test for interpreters/rust
       python.yml              cargo test for the Python binding
+      elixir.yml              mix test for the Elixir binding
       typescript.yml          tsc + node --test for the second implementation
   README.md
   LICENSE
@@ -296,14 +300,32 @@ import json, aph
 envelope = json.loads(aph.parse_envelope_json(received))  # raises aph.AphError on invalid shape
 ```
 
-`aph-py` and `aph-ts` are two **bindings of this one reference
-implementation**, held at export parity — the same four operations, the same
-semantics, the same error text, each in its language's case convention — under
-a standing rule that an addition to either is unfinished until it lands in the
-other, so the two cannot drift into teaching different things. Both
-cross the FFI as JSON text in both directions, because the envelope's `proof`
-union is untagged and an object round-trip hands arm selection to a second
-deserializer. Neither is a second implementation, and neither is evidence that
+### Elixir / BEAM
+
+```sh
+cd interpreters/elixir && mix deps.get && mix test
+```
+
+```elixir
+{:ok, normalized} = APH.parse_envelope_json(received)   # {:error, code} on invalid shape
+{:ok, mode} = APH.verify_proof_structure(received)      # "PrincipalSigned" | "NotaryAttested"
+:ok = APH.require_attestation_mode(received, "PrincipalSigned")
+```
+
+Refusals are `{:error, message}` rather than exceptions — on the BEAM a refused
+envelope is an ordinary outcome — and a protocol refusal's message leads with
+its `APH_E*` code, so a caller matches `APH_E013` there exactly as a TypeScript
+caller matches it on the thrown message. Not published to hex.pm: see
+[interpreters/elixir/README.md](interpreters/elixir/README.md).
+
+`aph-ts`, `aph-py` and the Elixir binding are three **bindings of this one
+reference implementation**, held at export parity — the same four operations,
+the same semantics, the same error identity, each in its language's idiom —
+under a standing rule that an addition to any one is unfinished until it lands
+in the other two, so they cannot drift into teaching different things. All
+three cross the FFI as JSON text in both directions, because the envelope's
+`proof` union is untagged and an object round-trip hands arm selection to a
+second deserializer. None is a second implementation, and none is evidence that
 one can be built: see [interpreters/rust/aph-py/README.md](interpreters/rust/aph-py/README.md).
 
 ## The second implementation (TypeScript)
@@ -321,8 +343,8 @@ cd interpreters/typescript && npm install && npm run build && npm test
 ```
 
 **What it proves, and what it does not.** It proves the specification is
-implementable **twice from its own text** — the definitional gap `aph-ts` and
-`aph-py` cannot close, because both are bindings of the one reference. It is
+implementable **twice from its own text** — the definitional gap the three
+bindings cannot close, because all three are bindings of the one reference. It is
 independence of **CODE, not of TEAM**: the same authors wrote both, so it is
 not evidence that the document survives a stranger. The invitation below still
 stands, and an outside implementation remains the missing half.

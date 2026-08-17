@@ -1,0 +1,27 @@
+# Mix build output and fetched dependencies.
+/_build/
+/cover/
+/deps/
+/doc/
+/.fetch
+erl_crash.dump
+*.ez
+*.beam
+
+# Cargo output for the NIF crate. Mix drives that build and copies the shared
+# object into _build/, so nothing under target/ is ever an input to anything.
+/native/aph_nif/target/
+
+# The compiled NIF itself, which rustler also copies here. A shared object is
+# build output twice over: it embeds absolute build-machine paths (the name
+# hygiene scan catches them — that is how this entry got written), and a
+# committed binary nobody can read is exactly the artifact a supply-chain
+# reviewer cannot review. Every consumer builds it from source via mix.
+/priv/native/
+
+# ⛔ DELIBERATELY NOT IGNORED: `mix.lock` and `native/aph_nif/Cargo.lock`.
+# Both are written by the first successful build, and both belong in the same
+# commit as the code that caused them — the same rule the Python binding's
+# workflow states about its own lockfile. Without them CI re-resolves the whole
+# dependency tree on every run, and the version this binding was actually
+# tested against is nowhere on record.

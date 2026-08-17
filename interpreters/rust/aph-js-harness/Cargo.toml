@@ -1,0 +1,27 @@
+[package]
+name = "aph-js-harness"
+description = "Runs the TypeScript implementation's crypto-free core under a second ECMAScript engine, from cargo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+# Nothing here is a library anyone could depend on: every entry point reads
+# build output from a sibling directory that is not part of any package. A
+# published crate would carry a dependency on files it does not ship.
+publish = false
+
+[dependencies]
+# PINNED to an exact version rather than a caret range, and that is the whole
+# design of this crate in one line. It exists to detect a DIVERGENCE between
+# two ECMAScript engines over the same compiled JavaScript. If the second
+# engine can change under CI without a commit, a red run stops being evidence
+# about the TypeScript and becomes a question about which engine ran — so the
+# engine is pinned and moving it is a reviewed change like any other.
+boa_engine = "=0.21.1"
+# The shared expectation table is JSON, read on this side so a failure can
+# print the row's name and its stated reason. The JavaScript side receives the
+# same text and parses it with its own parser — see the crate docs on why the
+# boundary is text in both directions.
+serde = { workspace = true }
+serde_json = { workspace = true }

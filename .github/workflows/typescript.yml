@@ -6,17 +6,29 @@ name: TypeScript interpreter
 # result. `examples/**` is in the path filter because a new or regenerated
 # vector changes what this suite must admit — the corpus harness fails on any
 # example file it has no expectation for.
+#
+# The harness paths below belong to THIS workflow and not to the Rust one:
+# `aph-js-harness` consumes the tsc output, so the thing that must rebuild
+# before it runs is this job's build step. Naming its crate directory, the
+# workspace manifest and the lockfile is what keeps an engine-version bump or a
+# harness edit from reaching main without ever scheduling the job that runs it.
 on:
   push:
     branches: [main]
     paths:
       - "interpreters/typescript/**"
+      - "interpreters/rust/aph-js-harness/**"
+      - "interpreters/rust/Cargo.toml"
+      - "interpreters/rust/Cargo.lock"
       - "examples/**"
       - ".github/workflows/typescript.yml"
   pull_request:
     branches: [main]
     paths:
       - "interpreters/typescript/**"
+      - "interpreters/rust/aph-js-harness/**"
+      - "interpreters/rust/Cargo.toml"
+      - "interpreters/rust/Cargo.lock"
       - "examples/**"
       - ".github/workflows/typescript.yml"
 
@@ -69,3 +81,42 @@ jobs:
         run: npm run build
       - name: Run the suite
         run: npm test
+
+  second-engine:
+    # A SEPARATE job rather than a step in the matrix above, and the separation
+    # is the point: this run contains no Node at all beyond the compiler that
+    # produced `dist/`. Bolting it onto the matrix would run one engine's
+    # conformance check twice, once per Node version, and would read as though
+    # the result depended on which Node was installed. It does not — that
+    # independence is the whole claim.
+    name: second ECMAScript engine (cargo)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # One Node version, used only to RUN tsc. Nothing in this job executes
+      # JavaScript on Node: the suite under test runs inside the Rust process.
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the compiler (the only dependency)
+        working-directory: interpreters/typescript
+        run: npm install --no-audit --no-fund
+      # The harness reads build OUTPUT, so this step is its prerequisite. Its
+      # tests fail with a BUILD FIRST message when `dist/` is absent rather than
+      # with a module-resolution error, which is what makes a broken build step
+      # legible here instead of looking like a broken harness.
+      - name: Type-check and build
+        working-directory: interpreters/typescript
+        run: npm run build
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: interpreters/rust
+      # Named explicitly because the crate is outside `default-members`: the
+      # bare `cargo test` in the Rust workflow never reaches it, and must not.
+      - name: Run the compiled core under the second engine
+        working-directory: interpreters/rust
+        run: cargo test -p aph-js-harness

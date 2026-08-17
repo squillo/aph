@@ -16,28 +16,31 @@ a parsed envelope can hand `bodySize` back as a float, or as an integer past
 2^53 that a double cannot hold, without noticing either. Text in, text out:
 the only number parser that runs is `serde_json`'s.
 
-## Parity with `aph-ts`, and what this crate is not
+## Parity with the other two bindings, and what this crate is not
 
-`aph-py` and `aph-ts` are two **bindings of one reference implementation**,
-not two implementations. They export the same operations, with the same
-semantics and the same error text, in each language's case convention:
+`aph-py`, `aph-ts` and the Elixir binding under `interpreters/elixir` are three
+**bindings of one reference implementation**, not three implementations. They
+export the same operations, with the same semantics and the same error text, in
+each language's idiom:
 
-| `aph-ts` (JS)            | `aph` (Python)             |
-|--------------------------|----------------------------|
-| `parseEnvelopeJson`      | `parse_envelope_json`      |
-| `serializeEnvelope`      | `serialize_envelope`       |
-| `verifyProofStructure`   | `verify_proof_structure`   |
-| `requireAttestationMode` | `require_attestation_mode` |
+| `aph-ts` (JS)            | `aph` (Python)             | `aph` (Elixir)                   |
+|--------------------------|----------------------------|----------------------------------|
+| `parseEnvelopeJson`      | `parse_envelope_json`      | `APH.parse_envelope_json/1`      |
+| `serializeEnvelope`      | `serialize_envelope`       | `APH.serialize_envelope/1`       |
+| `verifyProofStructure`   | `verify_proof_structure`   | `APH.verify_proof_structure/1`   |
+| `requireAttestationMode` | `require_attestation_mode` | `APH.require_attestation_mode/2` |
 
-Neither may grow an operation the other lacks. Two bindings that teach
-different things about one protocol are how a protocol acquires two meanings —
-so a change to this surface is not finished until the same change lands in
-`aph-ts`, and the reverse.
+None may grow an operation the others lack. Bindings that teach different
+things about one protocol are how a protocol acquires several meanings — so a
+change to this surface is not finished until the same change lands in the other
+two, and the reverse. The Elixir member answers `{:ok, result} | {:error,
+code}` instead of raising, because that is the BEAM's spelling for a refusal
+that is an ordinary outcome; the `APH_E*` code still travels as the wire string.
 
-What neither binding is: independent evidence. A binding that agrees with the
+What none of the three is: independent evidence. A binding that agrees with the
 reference agrees with itself. The question "can a stranger build this from the
 specification alone?" is answered by an implementation that shares no code
-with this workspace — not by either of these crates.
+with this workspace — not by any of these bindings.
 
 ## Test
 
@@ -113,5 +116,5 @@ because no protocol rule has been reached yet.
 The surface covers JSON round-trip plus proof-structure verification, so a
 Python consumer can detect a forged `PrincipalSigned` label instead of
 trusting the self-asserted string. Cryptographic signature verification stays
-on the Rust side. Any addition here is an addition to `aph-ts` as well; see
-the parity contract above.
+on the Rust side. Any addition here is an addition to the other two bindings as
+well; see the parity contract above.

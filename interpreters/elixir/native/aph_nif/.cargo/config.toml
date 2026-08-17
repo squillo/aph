@@ -1,0 +1,13 @@
+# A NIF is a shared object with UNDEFINED `enif_*` symbols: the BEAM supplies
+# them at load time, and there is no library to link them from at build time.
+# ELF linkers allow that by default, so Linux needs nothing here. The Apple
+# linker does not — it fails the cdylib with undefined symbols unless told to
+# defer them — so macOS builds need these two flags or the crate does not link
+# at all on the machine most of this is written on.
+[target.'cfg(target_os = "macos")']
+rustflags = [
+  "-C",
+  "link-arg=-undefined",
+  "-C",
+  "link-arg=dynamic_lookup",
+]

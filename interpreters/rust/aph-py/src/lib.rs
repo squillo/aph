@@ -27,28 +27,34 @@
 //! aph.require_attestation_mode(text, "PrincipalSigned")  # §8.3.1 step 1a
 //! ```
 //!
-//! # Parity contract with `aph-ts`
+//! # Parity contract with `aph-ts` and the Elixir binding
 //!
-//! This crate and `aph-ts` are two BINDINGS of one reference implementation,
-//! not two implementations. They export the same operations with the same
-//! semantics and the same error text, spelled in each language's case
-//! convention:
+//! This crate, `aph-ts` and the Elixir binding under `interpreters/elixir` are
+//! three BINDINGS of one reference implementation, not three implementations.
+//! They export the same operations with the same semantics and the same error
+//! text, spelled in each language's idiom:
 //!
-//! | `aph-ts` (JS)            | `aph` (Python)             |
-//! |--------------------------|----------------------------|
-//! | `parseEnvelopeJson`      | `parse_envelope_json`      |
-//! | `serializeEnvelope`      | `serialize_envelope`       |
-//! | `verifyProofStructure`   | `verify_proof_structure`   |
-//! | `requireAttestationMode` | `require_attestation_mode` |
+//! | `aph-ts` (JS)            | `aph` (Python)             | `aph` (Elixir)                   |
+//! |--------------------------|----------------------------|----------------------------------|
+//! | `parseEnvelopeJson`      | `parse_envelope_json`      | `APH.parse_envelope_json/1`      |
+//! | `serializeEnvelope`      | `serialize_envelope`       | `APH.serialize_envelope/1`       |
+//! | `verifyProofStructure`   | `verify_proof_structure`   | `APH.verify_proof_structure/1`   |
+//! | `requireAttestationMode` | `require_attestation_mode` | `APH.require_attestation_mode/2` |
 //!
-//! Neither binding may grow an operation, a semantic, or an error spelling
-//! the other lacks: two bindings that teach different things about one
-//! protocol are how a protocol acquires two meanings. Operatively — a change
-//! to this surface is unfinished until the same change lands in `aph-ts`, and
-//! the reverse. Independence from the reference is a different artifact
-//! entirely — an implementation written from the specification and the
-//! published vectors, sharing no code with this workspace — and neither
-//! binding is or claims to be one.
+//! No binding may grow an operation, a semantic, or an error spelling the
+//! others lack: bindings that teach different things about one protocol are
+//! how a protocol acquires several meanings. Operatively — a change to this
+//! surface is unfinished until the same change lands in the other two, and the
+//! reverse. Independence from the reference is a different artifact entirely —
+//! an implementation written from the specification and the published vectors,
+//! sharing no code with this workspace — and no binding is or claims to be one.
+//!
+//! The Elixir member returns `{:ok, result} | {:error, code}` rather than
+//! raising, because that is the BEAM's spelling for a refusal that is an
+//! ordinary outcome; the APH code still travels as the wire STRING, so a
+//! caller matches `APH_E013` there exactly as one matches it on `str(e)` here.
+//! Its NIF crate is excluded from the Rust workspace outright rather than
+//! merely from `default-members`, because mix drives that build.
 //!
 //! # Errors
 //!

@@ -1,0 +1,249 @@
+{
+  "purpose": "The RFC 8785 expectation table, in a format with no language in it. One table, two engines: the node suite reads it in test/jcs.test.ts and a second ECMAScript engine reads the same file from cargo (interpreters/rust/aph-js-harness). A row that passes under one engine and fails under the other is a conformance finding about the canonicalizer -- an accidental host-ism -- and is reported as a divergence with both outputs, never papered over with a per-engine branch.",
+  "readingTheTable": "`json` is the INPUT's JSON text, so a backslash escape inside it is written doubled (\\\\u20ac); `canonical` is the EXPECTED OUTPUT text, so a non-ASCII character in it is written as a single escape (\\u20ac) and arrives as the character itself. Both fields stay pure ASCII on disk: a raw control or zero-width character in a fixture is invisible to a reviewer, and this repository sweeps for them.",
+  "inputSpelling": "Every numeric input is spelled so that its decimal-to-double conversion is unambiguous -- an exactly-representable integer, or a shortest-round-trip decimal. That is deliberate. RFC 8785 section 3.2.2.3 governs how a number is SERIALIZED, not how its decimal text is read, so a case whose value depended on the host's number parser would be pinning the wrong thing. Where a rounding case is wanted on purpose (the 2^53 tie), it is written in fractional form so both engines take their correctly-rounded path to the same double and the row still measures formatting.",
+  "canonicalize": [
+    {
+      "name": "members sort by UTF-16 code unit, not by insertion order",
+      "pins": "RFC 8785 section 3.2.3. A canonicalizer that preserves insertion order signs different bytes than one that sorts, and neither can verify the other.",
+      "json": "{\"b\":1,\"a\":2,\"C\":3}",
+      "canonical": "{\"C\":3,\"a\":2,\"b\":1}"
+    },
+    {
+      "name": "an uppercase letter sorts before a lowercase one",
+      "pins": "RFC 8785 section 3.2.3. A locale-aware comparator sorts \"a\" before \"C\" in several locales. The code units are 0x43 and 0x61, so \"C\" MUST come first.",
+      "json": "{\"a\":1,\"C\":2}",
+      "canonical": "{\"C\":2,\"a\":1}"
+    },
+    {
+      "name": "a surrogate pair sorts above the BMP",
+      "pins": "RFC 8785 section 3.2.3 compares UTF-16 CODE UNITS. \"a\" is U+0061, the euro sign is U+20AC, and the emoji is the pair D83D DE02 -- which therefore compares by its LEADING surrogate and sorts last.",
+      "json": "{\"\\ud83d\\ude02\":3,\"\\u20ac\":2,\"a\":1}",
+      "canonical": "{\"a\":1,\"\u20ac\":2,\"\ud83d\ude02\":3}"
+    },
+    {
+      "name": "sorting recurses into nested objects and never reorders an array",
+      "pins": "RFC 8785 section 3.2.3. Array order is data; object member order is not.",
+      "json": "{\"z\":{\"b\":1,\"a\":2},\"list\":[{\"y\":1,\"x\":2},3]}",
+      "canonical": "{\"list\":[{\"x\":2,\"y\":1},3],\"z\":{\"a\":2,\"b\":1}}"
+    },
+    {
+      "name": "an integer serializes with no decoration",
+      "pins": "RFC 8785 section 3.2.2.3 defers to ECMAScript Number::toString.",
+      "json": "1",
+      "canonical": "1"
+    },
+    {
+      "name": "an integer-valued double loses its trailing \".0\"",
+      "pins": "RFC 8785 section 3.2.2.3. A trailing \".0\" is not part of the ECMAScript form; an implementation that emitted one would sign different bytes for the same value.",
+      "json": "1.0",
+      "canonical": "1"
+    },
+    {
+      "name": "negative zero serializes as \"0\"",
+      "pins": "RFC 8785 section 3.2.2.3 via ECMAScript Number::toString, which maps both zeroes to \"0\". A surviving sign here would be a defect: two producers holding the same value would sign different bytes.",
+      "json": "-0",
+      "canonical": "0"
+    },
+    {
+      "name": "negative zero inside an array is still \"0\"",
+      "pins": "The zero rule is a property of the number, not of the top-level position -- worth a row of its own because an implementation that special-cases the scalar entry point would pass the row above and fail this one.",
+      "json": "[-0]",
+      "canonical": "[0]"
+    },
+    {
+      "name": "negative zero as a member value is still \"0\"",
+      "pins": "Same rule as the array row, reached through the object path.",
+      "json": "{\"a\":-0}",
+      "canonical": "{\"a\":0}"
+    },
+    {
+      "name": "a plain zero serializes as \"0\"",
+      "pins": "The control for the two negative-zero rows: without it, a canonicalizer that emitted \"0\" for everything would pass them.",
+      "json": "0",
+      "canonical": "0"
+    },
+    {
+      "name": "a fractional value keeps its shortest round-tripping form",
+      "pins": "RFC 8785 section 3.2.2.3. 0.1 has no exact binary form, so the output is the shortest decimal that reads back to the same double.",
+      "json": "0.1",
+      "canonical": "0.1"
+    },
+    {
+      "name": "a negative fractional value keeps its sign and its shortest form",
+      "pins": "RFC 8785 section 3.2.2.3.",
+      "json": "-1.5",
+      "canonical": "-1.5"
+    },
+    {
+      "name": "an arithmetic-artifact double keeps all seventeen significant digits",
+      "pins": "RFC 8785 section 3.2.2.3. 0.30000000000000004 is the classic shortest-round-trip case: an implementation that rounded to fifteen digits for display would sign different bytes.",
+      "json": "0.30000000000000004",
+      "canonical": "0.30000000000000004"
+    },
+    {
+      "name": "a small integer serializes in positional form",
+      "pins": "RFC 8785 section 3.2.2.3.",
+      "json": "100",
+      "canonical": "100"
+    },
+    {
+      "name": "exponent notation in the INPUT does not survive into the output",
+      "pins": "RFC 8785 section 3.2.2.3 serializes the VALUE, not the source text. 1e2 and 100 are the same double and MUST canonicalize identically, or the same document written two ways would carry two signatures.",
+      "json": "1e2",
+      "canonical": "100"
+    },
+    {
+      "name": "an uppercase exponent marker in the input does not survive either",
+      "pins": "Same rule as the row above, through JSON's other spelling of the exponent.",
+      "json": "1E2",
+      "canonical": "100"
+    },
+    {
+      "name": "a mixed fraction-and-exponent input collapses to the positional form",
+      "pins": "RFC 8785 section 3.2.2.3.",
+      "json": "1.0e1",
+      "canonical": "10"
+    },
+    {
+      "name": "1e20 stays positional -- the last magnitude before the exponent boundary",
+      "pins": "ECMAScript Number::toString switches to exponential form only above 10^21. 1e20 is on the positional side and expands to twenty-one digits.",
+      "json": "1e20",
+      "canonical": "100000000000000000000"
+    },
+    {
+      "name": "the largest value still written positionally keeps its zero padding",
+      "pins": "ECMAScript Number::toString expands sixteen significant digits into a twenty-one-digit positional form here. This is the exact boundary case: one more decimal place and the output flips to exponential.",
+      "json": "9.999999999999999e20",
+      "canonical": "999999999999999900000"
+    },
+    {
+      "name": "1e21 crosses the boundary into exponential form",
+      "pins": "ECMAScript Number::toString. The \"+\" in \"1e+21\" is required and is the detail a hand-rolled formatter drops.",
+      "json": "1e21",
+      "canonical": "1e+21"
+    },
+    {
+      "name": "1e-6 stays positional -- the last magnitude before the negative boundary",
+      "pins": "ECMAScript Number::toString writes a leading \"0.\" down to 10^-6 inclusive.",
+      "json": "1e-6",
+      "canonical": "0.000001"
+    },
+    {
+      "name": "1e-7 crosses the negative boundary into exponential form",
+      "pins": "ECMAScript Number::toString. Note the exponent is written \"e-7\" with no \"+\" and no zero padding.",
+      "json": "1e-7",
+      "canonical": "1e-7"
+    },
+    {
+      "name": "a negative value below the boundary carries both signs",
+      "pins": "ECMAScript Number::toString. Two minus signs in one literal is where a string-concatenating formatter goes wrong.",
+      "json": "-1e-7",
+      "canonical": "-1e-7"
+    },
+    {
+      "name": "MAX_SAFE_INTEGER round-trips exactly",
+      "pins": "2^53 - 1 is the last integer with an exclusive double representation. Below the boundary nothing rounds, so this row is the control the three rows after it are read against.",
+      "json": "9007199254740991",
+      "canonical": "9007199254740991"
+    },
+    {
+      "name": "2^53 itself round-trips exactly",
+      "pins": "The first magnitude where consecutive doubles are two apart. The value is exact, so it must survive unchanged.",
+      "json": "9007199254740992",
+      "canonical": "9007199254740992"
+    },
+    {
+      "name": "2^53 + 1 is not representable and lands on 2^53",
+      "pins": "The tie case: 9007199254740993 sits exactly halfway between two doubles and rounds to the even one. Written in fractional form on purpose -- see inputSpelling -- so the row measures how the resulting double is SERIALIZED. A canonicalizer that carried the literal text through would emit an unrepresentable number and no verifier could reproduce it.",
+      "json": "9007199254740993.0",
+      "canonical": "9007199254740992"
+    },
+    {
+      "name": "2^53 + 2 is representable again",
+      "pins": "The other side of the tie: with a spacing of two above 2^53, the even neighbour survives exactly. Together with the row above, this proves the rounding is a property of the VALUE and not a truncation of the digits.",
+      "json": "9007199254740994",
+      "canonical": "9007199254740994"
+    },
+    {
+      "name": "the tie rounds the same way on the negative side",
+      "pins": "Rounding is magnitude-symmetric in IEEE-754 round-half-to-even; a formatter that applied the sign before the rounding would disagree here and nowhere else.",
+      "json": "-9007199254740993.0",
+      "canonical": "-9007199254740992"
+    },
+    {
+      "name": "a seventeen-digit value far above the boundary takes the exponential form",
+      "pins": "ECMAScript Number::toString writes one digit, a point, the remaining significant digits, then \"e+29\".",
+      "json": "1.2345678901234568e29",
+      "canonical": "1.2345678901234568e+29"
+    },
+    {
+      "name": "the largest finite double has a three-digit exponent",
+      "pins": "ECMAScript Number::toString. A formatter that padded or truncated the exponent to two digits would break here and pass everything else.",
+      "json": "1.7976931348623157e308",
+      "canonical": "1.7976931348623157e+308"
+    },
+    {
+      "name": "the quotation mark and the backslash take their two-character escapes",
+      "pins": "RFC 8785 section 3.2.2.2.",
+      "json": "\"a\\\"b\\\\c\"",
+      "canonical": "\"a\\\"b\\\\c\""
+    },
+    {
+      "name": "the five named control characters take their named escapes",
+      "pins": "RFC 8785 section 3.2.2.2 gives backspace, tab, newline, form feed and carriage return two-character forms; an implementation that emitted \\u000a for a newline would sign different bytes.",
+      "json": "\"\\b\\t\\n\\f\\r\"",
+      "canonical": "\"\\b\\t\\n\\f\\r\""
+    },
+    {
+      "name": "the rest of the C0 range takes the \\u00xx form with LOWERCASE hex",
+      "pins": "RFC 8785 section 3.2.2.2. Uppercase hex is the plausible mistake and it changes the bytes.",
+      "json": "\"\\u0001\\u001f\"",
+      "canonical": "\"\\u0001\\u001f\""
+    },
+    {
+      "name": "U+007F DELETE is NOT escaped",
+      "pins": "RFC 8785 section 3.2.2.2 escapes below U+0020 only. DELETE is not a C0 control and is left alone -- a plausible mistake, so it is pinned.",
+      "json": "\"\\u007f\"",
+      "canonical": "\"\u007f\""
+    },
+    {
+      "name": "non-ASCII characters stay literal, inside and outside the BMP",
+      "pins": "RFC 8785 section 3.2.2.2. The canonical form carries the character and the UTF-8 encoding carries the bytes; an implementation that escaped them would produce a form no other implementation reproduces.",
+      "json": "\"\\u00e9\\ud83d\\ude02\"",
+      "canonical": "\"\u00e9\ud83d\ude02\""
+    },
+    {
+      "name": "the JSON literals and the empty containers carry no insignificant whitespace",
+      "pins": "RFC 8785 section 3.2. Whitespace is where a pretty-printing serializer leaks into signed bytes.",
+      "json": "{\"a\":null,\"b\":true,\"c\":false,\"d\":[],\"e\":{}}",
+      "canonical": "{\"a\":null,\"b\":true,\"c\":false,\"d\":[],\"e\":{}}"
+    },
+    {
+      "name": "a protocol-shaped object sorts its members and keeps its integers positional",
+      "pins": "The rules above, on the member names and value shapes an envelope actually carries (a byte count, a latency, a line count, and an omitted-as-null rate limit). A canonicalizer can be right about synthetic inputs and wrong about the document it will be handed.",
+      "json": "{\"previewLines\":3,\"bodySize\":1024,\"rateLimitPerHour\":null,\"decisionLatencyMs\":0}",
+      "canonical": "{\"bodySize\":1024,\"decisionLatencyMs\":0,\"previewLines\":3,\"rateLimitPerHour\":null}"
+    }
+  ],
+  "refuse": [
+    {
+      "name": "NaN is refused rather than coerced",
+      "pins": "JSON.stringify turns NaN into `null`, silently changing the bytes a signature covers. There is no JSON form for a non-finite number, so refusing is the only safe answer.",
+      "nonFinite": "NaN",
+      "errorName": "TypeError"
+    },
+    {
+      "name": "positive infinity is refused rather than coerced",
+      "pins": "Same reasoning as NaN, and the same silent `null` from JSON.stringify.",
+      "nonFinite": "Infinity",
+      "errorName": "TypeError"
+    },
+    {
+      "name": "negative infinity is refused rather than coerced",
+      "pins": "The third non-finite double. Listed separately because an implementation that tested only `Number.isNaN` would let both infinities through.",
+      "nonFinite": "-Infinity",
+      "errorName": "TypeError"
+    }
+  ]
+}
