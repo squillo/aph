@@ -57,11 +57,25 @@ jobs:
             cargo build --release --target wasm32-unknown-unknown -p aph-wasm-abi
 
       - name: Byte-diff against the committed artifact
+        id: bytediff
         run: |
           cmp interpreters/rust/target/wasm32-unknown-unknown/release/aph_wasm_abi.wasm \
               interpreters/go/internal/wasm/aph.wasm \
             && echo "committed wasm is byte-identical to the pinned-toolchain rebuild" \
-            || { echo "::error::committed aph.wasm does not match a pinned-toolchain rebuild — regenerate it in this commit (recipe in interpreters/go/README.md)"; exit 1; }
+            || { echo "::error::committed aph.wasm does not match a pinned-toolchain rebuild — download this run's rebuilt-aph-wasm artifact and commit it (recipe in interpreters/go/README.md)"; exit 1; }
+
+      # THE REFERENCE BUILDER IS THIS JOB, not any developer machine: the same
+      # rustc on macOS and Linux does not produce byte-identical wasm (the
+      # host-shipped std differs), so exactly one platform's bytes can be the
+      # committed truth and this runner is it. On a mismatch the rebuilt bytes
+      # are uploaded so the fix is download-and-commit, never hand-rebuilding
+      # toward a target the builder cannot reach.
+      - name: Upload the reference bytes on mismatch
+        if: failure() && steps.bytediff.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-aph-wasm
+          path: interpreters/rust/target/wasm32-unknown-unknown/release/aph_wasm_abi.wasm
 
       - name: Install Go
         uses: actions/setup-go@v5

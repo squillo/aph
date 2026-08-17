@@ -57,7 +57,21 @@ the same commit that moves the pin) and canonicalized source paths, because
 rustc embeds panic-location and registry paths that would otherwise differ
 per machine and leak developer paths into a committed file.
 
-Regenerate from the repository root:
+**The reference builder is the CI job, not a developer machine.** The same
+rustc version on macOS and on Linux does not produce byte-identical wasm —
+the host-shipped standard library differs — so exactly one platform's bytes
+can be the committed truth, and the Linux runner is it. To regenerate after
+changing the shim or moving the toolchain pin:
+
+1. Push the source change (the byte-diff job fails, by design, and uploads
+   the freshly built reference as the `rebuilt-aph-wasm` workflow artifact).
+2. Download that artifact, place it at `internal/wasm/aph.wasm`, run
+   `go test ./...` locally against it (wasm is platform-independent at
+   runtime, so any machine can verify it), and commit.
+
+A local build with the same canonicalized flags is still useful — it proves
+the source compiles and the tests pass end to end before pushing — it just
+cannot produce the committed bytes:
 
 ```sh
 cd interpreters/rust
@@ -66,11 +80,6 @@ RUSTFLAGS="--remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$HOME/.ru
 cp target/wasm32-unknown-unknown/release/aph_wasm_abi.wasm ../go/internal/wasm/aph.wasm
 cd ../go && go test ./...
 ```
-
-If the byte-diff job ever disagrees with a locally regenerated artifact,
-prefer the CI-built bytes: the pinned-toolchain Linux build is the recorded
-reference, and the mismatch is a finding about build reproducibility to
-investigate, not to paper over.
 
 ## Tests
 
