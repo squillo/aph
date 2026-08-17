@@ -163,16 +163,12 @@ pub fn verify_proof_structure(json: &str) -> pyo3::PyResult<std::string::String>
 /// `PrincipalSigned` label. Calling this function alone accepts one.
 #[pyo3::pyfunction]
 pub fn require_attestation_mode(json: &str, required: &str) -> pyo3::PyResult<()> {
-  let required_mode = match required {
-    "PrincipalSigned" => aph_core::AttestationMode::PrincipalSigned,
-    "NotaryAttested" => aph_core::AttestationMode::NotaryAttested,
-    other => {
-      return std::result::Result::Err(AphError::new_err(std::format!(
-        "unknown attestation mode `{}`: expected `PrincipalSigned` or `NotaryAttested`",
-        other
-      )));
-    }
-  };
+  // One meaning, one place: the spellings live in aph-core's `FromStr` (the
+  // inverse of `label()`); this binding only wraps the message in its
+  // exception type. Four copies of the downgrade gate's vocabulary was four
+  // places a typo could become the downgrade.
+  let required_mode: aph_core::AttestationMode =
+    required.parse().map_err(AphError::new_err)?;
   let envelope = parse_envelope(json).map_err(AphError::new_err)?;
   aph_core::require_mode(&envelope, required_mode)
     .map_err(|e| AphError::new_err(std::format!("{}", e)))

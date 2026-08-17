@@ -109,16 +109,11 @@ fn require_attestation_mode_impl(
   json: &str,
   required: &str,
 ) -> std::result::Result<(), std::string::String> {
-  let required_mode = match required {
-    "PrincipalSigned" => aph_core::AttestationMode::PrincipalSigned,
-    "NotaryAttested" => aph_core::AttestationMode::NotaryAttested,
-    other => {
-      return std::result::Result::Err(std::format!(
-        "unknown attestation mode `{}`: expected `PrincipalSigned` or `NotaryAttested`",
-        other
-      ));
-    }
-  };
+  // One meaning, one place: the spellings live in aph-core's `FromStr`, the
+  // inverse of `label()`. This shim used to carry its own copy of this match
+  // — as did every sibling binding — and four copies of the downgrade gate's
+  // vocabulary is four places a typo could become the downgrade.
+  let required_mode: aph_core::AttestationMode = required.parse()?;
   let envelope = parse_envelope(json)?;
   aph_core::require_mode(&envelope, required_mode).map_err(|e| std::format!("{}", e))
 }

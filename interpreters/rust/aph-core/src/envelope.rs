@@ -183,6 +183,33 @@ impl std::fmt::Display for AttestationMode {
   }
 }
 
+impl std::str::FromStr for AttestationMode {
+  type Err = std::string::String;
+
+  /// The inverse of [`AttestationMode::label`], and the ONE place the wire
+  /// spellings are matched. Every binding's `require_attestation_mode` takes
+  /// the required mode as a caller-supplied string, and until this impl
+  /// existed each binding matched the spellings itself — four identical
+  /// copies of one meaning, each a site where a defaulting typo would BE the
+  /// downgrade that gate exists to refuse. The bindings now call this and
+  /// stay glue.
+  ///
+  /// The error is a plain message rather than an [`crate::errors::AphError`]
+  /// on purpose: an unknown label here is a CALLER's programming mistake
+  /// (nothing from the wire is involved), so it must not dress itself in a
+  /// protocol code a caller might route on.
+  fn from_str(label: &str) -> std::result::Result<Self, Self::Err> {
+    match label {
+      "PrincipalSigned" => std::result::Result::Ok(Self::PrincipalSigned),
+      "NotaryAttested" => std::result::Result::Ok(Self::NotaryAttested),
+      other => std::result::Result::Err(std::format!(
+        "unknown attestation mode `{}`: expected `PrincipalSigned` or `NotaryAttested`",
+        other
+      )),
+    }
+  }
+}
+
 /// The notarized claim: who authorized what, on which channel, under
 /// which policy, attested by which notary.
 #[derive(

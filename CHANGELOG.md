@@ -269,6 +269,10 @@ One commit, six deliverables, all aimed at the same target: the distance between
 - The export-parity contract is now **FOUR-way** (wasm/JS, Python, Elixir, Go), flipped on every surface that stated three. None of the four is a second implementation; that remains `interpreters/typescript/` alone.
 - Go suite over the published corpus: the signed golden admitted by every operation, forged label refused `APH_E013` and downgrade `APH_E012` by exact code, both proof-union arms round-tripped value-lossless, the widening tripwire, and a string-in/string-out pin. A missing embedded artifact fails with a REGENERATE-FIRST message, never a runtime panic.
 
+### Changed (revision 2026-08-17d — one meaning, one place: the mode spellings)
+
+- `AttestationMode` gains a `FromStr` — the inverse of its existing `label()` and now the ONE place the wire spellings `PrincipalSigned`/`NotaryAttested` are matched. All four bindings' `require_attestation_mode` shims previously carried an identical private copy of that match: four statements of one meaning, each a site where a defaulting typo would BE the mode downgrade that gate exists to refuse. Each shim now delegates (`required.parse()?`), the error message is byte-identical to what every binding produced before, and the shims are thinner — which is the direction glue is supposed to move. Deliberately a plain-message error rather than a protocol code: an unknown label is a caller's programming mistake with nothing from the wire involved, and it must not dress itself in a code a caller might route on. Found by the DRY audit, not by a failure.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.
