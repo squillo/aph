@@ -7,7 +7,7 @@ Contributions to the APH specification, examples, and tests are welcome via pull
 - Pull requests target the `main` branch.
 - Every commit MUST carry a `Signed-off-by:` line (Developer Certificate of Origin). Configure with `git commit -s`.
 - Maintainers from Squillo, Inc. review and merge.
-- For substantive discussion, open a GitHub issue before opening a PR so the design conversation lives in the issue tracker.
+- For substantive discussion, open a GitHub issue before opening a PR so the design conversation lives in the issue tracker. Three issue forms carry the process: **RFC** for any change to normative text (the request-for-change entry point — problem, proposal, compatibility, security, in that order), **Erratum** for spec text that is simply wrong, and **Conformance disagreement** for an implementation that disagrees with a published artifact. Review routing is codified in `.github/CODEOWNERS`; the PR template restates the approval bar at the moment it applies.
 
 ## Scope
 

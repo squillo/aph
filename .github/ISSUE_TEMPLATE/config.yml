@@ -1,0 +1,11 @@
+# Blank issues stay enabled: a report that fits no template is still worth
+# having, and a closed template list is how edge cases go unreported.
+blank_issues_enabled: true
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/squillo/aph/blob/main/spec/security-considerations.md
+    about: >-
+      Read the threat model first — §2 lists what APH defends against and §3
+      what it deliberately does not. For a vulnerability in the protocol or
+      the reference implementation, use a private channel to the maintainer
+      rather than a public issue.

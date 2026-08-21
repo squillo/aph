@@ -1,0 +1,33 @@
+# Review routing. CODEOWNERS makes the review rules in CONTRIBUTING.md
+# platform-visible: GitHub auto-requests these reviewers on any PR touching
+# the matched paths, and branch protection (when enabled with "require review
+# from Code Owners") makes the request blocking rather than advisory.
+#
+# An unknown username here fails SILENTLY — GitHub skips it without warning —
+# so every entry below is a verified account, and adding a maintainer means
+# verifying the handle before committing it.
+#
+# Later rules override earlier ones; the last match wins.
+
+# Default: everything routes to the maintainer.
+* @scott-wyatt
+
+# THE NORMATIVE SURFACE — the paths where a change can alter what conformance
+# means. CONTRIBUTING.md requires two maintainer approvals and a version bump
+# here (pre-production exception: the bump may be skipped, the approvals may
+# not). Listed separately so that when a second maintainer exists, adding
+# them to THESE lines is the one-line change that makes the two-approval rule
+# enforceable, and so a reviewer can see at a glance that a PR has crossed
+# from editorial into normative territory.
+/spec/aph-0.1.md @scott-wyatt
+/spec/a2a-extension.md @scott-wyatt
+/spec/schemas/ @scott-wyatt
+/examples/ @scott-wyatt
+
+# The signed vectors and the generators that mint them: a change here alters
+# the bytes other implementations test against.
+/interpreters/rust/aph-conformance/ @scott-wyatt
+
+# Registration requests: the contact/change-controller content is an
+# organizational statement, not an editorial one.
+/spec/registrations/ @scott-wyatt

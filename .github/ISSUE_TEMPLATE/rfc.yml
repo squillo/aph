@@ -1,0 +1,89 @@
+name: "RFC — propose a protocol change"
+description: >-
+  The request-for-change entry point CONTRIBUTING.md's process begins with:
+  design discussion lives in an issue BEFORE a pull request exists. Use this
+  for anything that would touch a normative MUST/SHALL clause, the wire
+  shape, the algorithm set, the state machines, or the error taxonomy.
+title: "RFC: "
+labels: ["rfc"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Normative changes need a pull request, two maintainer approvals, and a
+        version bump (see CONTRIBUTING.md — including the pre-production
+        exception and when it expires). This issue is the step before all of
+        that: the design conversation, kept where future readers can find it.
+        An RFC does not need to be long. It needs to be answerable.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What breaks, misleads, or cannot be expressed today? Cite the spec
+        section (§) you are reading. A change without a named problem is a
+        preference.
+      placeholder: "§8.4.5 cannot express ... / a verifier following §8.3 step 4 will ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposed change
+      description: >-
+        What text or behavior changes, stated concretely enough to disagree
+        with. Wire examples welcome. If there are alternatives you rejected,
+        name them and say why — the rejected options are half the value of an
+        RFC.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface does this touch?
+      description: >-
+        Decides the review bar per CONTRIBUTING.md. If you are unsure, pick
+        the strictest that could apply.
+      options:
+        - Normative spec text (MUST/SHALL, wire shape, algorithms, state machines, error codes)
+        - Published vectors or schemas (bytes other implementations test against)
+        - Non-normative docs (runbook, security considerations, guides)
+        - Reference implementation or bindings only (no spec text moves)
+    validations:
+      required: true
+  - type: textarea
+    id: compat
+    attributes:
+      label: Compatibility and migration
+      description: >-
+        What happens to an envelope minted yesterday, and to a verifier that
+        has not updated? Say "breaking" plainly if it is breaking — the spec's
+        own §8.4.6 no-downgrade analysis is the model for how to reason about
+        a partially-migrated world. State the version-bump consequence under
+        the SemVer rules in CONTRIBUTING.md.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security considerations
+      description: >-
+        Which §2 threat does this interact with, or which §3 exclusion does it
+        move? "None that I can see" is an acceptable answer; silence is not.
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Scope check
+      options:
+        - label: >-
+            I checked the spec's Future Work appendix and the CHANGELOG for an
+            existing decision on this — and if one exists, this RFC says why
+            it should be revisited.
+          required: true
+        - label: >-
+            If accepted, I understand the change lands as a PR with a dated
+            CHANGELOG revision entry, and normative changes need two
+            maintainer approvals.
+          required: true

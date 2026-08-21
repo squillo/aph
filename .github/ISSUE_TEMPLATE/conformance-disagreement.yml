@@ -1,0 +1,54 @@
+name: "Conformance disagreement"
+description: >-
+  Your implementation disagrees with a published artifact — a vector, a
+  schema, a golden envelope, or the reference implementation's verdict. The
+  README says this is worth filing either way, and means it: the disagreement
+  is the finding, whichever side turns out to be the defect.
+title: "Conformance: "
+labels: ["conformance"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        The precedence rules, so the triage is predictable: the SPECIFICATION
+        is normative; schemas and fixtures are not, and where a fixture and
+        the spec conflict, the fixture is the defect. Where your
+        implementation and the reference implementation disagree and the spec
+        is silent — that silence is itself a spec defect, and this report
+        becomes an erratum.
+  - type: input
+    id: artifact
+    attributes:
+      label: The artifact you disagree with
+      placeholder: "examples/es256_signed_envelope.json / spec/schemas/... / the reference verifier's verdict on ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expectation
+    attributes:
+      label: What your implementation does
+      description: >-
+        The verdict or bytes your implementation produces, and the spec
+        section it is following. For byte-level disagreements (signatures,
+        canonicalization), include the canonical bytes each side produced —
+        RFC 8785 §3.2.2.3 number formatting and the §7.2.1 proofValue rules
+        are where most byte differences live.
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What the published artifact says
+      description: The conflicting value, verdict, or bytes.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Implementation and environment
+      description: >-
+        Language, library versions, and — for anything cryptographic — which
+        primitive library. If you can run the reference (cargo test, or any of
+        the four bindings), say whether it reproduces on your machine.
+    validations:
+      required: true

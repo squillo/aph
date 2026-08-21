@@ -1,0 +1,42 @@
+name: "Spec defect / erratum"
+description: >-
+  The spec says something wrong, ambiguous, or self-contradictory — no design
+  change proposed, just the text made right. The §7.1.5 channel-kind erratum
+  is the model: a published correction with a dated record.
+title: "Erratum: "
+labels: ["erratum"]
+body:
+  - type: input
+    id: section
+    attributes:
+      label: Section
+      description: "The § you were reading (file + section number)."
+      placeholder: "spec/aph-0.1.md §7.2.1"
+    validations:
+      required: true
+  - type: textarea
+    id: text
+    attributes:
+      label: The text as published
+      description: Quote it exactly — the defect is in the bytes, so cite the bytes.
+    validations:
+      required: true
+  - type: textarea
+    id: defect
+    attributes:
+      label: Why it is wrong
+      description: >-
+        Contradicts another section? Disagrees with every published example?
+        Ambiguous in a way two implementers resolved differently? Cite the
+        other artifact — when spec text and signed fixtures disagree, that
+        conflict IS the finding, and which one is the defect is the
+        maintainers' call (the spec is normative; a fixture that contradicts
+        it is a broken fixture, but more than one erratum has gone the other
+        way).
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: Proposed correction (optional)
+      description: The sentence you would write instead, if you have one.
