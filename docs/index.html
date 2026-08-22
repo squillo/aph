@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APH — the driver's license for AI agents</title>
+<meta name="description" content="APH (Agent per Human) is an open protocol for cryptographically proving that a specific human authorized a specific agent action — verifiable by anyone, across vendors, with no shared platform.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230b1220'/%3E%3Cpath d='M50 14 L82 28 V52 C82 70 68 82 50 88 C32 82 18 70 18 52 V28 Z' fill='none' stroke='%2360d6a7' stroke-width='7'/%3E%3Cpath d='M36 52 L46 62 L66 40' fill='none' stroke='%2360d6a7' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0b1220; --bg2:#101a2e; --panel:#141f36; --line:#22304d;
+    --text:#e8eefc; --dim:#9fb0cc; --accent:#60d6a7; --accent2:#7aa2ff;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+
+  header{padding:18px 0;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,18,32,.92);backdrop-filter:blur(8px);z-index:10}
+  .nav{display:flex;align-items:center;gap:22px}
+  .brand{font-weight:800;letter-spacing:.04em;color:var(--text);font-size:18px}
+  .brand span{color:var(--accent)}
+  .nav a.item{color:var(--dim);font-size:14px}
+  .nav a.item:hover{color:var(--text);text-decoration:none}
+  .nav .push{margin-left:auto}
+  .btn{display:inline-block;padding:10px 18px;border-radius:8px;font-weight:600;font-size:15px}
+  .btn.primary{background:var(--accent);color:#06281b}
+  .btn.primary:hover{filter:brightness(1.08);text-decoration:none}
+  .btn.ghost{border:1px solid var(--line);color:var(--text)}
+  .btn.ghost:hover{border-color:var(--accent2);text-decoration:none}
+
+  .hero{padding:72px 0 40px;display:grid;grid-template-columns:1.15fr .85fr;gap:44px;align-items:center}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;font-size:13px;text-transform:uppercase}
+  h1{font-size:44px;line-height:1.12;margin:14px 0 18px;letter-spacing:-.01em}
+  .lede{color:var(--dim);font-size:19px;max-width:34em}
+  .cta{margin-top:28px;display:flex;gap:14px;flex-wrap:wrap}
+  .hero img{width:100%;border-radius:14px;border:1px solid var(--line);box-shadow:0 24px 60px rgba(0,0,0,.45)}
+
+  .strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2)}
+  .strip .wrap{display:flex;flex-wrap:wrap;gap:0;padding:0 24px}
+  .fact{flex:1 1 160px;padding:22px 18px;text-align:center;border-left:1px solid var(--line)}
+  .fact:first-child{border-left:none}
+  .fact b{display:block;font-size:26px;color:var(--accent)}
+  .fact span{color:var(--dim);font-size:13.5px}
+
+  section{padding:64px 0}
+  h2{font-size:30px;margin-bottom:10px;letter-spacing:-.01em}
+  .sub{color:var(--dim);max-width:46em;margin-bottom:34px}
+  .tag{display:block;font-size:22px;font-weight:700;text-align:center;padding:34px 20px;color:var(--text)}
+  .tag em{color:var(--accent);font-style:normal}
+
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px}
+  .card .n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#06281b;font-weight:800;align-items:center;justify-content:center;margin-bottom:12px}
+  .card h3{font-size:18px;margin-bottom:8px}
+  .card p{color:var(--dim);font-size:15px}
+  .card code{font-family:var(--mono);font-size:13px;color:var(--accent)}
+
+  .why{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 28px}
+  .why div{padding-left:26px;position:relative;color:var(--dim);font-size:15.5px}
+  .why div::before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:800}
+  .why b{color:var(--text)}
+
+  pre{background:#0a101d;border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;line-height:1.6;color:#cfe3ff}
+  pre .c{color:#5c7599}
+  .langs{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .langs h3{font-size:15px;margin-bottom:8px;color:var(--accent)}
+
+  .std{display:flex;flex-wrap:wrap;gap:10px}
+  .std span{border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13.5px;color:var(--dim)}
+
+  footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--dim);font-size:14px}
+  footer .links{display:flex;flex-wrap:wrap;gap:18px;margin-bottom:14px}
+
+  @media (max-width:840px){
+    .hero{grid-template-columns:1fr;padding-top:44px}
+    h1{font-size:34px}
+    .cols,.why,.langs{grid-template-columns:1fr}
+    .fact{flex-basis:50%;border-left:none;border-top:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <span class="brand">APH<span>·</span>Agent&nbsp;per&nbsp;Human</span>
+    <a class="item" href="#how">How it works</a>
+    <a class="item" href="#start">Get started</a>
+    <a class="item" href="#standards">Standards</a>
+    <a class="item push btn ghost" href="https://github.com/squillo/aph">GitHub</a>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <div>
+    <span class="kicker">An open protocol · v0.1 draft for community review</span>
+    <h1>The driver's license for AI&nbsp;agents</h1>
+    <p class="lede">Agents already act on our behalf. APH gives every action a
+    verifiable credential proving <b>a specific human authorized it</b> — checkable
+    by any recipient, across vendors and organizations, with nothing but public
+    standards and public keys.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/squillo/aph/blob/main/spec/aph-0.1.md">Read the spec</a>
+      <a class="btn ghost" href="https://drive.google.com/file/d/1JSqeo4tzvxMWN8M3fe-V-dT8etBiBADb/view?usp=sharing">▶ Watch the explainer</a>
+    </div>
+  </div>
+  <img src="banner.jpg" alt="The APH emblem — a human figure and an AI chip joined in an infinity loop inside a chained seal, surrounded by people and their agents working together.">
+</div>
+
+<div class="strip">
+  <div class="wrap">
+    <div class="fact"><b>2</b><span>independent implementations, cross-verifying</span></div>
+    <div class="fact"><b>4</b><span>language bindings — JS, Python, Elixir, Go</span></div>
+    <div class="fact"><b>670+</b><span>automated tests across five toolchains</span></div>
+    <div class="fact"><b>12</b><span>published vectors, every mandatory signing path</span></div>
+    <div class="fact"><b>1</b><span>live notary you can resolve today</span></div>
+  </div>
+</div>
+
+<span class="tag wrap">A2A is the road network. AP2 is the toll booth.<br><em>APH is the driver's license.</em></span>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">Three parties, one credential, zero shared platform. The human's
+    key never leaves their device — which is why a notary can be run by anyone,
+    and why its word alone is never mistaken for the human's.</p>
+    <div class="cols">
+      <div class="card">
+        <span class="n">1</span>
+        <h3>The human authorizes</h3>
+        <p>A person signs a <b>Delegation Mandate</b> with their own key: which
+        agent, which channels, what scope, for how long. Revocable at any time —
+        and revocation reaches strangers in minutes through a published status
+        list.</p>
+      </div>
+      <div class="card">
+        <span class="n">2</span>
+        <h3>A notary witnesses</h3>
+        <p>When the agent acts, a <b>Notary Service</b> checks the action against
+        the mandate, records the decision, and countersigns a W3C Verifiable
+        Credential binding the exact message bytes, channel, and recipient to
+        that authority.</p>
+      </div>
+      <div class="card">
+        <span class="n">3</span>
+        <h3>Anyone verifies</h3>
+        <p>The recipient resolves the notary's public key from
+        <code>DNS</code> or <code>did:web</code> — infrastructure they already
+        trust — and checks every signature offline. No account with the sender's
+        platform. No prior relationship. No trust in the agent's runtime.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Why it's different</h2>
+    <div class="why">
+      <div><b>The human layer proves consent.</b> A notary alone can only assert; the human's signature is the authorization — and APH keeps the two claims impossible to confuse.</div>
+      <div><b>Portable like a license.</b> Issued under one organization's notary, verifiable by any other — the interstate-license property, from public standards alone.</div>
+      <div><b>Revocation with teeth.</b> Pull the mandate and verifiers everywhere refuse within minutes — enforced by a freshness bound, not a best effort.</div>
+      <div><b>Tamper-evident to the byte.</b> The credential commits to the message body's hash: change one byte in transit and verification fails with a named error.</div>
+      <div><b>No custodians, ever.</b> Keys stay on the operator's own machines; the protocol works without any third-party service to depend on — a written design constraint, not a preference.</div>
+      <div><b>Open and auditable.</b> Apache-2.0, a public spec, published test vectors, an operator runbook, and a governance process with a public request-for-change entry point.</div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>Get started in your language</h2>
+    <p class="sub">One reference implementation in Rust, one fully independent
+    implementation in TypeScript — they mint and verify each other's envelopes —
+    and bindings that hand the reference to four ecosystems.</p>
+    <div class="langs">
+      <div>
+        <h3>Rust — the reference</h3>
+        <pre>cargo add aph-core        <span class="c"># types, validation, signing</span>
+cargo add aph-resolver    <span class="c"># DNS + did:web key discovery</span></pre>
+      </div>
+      <div>
+        <h3>Go — pure Go, no cgo</h3>
+        <pre>go get github.com/squillo/aph/interpreters/go</pre>
+      </div>
+      <div>
+        <h3>TypeScript — the independent implementation</h3>
+        <pre>git clone https://github.com/squillo/aph
+cd aph/interpreters/typescript
+npm install &amp;&amp; npm run build &amp;&amp; npm test</pre>
+      </div>
+      <div>
+        <h3>Python &amp; Elixir — bindings</h3>
+        <pre><span class="c"># Python (pyo3)</span>
+cargo test -p aph-py
+<span class="c"># Elixir (rustler NIF)</span>
+cd interpreters/elixir &amp;&amp; mix test</pre>
+      </div>
+    </div>
+    <p class="sub" style="margin-top:26px;margin-bottom:0">Validate your first envelope in one command:
+    <code style="font-family:var(--mono);color:var(--accent)">cargo run -p aph-cli -- validate examples/principal_signed_envelope.json</code>
+    — a published credential carrying four real signatures your own code can re-verify.</p>
+  </div>
+</section>
+
+<section id="standards">
+  <div class="wrap">
+    <h2>Built on standards you already run</h2>
+    <p class="sub">Nothing novel where novel is dangerous: no new cryptography, no
+    new trust anchors — the same primitives that already secure email
+    authentication and the credential web, composed.</p>
+    <div class="std">
+      <span>W3C Verifiable Credentials 2.0</span>
+      <span>W3C Data Integrity (eddsa-jcs-2022 · ecdsa-jcs-2019)</span>
+      <span>RFC 8785 canonical JSON</span>
+      <span>RFC 7515 detached JWS</span>
+      <span>Ed25519 &amp; P-256</span>
+      <span>W3C Bitstring Status List</span>
+      <span>DID — did:key · did:web</span>
+      <span>DKIM-style DNS publication</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="https://github.com/squillo/aph/blob/main/spec/aph-0.1.md">Specification</a>
+      <a href="https://github.com/squillo/aph/blob/main/spec/security-considerations.md">Security model</a>
+      <a href="https://github.com/squillo/aph/blob/main/spec/operations.md">Operator runbook</a>
+      <a href="https://github.com/squillo/aph/blob/main/CONTRIBUTING.md">Contributing &amp; governance</a>
+      <a href="https://crates.io/crates/aph-core">crates.io</a>
+    </div>
+    <p>APH is an open protocol published under Apache-2.0 by Squillo, Inc.
+    v0.1 is a draft for community review: the wire shape may change before 1.0,
+    corrections land in the open, and outside implementations are the point —
+    if yours disagrees with a published artifact, that disagreement is worth
+    filing either way.</p>
+  </div>
+</footer>
+
+</body>
+</html>
