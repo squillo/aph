@@ -4,6 +4,8 @@
 
 APH is an open protocol for cryptographically notarizing the actions an autonomous agent takes on behalf of a specific human, producing a W3C Verifiable Credential 2.0-shaped envelope that any downstream recipient can independently verify across vendors and across organizations.
 
+**▶ [Watch the explainer video](https://drive.google.com/file/d/1JSqeo4tzvxMWN8M3fe-V-dT8etBiBADb/view?usp=sharing)** — the driver's-license model and the verification story in plain language, before the spec makes them precise.
+
 ## Mental model — the agent's driver's license
 
 Think of an APH credential as an **agent's driver's license**:
