@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E015. Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E016. Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -146,6 +146,25 @@ pub enum AphError {
     /// Identifier of the revoked delegation mandate.
     mandate_id: String,
   },
+
+  /// `APH_E016` — a human-not-present notarization (§9.2) was attempted with
+  /// no matching, unexpired delegation mandate: nothing authorized this act.
+  /// Held distinct from THREE neighbours because the remedies differ
+  /// completely — `APH_E007` is *nobody was asked* (reach the human),
+  /// `APH_E011` is *the authorization presented is invalid* (inspect it),
+  /// `APH_E015` is *the authorization was withdrawn* (obtain a new one).
+  /// Reporting an ABSENT mandate under any of those conflates absence with
+  /// failure — the distinction this crate makes structural everywhere else
+  /// (`discovery::DiscoveryOutcome`). Added 2026-08-23 from an implementer
+  /// field report: the first production consumer had to misuse an
+  /// invalid-mandate code for exactly this case.
+  #[error("APH_E016: no delegation mandate authorizes this act (agent `{agent_did}`, channel `{channel_kind}`)")]
+  MandateRequired {
+    /// DID of the agent that attempted the act.
+    agent_did: String,
+    /// Channel kind the act targeted.
+    channel_kind: String,
+  },
 }
 
 impl AphError {
@@ -169,6 +188,7 @@ impl AphError {
       Self::ProofChainInvalid { .. } => "APH_E013",
       Self::NotaryKeyNotPublished { .. } => "APH_E014",
       Self::MandateRevoked { .. } => "APH_E015",
+      Self::MandateRequired { .. } => "APH_E016",
     }
   }
 
@@ -190,6 +210,7 @@ impl AphError {
       Self::ProofChainInvalid { .. } => "Emit principal proof then notary proof, linked by `previousProof`",
       Self::NotaryKeyNotPublished { .. } => "Publish the key at this surface (§8.4.4/§8.4.5), or query one the notary publishes to",
       Self::MandateRevoked { .. } => "Obtain a fresh delegation mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2)",
+      Self::MandateRequired { .. } => "Issue a delegation mandate covering this channel and scope, or route the act through the human-present flow (§9.1)",
     }
   }
 
@@ -280,6 +301,19 @@ impl AphError {
       mandate_id: mandate_id.into(),
     }
   }
+
+  /// Builds an `APH_E016` naming the agent and channel nothing authorized,
+  /// so the operator's first question — WHO tried WHAT — is answered by the
+  /// error itself rather than by log correlation.
+  pub fn mandate_required(
+    agent_did: impl std::convert::Into<String>,
+    channel_kind: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::MandateRequired {
+      agent_did: agent_did.into(),
+      channel_kind: channel_kind.into(),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -301,12 +335,13 @@ mod tests {
       super::AphError::proof_chain_invalid("previousProof does not name a proof in this chain"),
       super::AphError::notary_key_not_published("_aph._notary.example.com"),
       super::AphError::mandate_revoked("urn:uuid:00000000-0000-4000-8000-000000000002"),
+      super::AphError::mandate_required("did:key:zTestAgent", "slack"),
     ]
   }
 
   #[test]
-  fn fifteen_codes_are_unique() {
-    // The spec (§11) fixes a CLOSED set of exactly fifteen codes, and
+  fn every_code_in_the_closed_set_is_unique() {
+    // The spec (§11) fixes a CLOSED set of exactly sixteen codes, and
     // other implementations branch on them. A duplicate would make two
     // distinct failures indistinguishable to a remote verifier. The count
     // is pinned so that adding a code without amending §11 fails here.
@@ -316,9 +351,15 @@ mod tests {
     // so the count stayed at thirteen against a §11 that said fourteen and
     // E014 was swept by NONE of the three all_variants() tests below. Both
     // missing entries are restored here alongside APH_E015 — the sweep is
-    // only worth its comment if the list it walks is the whole enum.
+    // only worth its comment if the list it walks is the whole enum. And it
+    // failed a SECOND time the very day APH_E016 landed: the new variant's
+    // own pin test passed while this list still held fifteen, because a
+    // hand-maintained census cannot fail on what it does not contain. The
+    // count-free test name is deliberate (the old name carried the number
+    // and rotted); the pinned count below is the tripwire, kept in exactly
+    // one place.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 15);
+    std::assert_eq!(errors.len(), 16);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();
@@ -478,6 +519,29 @@ mod tests {
     std::assert_eq!(expired.code(), "APH_E003");
     std::assert_ne!(revoked, expired);
     std::assert!(std::string::ToString::to_string(&revoked).contains("urn:uuid:def"));
+  }
+
+  /// WHY THIS TEST EXISTS: the first production consumer of the human-not-
+  /// present flow had to reuse an invalid-mandate code for the no-mandate
+  /// case, because §11 had no code for unrooted authority — absence reported
+  /// as failure, the conflation this crate exists to keep structural.
+  /// WHAT IT PINS: `APH_E016` is its own code, distinct from its neighbours
+  /// (absent ≠ invalid ≠ revoked ≠ human-unreachable), and the message names
+  /// the agent and channel so the refusal is actionable without log
+  /// correlation.
+  #[test]
+  fn an_absent_mandate_is_its_own_refusal_not_an_invalid_one() {
+    let required =
+      super::AphError::mandate_required("did:key:zAgent", "slack");
+    std::assert_eq!(required.code(), "APH_E016");
+    std::assert_ne!(required.code(), super::AphError::mandate_revoked("x").code());
+    let msg = std::string::ToString::to_string(&required);
+    std::assert!(msg.contains("did:key:zAgent"));
+    std::assert!(msg.contains("slack"));
+    std::assert!(
+      required.suggestion().contains("§9.1"),
+      "the remedy must point at the human-present flow, not at mandate repair"
+    );
   }
 
   #[test]

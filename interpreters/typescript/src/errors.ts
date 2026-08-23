@@ -2,7 +2,7 @@
  * APH error taxonomy (spec §11) and the two failure kinds that deliberately
  * carry NO §11 code.
  *
- * §11 is a CLOSED set of fifteen protocol-level codes. Two things that can go
+ * §11 is a CLOSED set of sixteen protocol-level codes. Two things that can go
  * wrong in this implementation are outside it, and inventing a code for either
  * would widen a set the specification closed:
  *
@@ -20,7 +20,7 @@
  */
 
 /**
- * The fifteen codes of §11, enumerated rather than counted. The `as const`
+ * The sixteen codes of §11, enumerated rather than counted. The `as const`
  * tuple is the enumeration: `APH_ERROR_CODES.length` is derived from it, so a
  * code added here cannot leave a stated count stale.
  */
@@ -40,6 +40,7 @@ export const APH_ERROR_CODES = [
   'APH_E013', // ProofChainInvalid
   'APH_E014', // NotaryKeyNotPublished
   'APH_E015', // MandateRevoked
+  'APH_E016', // MandateRequired — unrooted authority: §9.2 with no mandate at all
 ] as const;
 
 export type AphErrorCode = (typeof APH_ERROR_CODES)[number];
@@ -61,9 +62,10 @@ export const APH_ERROR_VARIANTS: Readonly<Record<AphErrorCode, string>> = {
   APH_E013: 'ProofChainInvalid',
   APH_E014: 'NotaryKeyNotPublished',
   APH_E015: 'MandateRevoked',
+  APH_E016: 'MandateRequired',
 };
 
-/** A protocol-level refusal carrying one of the fifteen §11 codes. */
+/** A protocol-level refusal carrying one of the sixteen §11 codes. */
 export class AphError extends Error {
   readonly code: AphErrorCode;
 

@@ -123,7 +123,7 @@ The following terms are used throughout this specification:
 - **Delegation Mandate** — a long-lived authorization issued by a Human Principal to an Agent for a bounded scope of channels, recipient patterns, and content classes. May be referenced by many Communication Mandates.
 - **Communication Mandate** — a per-message authorization issued by the Notary Service for a single outbound payload. Optionally references a parent Delegation Mandate.
 - **Notarization Envelope** — the W3C Verifiable Credential 2.0-shaped object carrying the notarized claim. The on-wire artifact.
-- **Notary Decision** — the human-configured policy outcome for an outbound message: `AlwaysAllow`, `AskEveryTime`, or `NeverAllow`.
+- **Notary Decision** — the human-configured policy outcome for an outbound message: `AlwaysAllow`, `AskEveryTime`, or `NeverAllow`. Despite the name, this is a standing **mode**, not the verdict on any single act: what was decided about a specific act is carried by the state the envelope was issued from (§9), and by the envelope's existence itself — an envelope can only exist if `Approved` was reached.
 - **Verifiable Credential (VC)** — as defined in W3C Verifiable Credentials Data Model 2.0.
 - **DID** — Decentralized Identifier, as defined in W3C DID Core 1.0.
 - **JCS** — JSON Canonicalization Scheme, as defined in RFC 8785.
@@ -286,10 +286,10 @@ Fields:
 | `agentDid` | string | yes | DID of the agent sender (restated). |
 | `channelKind` | string | yes | Channel kind (`slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`). |
 | `recipientAddressing` | JSON object | yes | Channel-shaped addressing payload (opaque to APH core; see §6.4). |
-| `contentClass` | string | yes | Content classification (`Reply`, `New`, `Mention`, `DM`, `Channel`, etc.). |
+| `contentClass` | string | yes | Content classification. The SAME closed enum as the envelope's `communication.contentClass` (§7.1.6): `Reply`, `New`, `Mention`, `DM`, `Channel`, `BulkSend`, `Broadcast` — and it MUST equal the value the resulting envelope carries. *(Erratum 2026-08-23: this row previously read "etc.", leaving a required, signed field open while §7.1.6 closed it — two conformant notaries could have emitted values the other rejects, and neither would have been wrong.)* |
 | `bodySha256` | string | yes | SHA-256 hex digest of the outbound message body bytes (64 lowercase hex chars). |
 | `bodySize` | unsigned integer | yes | Body size in bytes. |
-| `policyDecision` | string | yes | The policy outcome that produced this mandate: `AlwaysAllow`, `AskEveryTime`, or `NeverAllow`. (A `NeverAllow` mandate is recorded but does NOT result in an envelope.) |
+| `policyDecision` | string | yes | The policy outcome that produced this mandate: `AlwaysAllow`, `AskEveryTime`, or `NeverAllow`. (A `NeverAllow` mandate is recorded but does NOT result in an envelope.) **This field records the human's standing configuration, NOT the outcome of this act** — the outcome is carried by the state the artifact was issued from (§9). On an `AskEveryTime` path the value stays `AskEveryTime` after the human approves; what asserts the approval is that the mandate exists at all, since §9.1 admits no path to `MandateIssued` that does not pass through `Approved`. |
 | `issuedAt` | RFC 3339 string | yes | Issuance timestamp. |
 | `expiresAt` | RFC 3339 string | yes | Expiry timestamp. |
 | `notarySignature` | string | yes | Signature over the JCS-canonical form MINUS `notarySignature`. |
@@ -509,12 +509,12 @@ Describes the policy decision context.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `decision` | string | yes | Policy outcome. Closed enum: `AlwaysAllow`, `AskEveryTime`, `NeverAllow`. |
+| `decision` | string | yes | Policy outcome. Closed enum: `AlwaysAllow`, `AskEveryTime`, `NeverAllow`. **Records the human's standing configuration, NOT the verdict on this act** — the verdict is carried by the state the envelope was issued from (§9.1 admits no path to `EnvelopeIssued` that bypasses `Approved`), so an `AskEveryTime` envelope truthfully carries `AskEveryTime` after the human said yes. Implementations that read this field as a per-act decision have shipped real defects; do not. |
 | `matchedScope` | string | yes | Scope of the matched policy rule (e.g., `per-channel`, `per-recipient`, `global`, `per-content-class`). |
-| `delegationMandateId` | string or null | no | Parent `DelegationMandate.id` if a standing authority matched; `null` otherwise. |
+| `delegationMandateId` | string or null | no | Parent `DelegationMandate.id` if a standing authority matched; `null` otherwise. **The null case is normative, not incidental:** an envelope issued from the human-not-present flow (§9.2) MUST carry a non-null `delegationMandateId` — that flow is gated on a matching Delegation Mandate, so there is always one to name. A verifier MUST therefore read a null or absent `delegationMandateId` as the human-present flow (§9.1): *a human personally approved this specific act.* Before this rule, absence was ambiguous between "one-shot approval" and "standing authority, mandate not recorded" — which erased exactly the distinction this protocol exists to carry. |
 | `attestationMode` | string | see below | Closed enum: `PrincipalSigned` \| `NotaryAttested`. REQUIRED when the envelope carries a principal proof (§7.1.11). **When absent, the envelope is `NotaryAttested`** — so envelopes written before this revision remain valid and unambiguous. |
 | `delegationMandate` | object or null | no | The **complete parent `DelegationMandate`**, embedded. See §7.1.7.1 — this is what lets a recipient verify the human's authorization offline in the human-not-present flow. |
-| `actChain` | array of strings | no | OAuth 2.0 Token Exchange (RFC 8693) `act` chain. Each element is a DID string identifying a delegated principal. Empty array if unused. |
+| `actChain` | array of strings | no | OAuth 2.0 Token Exchange (RFC 8693) `act` chain. Each element is a DID string identifying a delegated principal. Empty array if unused. **Element order is normative: root delegate FIRST, most recent actor LAST, and the human principal is never an element** (the human is `humanPrincipal`; restating them here would be a second spelling of an identity the signature already covers). Declared because this array is inside the signed bytes: RFC 8693's nested `act` claim flattens in either direction, and two producers choosing opposite orders would sign different bytes for the same delegation chain. |
 
 ##### 7.1.7.1 Why the delegation is embedded
 
@@ -1322,6 +1322,17 @@ EnvelopeIssued ---> Delivered
 
 Both `Delivered` and `Denied` are terminal.
 
+**`PendingDecision` produces NO wire artifact, normatively.** A held request
+has no mandate, no envelope, and no APH representation of any kind; how an
+implementation stores its pending prompts is implementation-local and outside
+this specification. This is stated rather than left silent because the
+pressure it resolves is real: signing something is easier than representing
+"held", and an artifact minted from `PendingDecision` would assert — by its
+very existence, since no transition reaches `MandateIssued` except through
+`Approved` — an approval that has not happened. The truth an envelope carries
+is structural before it is textual: possession of a well-formed envelope IS
+the claim that `Approved` was reached, whatever any field says.
+
 ### 9.2 Human-not-present flow
 
 The human-not-present flow has five states (four progress states and one terminal-denial state). It is gated by a matching unexpired Delegation Mandate.
@@ -1332,7 +1343,7 @@ States:
 - **`MandateIssued`** — Notary Service validated the Delegation Mandate and issued the Communication Mandate.
 - **`EnvelopeIssued`** — Notary Service signed and emitted the envelope.
 - **`Delivered`** — Terminal: envelope handed to the Channel Adapter.
-- **`Denied`** — Terminal: no matching unexpired Delegation Mandate, OR a scope mismatch, OR a matched `NeverAllow` rule.
+- **`Denied`** — Terminal: no matching unexpired Delegation Mandate, OR a scope mismatch, OR a matched `NeverAllow` rule. The no-mandate and scope-mismatch arrivals surface as `APH_E016 MandateRequired` (§11); a matched `NeverAllow` is the configured refusal, not an error.
 
 Allowed transitions:
 
@@ -1406,7 +1417,7 @@ APH identifies both the human principal and the agent via DIDs. v0.1 implementat
 
 ## 11. Error Taxonomy
 
-APH defines a closed set of fifteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
+APH defines a closed set of sixteen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
 
 | Code | Variant | Meaning | Suggested resolution |
 |---|---|---|---|
@@ -1416,7 +1427,7 @@ APH defines a closed set of fifteen error codes for v0.1. Implementations MUST u
 | `APH_E004` | `RoleViolation` | A party attempted an operation not enumerated for its role in §5. | Confirm the party holds the correct `AphPartyRole` for the operation. |
 | `APH_E005` | `ChannelNotAllowed` | The requested channel kind was not in the Delegation Mandate's `allowedChannels` list. | Grant the channel scope on the Delegation Mandate, or re-issue under AskEveryTime. |
 | `APH_E006` | `NotarySignatureInvalid` | The notary's signature did not verify (distinct from `APH_E001`: this is the mandate-level signature, not the envelope-level signature). | Verify the notary's published JWK matches the `verificationMethod`; re-issue the mandate. |
-| `APH_E007` | `HumanAuthenticationRequired` | An AskEveryTime path was triggered but the human was not reachable for interactive prompt. | Prompt the human, or wait until the human is reachable; alternatively, fall back to a Deferred-for-Review queue. |
+| `APH_E007` | `HumanAuthenticationRequired` | An AskEveryTime path was triggered but the human was not reachable for interactive prompt. | Prompt the human, or wait until the human is reachable. An implementation MAY hold the request for later review; any such hold is implementation-local and produces no APH artifact (§9.1). |
 | `APH_E008` | `NotaryServiceUnreachable` | A protocol-mandated fetch from a notary-hosted surface did not succeed: a remote notary service did not respond within the configured timeout, or a document the notary is contracted to serve could not be reached, parsed, or validated — a DID Document under §8.4.4, or a revocation status list credential under §6.3.3.4 case 2 (which folds TLS, parse, proof, issuer, purpose and freshness failures into this one code because the verifier's action and the operator's remedy are identical in all of them). Deliberately distinct from `APH_E014`, which means the surface answered and published nothing. | Check the notary endpoint's health and the surface it is contracted to serve; retry with exponential backoff. |
 | `APH_E009` | `EnvelopeBodyHashMismatch` | The recipient computed a SHA-256 over the actual outbound body that did not match `communication.bodySha256`. | Re-hash the body and compare against the envelope; investigate transport corruption or tampering. |
 | `APH_E010` | `UnsupportedAlgorithm` | The envelope declared a signing algorithm not in the supported set, or `alg: none`. | Use one of `ES256` or `EdDSA`; reject `alg: none`. |
@@ -1425,6 +1436,7 @@ APH defines a closed set of fifteen error codes for v0.1. Implementations MUST u
 | `APH_E013` | `ProofChainInvalid` | The proof chain is malformed: wrong length, wrong `proofPurpose` for a position, or a `previousProof` that is missing, dangling, duplicated, or cyclic (§7.1.11, §8.3.1 step 1e). | Emit exactly two proofs, principal first, with the notary proof's `previousProof` naming the principal proof's `id`. |
 | `APH_E014` | `NotaryKeyNotPublished` | No notary key is published at the queried discovery surface: the DNS TXT name carries no APH record (or none matching the named `kid`), or a fetched DID Document names no key under the queried fragment (§8.4.5, §8.4.4). Deliberately distinct from `APH_E008`, which means the surface could not be REACHED — §8.4.6's no-downgrade rule turns on exactly this distinction (absence advances the resolution sequence; failure stops it), and a taxonomy that flattened the two would force every implementation's error surface to flatten them again. | Publish the key at the queried surface, or direct verifiers to a surface the notary actually publishes to. |
 | `APH_E015` | `MandateRevoked` | The parent Delegation Mandate's bit is SET in the revocation status list the issuing notary publishes (§6.3.3): the human withdrew the standing authority this envelope was issued under. The envelope's signatures are still valid — this is a withdrawn authorization, not a forged one, and reporting it as a signature failure would send an operator to inspect key material when the answer is a human decision. Deliberately distinct from `APH_E003`, which is authority that ran out on schedule rather than authority that was pulled. | Obtain a fresh Delegation Mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2). |
+| `APH_E016` | `MandateRequired` | A human-not-present notarization (§9.2) was attempted with no matching, unexpired Delegation Mandate — nothing authorized this act. Deliberately distinct from THREE neighbours, because the remedies differ completely: `APH_E007` is *nobody was asked* (an AskEveryTime human was unreachable — remedy: reach the human); this code is *nothing authorized this* (remedy: the human mints a mandate); `APH_E011` is *the authorization presented is invalid* (remedy: inspect the mandate and its signatures); `APH_E015` is *the authorization was withdrawn*. Reporting an ABSENT mandate under any of those conflates absence with failure, and the distinction between the two is load-bearing everywhere else in this specification (§8.4.6). | Issue a Delegation Mandate covering this channel and scope, or route the act through the human-present flow (§9.1). |
 
 ---
 
@@ -1631,7 +1643,7 @@ during an implementation attempt. Four preconditions:
    *key material* — nothing in this specification is contracted to fetch an
    attestation document. Either §8.4.4's surface is widened or a fetch
    mechanism is named here.
-4. **An error code.** §11 is a closed taxonomy of fifteen. A failed
+4. **An error code.** §11 is a closed taxonomy of sixteen. A failed
    attestation check maps to none of them, so a conformant implementation
    cannot report it. Either a code is added at last position or §15 states
    which existing code it reuses and why.
