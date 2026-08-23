@@ -284,6 +284,11 @@ One commit, six deliverables, all aimed at the same target: the distance between
 - **The mandate's `contentClass` closes (erratum).** The §6.2 table read "…`Channel`, etc." — a required, SIGNED field left open, while the envelope's §7.1.6 closed the same vocabulary. Two conformant notaries could have emitted values the other rejects, and neither would have been wrong. Closed by reference to §7.1.6, with the erratum dated in the row, per the `google_chat` precedent.
 - **`actChain` element order is declared (found during adjudication, not filed by the reporter):** root delegate first, most recent actor last, the human never an element. The array is inside the signed bytes and RFC 8693's nested claim flattens either way — two producers choosing opposite orders would sign different bytes for the same chain. Declared while exactly one producer exists and every published vector carries the empty array, which is the last moment this rule is free.
 
+### Changed (revision 2026-08-23b — the RFC record gets its directory)
+
+- New `rfcs/` — the durable half of the request-for-change process, closing a shape gap a sibling team's review caught: the RFC issue form existed (the conversation), but an accepted design had no numbered home (the decision). The lifecycle is stated in `rfcs/README.md` — propose via the issue form, discuss in the issue, record the acceptance (or a rejection worth remembering) as `NNNN-name.md` — with `0000-template.md` mirroring the issue form's required sections, so an RFC that survived the issue stage arrives already drafted. Where an RFC and the specification disagree, the specification wins and the RFC is historical.
+- The rotation-attestation design draft becomes **RFC 0001** (`rfcs/0001-rotation-attestation.md`, moved from the spec directory with every live reference updated): it was already an RFC in everything but the number — a problem statement, a concrete design, honest limits, and a scope line — and a ceremony directory with no inhabitants would have been governance theater.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

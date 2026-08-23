@@ -1,4 +1,10 @@
-# Signed Key-Rotation Attestation — v0.2 design draft
+# RFC 0001 — Signed Key-Rotation Attestation (v0.2 candidate)
+
+- **Status:** Draft — written ahead of the RFC process existing; adopted as
+  RFC 0001 when this directory was created, because it was already an RFC in
+  everything but the number.
+- **Spec sections touched:** none while Draft — a v0.2 candidate; §8.4 when
+  accepted.
 
 > **NON-NORMATIVE, and not part of APH v0.1.** Nothing in this document
 > changes `spec/aph-0.1.md`. No field described here may be emitted by a

@@ -15,6 +15,8 @@ body:
         exception and when it expires). This issue is the step before all of
         that: the design conversation, kept where future readers can find it.
         An RFC does not need to be long. It needs to be answerable.
+        Accepted RFCs land as numbered documents in the rfcs/ directory —
+        the issue is the conversation, the document is the decision.
   - type: textarea
     id: problem
     attributes:

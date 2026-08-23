@@ -522,7 +522,7 @@ tracked for later drafts or for other specifications:
   A rotation attestation signed by the outgoing key — which would let a
   verifier check that a successor was named by its predecessor rather than
   merely served from the same origin — is a v0.2 question, and now has a
-  non-normative design draft: `spec/rotation-attestation-v02-draft.md`. The
+  non-normative design draft: `rfcs/0001-rotation-attestation.md` (RFC 0001). The
   draft's own honesty notes apply here too — a stolen current key signs a
   rotation as readily as the operator does, and the mechanism upgrades
   continuity, not genesis.

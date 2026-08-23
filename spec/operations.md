@@ -150,7 +150,7 @@ rotation statement, and neither publication surface is key-authenticated
 under the operator's domain control while the primary was healthy — which is
 the same authority that publishes every APH key. Saying it is "signed by the
 old key" would overstate what the wire actually carries. A signed rotation
-attestation is a reasonable v0.2 question — `spec/rotation-attestation-v02-draft.md`
+attestation is a reasonable v0.2 question — `rfcs/0001-rotation-attestation.md`
 is the non-normative design draft that answers it, including what such a
 statement would and would not buy — but it is not something to assume in v0.1,
 and nothing in that draft changes any procedure on this page.
