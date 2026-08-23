@@ -60,7 +60,7 @@ jobs:
           # DELIBERATELY ABSENT: `Snapp` and `N Lang`. Both are public,
           # documented, and licensed in the README; adding them would fail every
           # push for content that is meant to be here.
-          forbidden='Claude|Anthropic|Co-Authored-By|Generated with|@AI|claude\.ai|noreply@anthropic\.com|crates/|PRDs/|_recon/|MEMORY\.md'
+          forbidden='Claude|Anthropic|Co-Authored-By|Generated with|@AI|claude\.ai|noreply@anthropic\.com|PRDs/|_recon/|MEMORY\.md'
           forbidden="$forbidden"'|PRD-[0-9]|N_BOOK|SQUILLO_BOOK|BOOK [0-9]+/[0-9]+|Book [0-9]+/[0-9]+'
           forbidden="$forbidden"'|/Users/|squillo_[a-z]|recon_spec|hexser|STRATAFORM|D-Wire|stc intel'
           # `git grep`, not `grep -r`, so this scans TRACKED FILES ONLY.
@@ -78,6 +78,25 @@ jobs:
           # rewritten, or the check fails on itself.
           rc=0
           git grep -nE "$forbidden" -- . ':(exclude).github' || rc=$?
+          # `crates/` is checked separately with a carve-out, because the one
+          # pattern has two meanings: `crates/<name>` as a bare path is an
+          # internal workspace layout leaking (the thing this list exists to
+          # stop), while `crates.io/crates/<name>` is the public registry URL
+          # of this project's own published crates — the splash page and the
+          # README legitimately carry it. grep -E has no lookbehind, so the
+          # carve-out is a filter: flag `crates/` hits, drop the lines whose
+          # hit is part of a crates.io URL, fail on what remains. Found the
+          # hard way: the splash page's crates.io link turned this job red,
+          # and the redness went unnoticed for one push because the deployer
+          # watched only the Pages workflow — a green that is not looked at
+          # protects nothing.
+          crc=0
+          crates_hits=$(git grep -nE 'crates/' -- . ':(exclude).github' | grep -vE 'crates\.io/crates/') || crc=$?
+          if [ "$crc" -eq 0 ] && [ -n "$crates_hits" ]; then
+            echo "$crates_hits"
+            echo "Sanitization FAILED - internal crates/ path reference (write interpreters/rust/<crate> instead)." >&2
+            exit 1
+          fi
           if [ "$rc" -eq 0 ]; then
             echo "Sanitization FAILED - forbidden marker(s) detected above." >&2
             exit 1
