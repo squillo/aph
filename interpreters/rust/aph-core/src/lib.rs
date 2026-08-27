@@ -92,9 +92,9 @@ pub use credential_status::{
 };
 pub use delegation_mandate::DelegationMandate;
 pub use envelope::{
-  AgentRef, AttestationMode, ChannelDescriptor, CommunicationDescriptor, CredentialSubject,
-  EnvelopeProof, EnvelopeProofs, HumanPrincipalRef, LinkedMandate, NotarizationEnvelope,
-  NotarizationMetadata, NotaryServiceRef, PolicyDescriptor,
+  AgentRef, AttestationMode, ChannelDescriptor, ChannelKind, CommunicationDescriptor,
+  ContentClass, CredentialSubject, EnvelopeProof, EnvelopeProofs, HumanPrincipalRef,
+  LinkedMandate, NotarizationEnvelope, NotarizationMetadata, NotaryServiceRef, PolicyDescriptor,
 };
 pub use errors::AphError;
 pub use human_not_present_flow::{
@@ -120,5 +120,6 @@ pub use crate::crypto::jws_detached::{create_detached_jws, verify_detached_jws};
 pub use crate::crypto::signing::{sign_mandate, verify_mandate};
 pub use crate::crypto::proof_base::{ProofRole, mandate_signing_base, signing_base};
 pub use crate::verification::{
-  require_mode, verify_embedded_mandate_binding, verify_proof_structure, verify_timestamp_order,
+  require_closed_vocabulary, require_mode, verify_embedded_mandate_binding,
+  verify_proof_structure, verify_timestamp_order,
 };

@@ -210,6 +210,178 @@ impl std::str::FromStr for AttestationMode {
   }
 }
 
+/// The closed channel-kind vocabulary (§7.1.5), as a TYPE.
+///
+/// **Why this exists.** `ChannelDescriptor.kind` reached v0.1 as a bare
+/// `String`, so nothing in this crate refused a value outside the closed
+/// set — while the independent TypeScript implementation refused it at
+/// parse. Two implementations of one specification reached opposite
+/// verdicts on the same bytes, which is the defect class a second
+/// implementation exists to surface. This enum is the same repair already
+/// applied to `AttestationMode` above and `StatusPurpose` in
+/// `credential_status`: model the closed set as a closed type, so an
+/// unrecognized value is a constructible failure instead of a silent pass.
+///
+/// The wire field itself stays `String` in this revision (adopting the enum
+/// as the field type is a deliberate, separate breaking change); verifiers
+/// enforce the set via [`crate::verification::require_closed_vocabulary`].
+#[derive(std::fmt::Debug, std::clone::Clone, std::marker::Copy, std::cmp::PartialEq, std::cmp::Eq)]
+pub enum ChannelKind {
+  /// Wire value `slack`.
+  Slack,
+  /// Wire value `email`.
+  Email,
+  /// Wire value `discord`.
+  Discord,
+  /// Wire value `teams`.
+  Teams,
+  /// Wire value `whatsapp`.
+  Whatsapp,
+  /// Wire value `google_chat` — snake_case by erratum; every published
+  /// example and signed fixture emits this spelling.
+  GoogleChat,
+  /// Wire value `imessage`.
+  Imessage,
+}
+
+impl ChannelKind {
+  /// Every member of the closed set, in §7.1.5 order. The ONE enumerable
+  /// other surfaces (docs, tests, bindings) derive from.
+  pub const ALL: [Self; 7] = [
+    Self::Slack,
+    Self::Email,
+    Self::Discord,
+    Self::Teams,
+    Self::Whatsapp,
+    Self::GoogleChat,
+    Self::Imessage,
+  ];
+
+  /// The exact wire spelling. Exhaustive on purpose: adding a channel kind
+  /// without deciding its wire spelling must not compile.
+  pub fn label(&self) -> &'static str {
+    match self {
+      Self::Slack => "slack",
+      Self::Email => "email",
+      Self::Discord => "discord",
+      Self::Teams => "teams",
+      Self::Whatsapp => "whatsapp",
+      Self::GoogleChat => "google_chat",
+      Self::Imessage => "imessage",
+    }
+  }
+}
+
+impl std::fmt::Display for ChannelKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::write!(f, "{}", self.label())
+  }
+}
+
+impl std::str::FromStr for ChannelKind {
+  type Err = std::string::String;
+
+  /// The inverse of [`ChannelKind::label`], and the ONE place the wire
+  /// spellings are matched. The error is a plain message, not an
+  /// [`crate::errors::AphError`]: §8.3 step 1 classifies an unrecognized
+  /// value as a STRICT-PARSE rejection, the layer below the protocol's
+  /// closed set of error codes — exactly as the TypeScript implementation
+  /// models it with `AphParseError`. The message mirrors that
+  /// implementation's shape so the two report the same failure the same way.
+  fn from_str(label: &str) -> std::result::Result<Self, Self::Err> {
+    match label {
+      "slack" => std::result::Result::Ok(Self::Slack),
+      "email" => std::result::Result::Ok(Self::Email),
+      "discord" => std::result::Result::Ok(Self::Discord),
+      "teams" => std::result::Result::Ok(Self::Teams),
+      "whatsapp" => std::result::Result::Ok(Self::Whatsapp),
+      "google_chat" => std::result::Result::Ok(Self::GoogleChat),
+      "imessage" => std::result::Result::Ok(Self::Imessage),
+      other => std::result::Result::Err(std::format!(
+        "`{}` is not in the closed set {{slack, email, discord, teams, whatsapp, google_chat, imessage}}",
+        other
+      )),
+    }
+  }
+}
+
+/// The closed content-class vocabulary (§7.1.6), as a TYPE.
+///
+/// Same repair, same reasons as [`ChannelKind`] above: the wire field is a
+/// `String` and nothing refused values outside the closed set. See that
+/// type's documentation for the full account.
+#[derive(std::fmt::Debug, std::clone::Clone, std::marker::Copy, std::cmp::PartialEq, std::cmp::Eq)]
+pub enum ContentClass {
+  /// Wire value `Reply`.
+  Reply,
+  /// Wire value `New`.
+  New,
+  /// Wire value `Mention`.
+  Mention,
+  /// Wire value `DM` — both letters uppercase on the wire.
+  Dm,
+  /// Wire value `Channel`.
+  Channel,
+  /// Wire value `BulkSend`.
+  BulkSend,
+  /// Wire value `Broadcast`.
+  Broadcast,
+}
+
+impl ContentClass {
+  /// Every member of the closed set, in §7.1.6 order.
+  pub const ALL: [Self; 7] = [
+    Self::Reply,
+    Self::New,
+    Self::Mention,
+    Self::Dm,
+    Self::Channel,
+    Self::BulkSend,
+    Self::Broadcast,
+  ];
+
+  /// The exact wire spelling. Exhaustive on purpose.
+  pub fn label(&self) -> &'static str {
+    match self {
+      Self::Reply => "Reply",
+      Self::New => "New",
+      Self::Mention => "Mention",
+      Self::Dm => "DM",
+      Self::Channel => "Channel",
+      Self::BulkSend => "BulkSend",
+      Self::Broadcast => "Broadcast",
+    }
+  }
+}
+
+impl std::fmt::Display for ContentClass {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::write!(f, "{}", self.label())
+  }
+}
+
+impl std::str::FromStr for ContentClass {
+  type Err = std::string::String;
+
+  /// The inverse of [`ContentClass::label`]. Error shape per
+  /// [`ChannelKind::from_str`]'s documentation.
+  fn from_str(label: &str) -> std::result::Result<Self, Self::Err> {
+    match label {
+      "Reply" => std::result::Result::Ok(Self::Reply),
+      "New" => std::result::Result::Ok(Self::New),
+      "Mention" => std::result::Result::Ok(Self::Mention),
+      "DM" => std::result::Result::Ok(Self::Dm),
+      "Channel" => std::result::Result::Ok(Self::Channel),
+      "BulkSend" => std::result::Result::Ok(Self::BulkSend),
+      "Broadcast" => std::result::Result::Ok(Self::Broadcast),
+      other => std::result::Result::Err(std::format!(
+        "`{}` is not in the closed set {{Reply, New, Mention, DM, Channel, BulkSend, Broadcast}}",
+        other
+      )),
+    }
+  }
+}
+
 /// The notarized claim: who authorized what, on which channel, under
 /// which policy, attested by which notary.
 #[derive(
@@ -1569,5 +1741,79 @@ mod tests {
     let back: super::NotarizationEnvelope =
       serde_json::from_str(&s).expect("a PrincipalSigned chain envelope must parse");
     std::assert_eq!(envelope, back);
+  }
+}
+
+#[cfg(test)]
+mod closed_vocabulary_tests {
+  // These tests exist because the closed sets of §7.1.5 and §7.1.6 lived
+  // only in prose while the wire fields were bare `String`s: this crate
+  // accepted `kind: "service"` while the independent TypeScript
+  // implementation refused it — two conformant-claiming verifiers reaching
+  // opposite verdicts on the same bytes. Each test pins one half of the
+  // repair.
+
+  #[test]
+  fn every_channel_kind_wire_spelling_round_trips() {
+    // label() and from_str() are the two halves of one mapping; if either
+    // drifts (the google_chat snake_case erratum is the standing example of
+    // how), envelopes minted by one implementation stop verifying in
+    // another. ALL is the enumerable, so a variant added without updating
+    // it is caught here rather than in a consumer.
+    for kind in super::ChannelKind::ALL {
+      let back: super::ChannelKind = kind
+        .label()
+        .parse()
+        .expect("every published wire spelling must parse");
+      std::assert_eq!(kind, back);
+    }
+  }
+
+  #[test]
+  fn every_content_class_wire_spelling_round_trips() {
+    // Same pin as the channel-kind twin. `DM` is the value most likely to
+    // drift (a naive case transform yields `Dm`), so the round trip is what
+    // stands between the enum and a silent casing fork.
+    for class in super::ContentClass::ALL {
+      let back: super::ContentClass = class
+        .label()
+        .parse()
+        .expect("every published wire spelling must parse");
+      std::assert_eq!(class, back);
+    }
+  }
+
+  #[test]
+  fn an_unrecognized_channel_kind_is_refused_and_names_the_closed_set() {
+    // The divergence pin. `service` is the exact value the first service-act
+    // draft wanted to emit, and it must be REFUSED until the specification
+    // admits it — the TypeScript implementation already refuses it, and this
+    // crate silently accepted it. The message must name the closed set so an
+    // operator reading a log learns what WOULD have been accepted.
+    let err = "service"
+      .parse::<super::ChannelKind>()
+      .expect_err("a value outside the closed set must be refused");
+    std::assert!(err.contains("closed set"), "error must name the closed set: {err}");
+    std::assert!(err.contains("google_chat"), "error must list the members: {err}");
+  }
+
+  #[test]
+  fn an_unrecognized_content_class_is_refused() {
+    // Twin of the channel-kind refusal: `Mutation` is the first value a
+    // service-act envelope would want, and it stays refused until the
+    // specification admits it.
+    std::assert!("Mutation".parse::<super::ContentClass>().is_err());
+    std::assert!("reply".parse::<super::ContentClass>().is_err(), "case matters: wire is `Reply`");
+  }
+
+  #[test]
+  fn the_closed_sets_hold_exactly_seven_members_each() {
+    // A deliberate census tripwire, not bookkeeping: adding a channel kind
+    // or content class is a NORMATIVE event with a dozen documentation and
+    // fixture surfaces attached. This test failing is the checklist firing.
+    // When the service-act revision lands, update this count IN THE SAME
+    // CHANGE as the spec tables, the examples inventory, and the bindings.
+    std::assert_eq!(super::ChannelKind::ALL.len(), 7);
+    std::assert_eq!(super::ContentClass::ALL.len(), 7);
   }
 }
