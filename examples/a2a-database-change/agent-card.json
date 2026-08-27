@@ -1,0 +1,24 @@
+{
+  "name": "SSoT Record Service",
+  "description": "Applies structured record mutations to the single source of truth on behalf of an identified human principal.",
+  "url": "https://api.ssot.example/a2a",
+  "version": "0.1.0",
+  "capabilities": {
+    "streaming": false,
+    "push_notifications": false,
+    "extensions": [
+      {
+        "uri": "aph://extensions/notarization/v1",
+        "description": "APH (Agent per Human) outbound communication notarization",
+        "required": true
+      }
+    ]
+  },
+  "skills": [
+    {
+      "id": "record_mutate",
+      "name": "Mutate a record",
+      "description": "Apply a create/update/delete to a single source-of-truth record. Requires a verified APH envelope whose bodySha256 covers the mutation payload."
+    }
+  ]
+}

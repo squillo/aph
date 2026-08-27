@@ -1,0 +1,39 @@
+{
+  "jsonrpc": "2.0",
+  "id": "req-7c1f",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "messageId": "msg-0f3a91",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Apply the attached record mutation to customer cus_8f21a0c4."
+        },
+        {
+          "kind": "data",
+          "data": {
+            "resource": "customer",
+            "resourceId": "cus_8f21a0c4",
+            "operation": "update",
+            "changes": {
+              "billingEmail": "ap@northwind.example",
+              "paymentTerms": "net-30"
+            },
+            "expectedRevision": 41
+          }
+        }
+      ],
+      "metadata": {
+        "aph://extensions/notarization/v1": {
+          "envelope": "<the full contents of envelope.json, inline>",
+          "bodyRef": {
+            "partIndex": 1,
+            "note": "bodySha256 in the envelope covers the exact bytes of mutation-body.json (pretty-printed, 205 bytes). parts[1].data carries the SAME OBJECT for the reader's convenience, but its serialization in this file is NOT byte-identical to those bytes — which is precisely the trap this example exists to teach. A real deployment must transport the authorized bytes verbatim (for example base64 in a dedicated field) and the server MUST hash the bytes it received, never a re-serialization of the parsed object: two JSON texts that parse equal can hash differently, and the signature binds bytes, not meaning."
+          }
+        }
+      }
+    }
+  }
+}

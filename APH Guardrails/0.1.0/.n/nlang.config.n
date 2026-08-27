@@ -1,0 +1,116 @@
+{
+  "name": "aph_guardrails",
+  "version": "0.1.0-alpha.1",
+  "edition": "2026",
+  "description": "APH Guardrail Rosetta Stone: a shared, independently-resolvable vocabulary of agent-act, guard, and risk classifiers, so two agents from different organizations can agree what a phrase means without either one defining it",
+  "author": "Scott Wyatt <scott@squillo.com>, APH Protocol Contributors",
+  "authors": [],
+  "license": "Apache-2.0 (Snapp contents). N Lang is proprietary to Squillo Inc.; commercially licensable only through Squillo Inc.",
+  "tags": [],
+  "framework": "n",
+  "repository": "https://github.com/squillo/aph",
+  "homepage": "https://squillo.com/nlang",
+  "documentation": null,
+  "keywords": [
+    "aph",
+    "guardrails",
+    "classifiers",
+    "taxa",
+    "vocabulary",
+    "agent"
+  ],
+  "categories": [],
+  "main": null,
+  "target": null,
+  "incremental": true,
+  "features": {},
+  "channel": null,
+  "lens_gate": null,
+  "src_dir": "../",
+  "dep_dir": "./deps",
+  "build_dir": "./build",
+  "out_dir": "../../snapp",
+  "wal_dir": "./.n/wal",
+  "allowed_file_types": [
+    "n.md",
+    "n",
+    "nbin",
+    "json"
+  ],
+  "exclude": [
+    ".n/*",
+    ".nde/*",
+    ".git/*",
+    "node_modules/*"
+  ],
+  "export": [
+    {
+      "path": "ALL",
+      "as_name": null
+    }
+  ],
+  "start": [],
+  "log_level": "info",
+  "strict": false,
+  "pretty": true,
+  "indent": 2,
+  "optimize_level": 0,
+  "emit_snapp": true,
+  "emit_deps": true,
+  "emit_env": true,
+  "emit_tests": true,
+  "emit_blocks": true,
+  "emit_meta_blocks": true,
+  "emit_metadata": true,
+  "emit_types": true,
+  "emit_inferred": true,
+  "emit_vars": false,
+  "emit_derived": false,
+  "emit_nodes": true,
+  "emit_mod": true,
+  "emit_links": false,
+  "emit_dir_labels": false,
+  "emit_temp_labels": false,
+  "allow": [],
+  "std_prelude": true,
+  "language_prelude": true,
+  "standard": true,
+  "skip_linting": false,
+  "lint_allow": [],
+  "lint_deny": [],
+  "lint_warn": [],
+  "lib": null,
+  "cli_plugin": {
+    "namespace": "aph-guardrails",
+    "description": "APH Guardrail Rosetta Stone — shared act, guard, and risk vocabularies",
+    "how": {
+      "categories": {
+        "aph_guardrail_acts": {
+          "name": "APH Guardrails — Acts",
+          "description": "What the agent is asking for: scheduling, commitment, data mutation, access, financial, legal, and authority acts",
+          "examples_dir": "how/acts"
+        },
+        "aph_guardrail_guards": {
+          "name": "APH Guardrails — Guards",
+          "description": "Sealed, fail-closed gates: safety, injection, consent, and disclosure",
+          "examples_dir": "how/guards"
+        },
+        "aph_guardrail_risk": {
+          "name": "APH Guardrails — Risk and Routing",
+          "description": "Irreversibility, blast radius, urgency, jurisdiction, and the human-in-the-loop routing output",
+          "examples_dir": "how/risk"
+        },
+        "aph_guardrail_overlays": {
+          "name": "APH Guardrails — Extending the Vocabulary",
+          "description": "How a third party adds labels or tightens floors without weakening a guarantee",
+          "examples_dir": "how/overlays"
+        }
+      }
+    },
+    "permissions": {
+      "fs_read": true,
+      "fs_write": false,
+      "network": false
+    }
+  }
+}

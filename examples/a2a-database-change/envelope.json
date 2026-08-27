@@ -1,0 +1,74 @@
+{
+  "aphVersion": "0.1",
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/aph/v1"
+  ],
+  "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+  "id": "urn:uuid:00000000-0000-4000-8000-00000000a2a1",
+  "issuer": "did:web:notary.squillo.com",
+  "validFrom": "2026-08-26T00:00:00Z",
+  "validUntil": "2026-08-26T00:15:00Z",
+  "credentialSubject": {
+    "humanPrincipal": {
+      "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+      "displayName": "Scott Wyatt"
+    },
+    "agent": {
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
+      "displayName": "Squillo Concierge",
+      "version": "1.0"
+    },
+    "channel": {
+      "kind": "PLACEHOLDER_NOT_CONFORMANT_SEE_RFC_0002",
+      "recipientAddressing": {
+        "serviceEndpoint": "https://api.ssot.example/a2a",
+        "resourceId": "cus_8f21a0c4",
+        "operation": "customer.update"
+      }
+    },
+    "communication": {
+      "contentClass": "PLACEHOLDER_NOT_CONFORMANT_SEE_RFC_0002",
+      "bodySha256": "e530d871151677502633340fe1447b6ab711a8b2516d921ff66e1d68488803e2",
+      "bodySize": 205,
+      "previewLines": 3,
+      "preview": "resource: customer (cus_8f21a0c4)\noperation: update\nchanges: billingEmail, paymentTerms"
+    },
+    "policy": {
+      "decision": "AskEveryTime",
+      "matchedScope": "per-resource",
+      "delegationMandateId": null,
+      "actChain": []
+    },
+    "notarization": {
+      "notaryService": {
+        "id": "did:web:notary.squillo.com",
+        "name": "Squillo Notary Service",
+        "version": "0.1.0"
+      },
+      "decisionTimestamp": "2026-08-26T00:00:04Z",
+      "decisionLatencyMs": 4120
+    }
+  },
+  "linkedMandate": {
+    "ap2IntentMandateUri": null,
+    "ap2SignedPayloadB64": null,
+    "vaultMutation": {
+      "kind": {
+        "kind": "Custom",
+        "snapp_id": "ssot.me",
+        "mutation_slug": "customer.update"
+      },
+      "grant_scope_id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+    }
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "verificationMethod": "did:web:notary.squillo.com#k1",
+    "created": "2026-08-26T00:00:04Z",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "UNSIGNED-ILLUSTRATIVE-SHAPE-ONLY-NOT-A-SIGNATURE"
+  }
+}

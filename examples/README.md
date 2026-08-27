@@ -9,6 +9,13 @@ illustrate the wire shape of v0.1 envelopes and are suitable for round-trip
 parsing by any APH implementation; the four signed ones are additionally
 suitable for verification.
 
+One subdirectory sits deliberately outside that count:
+[`a2a-database-change/`](a2a-database-change/README.md) is an illustrative
+draft of an agent authorizing a database change over A2A. Its envelope is
+**not conformant** — two fields carry explicit placeholders because v0.1 has
+no wire value for a service act (see RFC 0002) — so it is excluded from every
+"all examples parse" claim above by design, and its own README says so first.
+
 ## Files
 
 - `slack_reply_envelope.json` — Slack thread reply

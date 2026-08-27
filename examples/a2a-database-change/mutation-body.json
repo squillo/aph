@@ -1,0 +1,10 @@
+{
+  "resource": "customer",
+  "resourceId": "cus_8f21a0c4",
+  "operation": "update",
+  "changes": {
+    "billingEmail": "ap@northwind.example",
+    "paymentTerms": "net-30"
+  },
+  "expectedRevision": 41
+}

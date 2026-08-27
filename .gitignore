@@ -4,6 +4,16 @@ interpreters/rust/target/
 # The compiler writes to build/ despite the config naming .n/build, so both
 # are listed. The exported bundle under snapp/ IS tracked: it is the
 # artifact other Snapps consume.
-APH Spec/0.1.0/build/
-APH Spec/0.1.0/.n/build/
-APH Spec/0.1.0/.n/wal/
+#
+# These patterns are GENERIC, not per-Snapp, and that is the point. They were
+# `APH Spec/0.1.0/build/` until a second Snapp was added and its build cache
+# was not covered — roughly five hundred lines of absolute developer paths and
+# sibling-project names, staged for a public repository, caught one command
+# before the commit. A path-specific ignore silently stops protecting the
+# moment someone adds a sibling, and nothing announces the gap: the sanitize
+# job scans TRACKED files, so the leak only becomes visible after it is
+# already committed. Keep these generic. Adding a Snapp must not require
+# remembering to add a line here.
+**/build/
+**/.n/build/
+**/.n/wal/
