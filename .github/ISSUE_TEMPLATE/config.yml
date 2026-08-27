@@ -2,10 +2,11 @@
 # having, and a closed template list is how edge cases go unreported.
 blank_issues_enabled: true
 contact_links:
-  - name: Security disclosure
-    url: https://github.com/squillo/aph/blob/main/spec/security-considerations.md
+  - name: Security disclosure (private)
+    url: https://github.com/squillo/aph/security/advisories/new
     about: >-
-      Read the threat model first — §2 lists what APH defends against and §3
-      what it deliberately does not. For a vulnerability in the protocol or
-      the reference implementation, use a private channel to the maintainer
-      rather than a public issue.
+      Report a vulnerability privately here — never as a public issue.
+      SECURITY.md at the repository root states scope, the response window,
+      and the disclosure terms. Read the threat model first
+      (spec/security-considerations.md) — §2 lists what APH defends against
+      and §3 what it deliberately does not.

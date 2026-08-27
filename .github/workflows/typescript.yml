@@ -12,6 +12,13 @@ name: TypeScript interpreter
 # before it runs is this job's build step. Naming its crate directory, the
 # workspace manifest and the lockfile is what keeps an engine-version bump or a
 # harness edit from reaching main without ever scheduling the job that runs it.
+#
+# `spec/**` is in the filter because this suite is the ONLY thing in the
+# repository that enforces the spec's closed value sets (channel kinds,
+# content classes) at parse time. Before it was listed, a commit editing only
+# the spec never scheduled this job — so the normative enum could widen in
+# one green PR while the sole enforcing implementation stayed narrow, and the
+# divergence landed with every checkmark green.
 on:
   push:
     branches: [main]
@@ -21,6 +28,7 @@ on:
       - "interpreters/rust/Cargo.toml"
       - "interpreters/rust/Cargo.lock"
       - "examples/**"
+      - "spec/**"
       - ".github/workflows/typescript.yml"
   pull_request:
     branches: [main]
@@ -30,6 +38,7 @@ on:
       - "interpreters/rust/Cargo.toml"
       - "interpreters/rust/Cargo.lock"
       - "examples/**"
+      - "spec/**"
       - ".github/workflows/typescript.yml"
 
 # Least privilege: this workflow only reads the tree.

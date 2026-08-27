@@ -20,12 +20,15 @@ jobs:
       - name: Validate every example JSON file parses
         run: |
           set -e
-          shopt -s nullglob
+          # `find`, not `examples/*.json`, because the top-level glob silently
+          # skipped every example that lives in its own directory — the first
+          # such example shipped four unvalidated JSON files. A syntax check
+          # that does not see a file is indistinguishable from one that passes.
           count=0
-          for f in examples/*.json; do
+          while IFS= read -r f; do
             jq empty "$f"
             count=$((count + 1))
-          done
+          done < <(find examples -name '*.json' -type f | sort)
           if [ "$count" -lt 7 ]; then
             echo "Expected at least 7 example JSON files, found $count." >&2
             exit 1
