@@ -4,6 +4,8 @@
 //! - `aph validate [--json] <file|->` — strict-parse an envelope; exit 0/1.
 //! - `aph inspect <file|->` — parse and print a human-readable summary.
 //! - `aph golden [index]` — list conformance fixtures, or print one raw.
+//! - `aph render-txt <did:key>` — the §8.4.5 DNS TXT value for a notary key.
+//! - `aph render-did <did:web> <did:key#kid>…` — the §8.4.4 DID Document.
 //! - `aph help` — usage, plus the `--json` verdict contract.
 //!
 //! `validate` reads stdin as `-`, which is what makes it usable as a gate on
@@ -13,6 +15,7 @@
 //! `report` module, which also states the shape's stability commitment. Without
 //! `--json` every byte this tool writes is what it has always written.
 
+mod publish;
 mod report;
 
 const USAGE: &str = "usage: aph <command>
@@ -21,6 +24,10 @@ commands:
   validate <file|-> [--json]   strict-parse a NotarizationEnvelope from a file or stdin
   inspect  <file|->            parse an envelope and print a human summary
   golden [index]               list conformance fixtures, or print fixture <index> (1-based) raw
+  render-txt <did:key>         the DNS TXT value publishing that key (\u{a7}8.4.5)
+                               [--kid K] [--not-before T] [--not-after T] [--domain D]
+  render-did <did:web> <k>...  the DID Document publishing those keys (\u{a7}8.4.4);
+                               each key is a did:key with its kid as fragment
   help                         show this message";
 
 /// The `--json` verdict contract, printed by `aph help` and by nothing else.
@@ -86,6 +93,8 @@ fn main() {
     std::option::Option::Some("validate") => cmd_validate(&args[1..]),
     std::option::Option::Some("inspect") => cmd_inspect(args.get(1).map(String::as_str)),
     std::option::Option::Some("golden") => cmd_golden(args.get(1).map(String::as_str)),
+    std::option::Option::Some("render-txt") => publish::cmd_render_txt(&args[1..]),
+    std::option::Option::Some("render-did") => publish::cmd_render_did(&args[1..]),
     std::option::Option::Some("help") | std::option::Option::Some("--help") | std::option::Option::Some("-h") => {
       outln(USAGE);
       outln(&json_contract());

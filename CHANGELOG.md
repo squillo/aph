@@ -377,6 +377,14 @@ One commit, six deliverables, all aimed at the same target: the distance between
 - **Two consequences recorded rather than left implicit:** the SIGNED TREE HEAD is the thing worth publishing widely — it commits to the whole history in one digest-sized value, so `_aph._vocab` is its natural carrier and every consumer resolving DNS then holds a receipt they never had to ask for. And consumers MUST actually keep and compare heads, or the property does not exist: a log nobody audits is a database with extra steps.
 - Publisher-operated and independent logs are not rivals: the first is cheap and covers the common case; the second is what you point a skeptic at.
 
+### Added (revision 2026-08-28j — an adopter can now publish a notary from this repository alone)
+
+- **`aph render-txt` and `aph render-did` ship the §8.4 publication surfaces.** `aph-core` has rendered both wire forms since the discovery work landed, and until now nothing in this repository called them: the bytes for the live reference deployment came from a program in another repository, so an adopter holding `aph-core` could implement a notary and still have no way to publish one. The capability existed and not where the person who needs it would look — the same defect class as a closed vocabulary nobody can check, one layer over.
+- **They DELEGATE and never re-derive.** Both decode their arguments and call `aph_core::discovery::publish`; neither templates, formats, nor re-implements a tag list or a DID Document. Two renderers of one wire form drift, and a drifted publication surface does not fail loudly — it publishes a key nobody can verify against. The `did:key` decode is `aph-core`'s too, so an operator publishes exactly the bytes a verifier reads back.
+- **`render-txt` writes the VALUE to stdout and the record NAME to stderr**, so a name cannot be captured into the record's content by a redirect — a broken publication that still looks published is the failure worth designing out. `render-did` accepts several keys, because a §8.4.7 rotation overlap must be publishable in one document; a tool that could only publish one key would make the overlap window unreachable, and that window is what keeps a rotation from stranding verifiers mid-flight.
+- **⛔ PUBLIC key material only, by construction.** Every input is a `did:key`, which IS a public key in a self-describing envelope. Nothing here accepts, reads, or derives a private key, and the module says plainly that it must never be extended to: a signing seed reaching a command line is readable in `ps` by every other process on the host. A publication tool needs the public half and nothing else, which is what makes it safe to hand to an operator.
+- Documented in README under the CLI section and in the agent skill, so the tool is findable from where the need is felt rather than by reading the source.
+
 ### Notes
 
 - This is a draft for community review. Wire shape may change before v0.1.0 final.

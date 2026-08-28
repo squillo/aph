@@ -279,6 +279,27 @@ cargo run -p aph-cli -- golden                       # list conformance fixtures
 cargo run -p aph-cli -- help                         # usage, plus the --json contract
 ```
 
+#### Publishing a notary's keys
+
+The two §8.4 discovery surfaces are rendered by the same code a verifier reads
+them with, so an operator never hand-writes either wire form:
+
+```sh
+# the DNS TXT value for a key (§8.4.5); --domain prints the record NAME on stderr
+cargo run -p aph-cli -- render-txt did:key:z6Mk... --kid k1 --domain notary.example.com
+
+# the DID Document (§8.4.4); each key is a did:key with its kid as the fragment
+cargo run -p aph-cli -- render-did did:web:notary.example.com did:key:z6Mk...#k1
+```
+
+`render-did` takes several keys so a rotation overlap (§8.4.7) can be published
+in one document. The record name goes to stderr and the value to stdout, so a
+name cannot be captured into the record's content by a redirect.
+
+**Both take PUBLIC key material only.** A `did:key` IS a public key; nothing
+here accepts a signing seed, and nothing here should be extended to — a seed on
+a command line is readable by every other process on the host.
+
 `validate` is a strict **structural** check — it does not verify signatures, time windows, or body hashes (spec §8.3 steps 2–8). Exit codes: `0` valid, `1` invalid, `2` usage.
 
 #### Reading the verdict from a build
