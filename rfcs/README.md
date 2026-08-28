@@ -43,3 +43,4 @@ issue stage already has every section drafted.
 | [0002](0002-service-act-channel.md) | A service-act channel binding | Draft |
 | [0003](0003-audience-and-single-use.md) | Audience binding and single-use envelopes | Draft |
 | [0004](0004-vendor-extension-channel-kind.md) | A vendor-extension arm for `ChannelKind` | Rejected |
+| [0005](0005-recipient-class.md) | Recipient class: who is on the other end of the medium | Draft |

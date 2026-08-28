@@ -79,6 +79,19 @@ medium — never the agent-to-agent rail." An agent-to-agent transport is not
 promoted to a channel kind by being the thing that carried the bytes, and
 neither is an internal scope by being the thing that authorized them.
 
+**This mapping disposes of the SCOPE-NAME case, and only that case.** An
+earlier draft of this document stated the `email` mapping flatly, which read
+as settling every question anyone might raise about mail-shaped channels. It
+does not. A separate request — argued on CONSENT GRANULARITY rather than on
+vocabulary, and asking whether unattended agent-to-agent mail should be
+distinguishable from mail a human reads — was already open when this was
+written, and nothing here answers it. That question is taken up on its own
+terms in `rfcs/0005-recipient-class.md`; the reasoning in this document
+neither grants nor refuses it, because the two are not the same question. A
+scope name in a medium field is an error. Asking whether one medium serves
+two materially different recipients is a design question with a real answer
+on either side.
+
 ### What IS admissible
 
 A named first-party variant is **categorically admissible**, and pretending
