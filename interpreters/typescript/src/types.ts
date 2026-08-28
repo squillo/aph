@@ -18,6 +18,8 @@ export const CHANNEL_KINDS = [
   'whatsapp',
   'google_chat',
   'imessage',
+  'service',
+  'squillo',
 ] as const;
 export type ChannelKind = (typeof CHANNEL_KINDS)[number];
 
@@ -29,6 +31,7 @@ export const CONTENT_CLASSES = [
   'Channel',
   'BulkSend',
   'Broadcast',
+  'Mutation',
 ] as const;
 export type ContentClass = (typeof CONTENT_CLASSES)[number];
 

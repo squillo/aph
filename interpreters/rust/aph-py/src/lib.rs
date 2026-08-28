@@ -396,7 +396,7 @@ mod tests {
     // taxonomy — the same two-shape distinction the module docs promise.
     pyo3::Python::attach(|py| {
       for (pointer, offending, member) in [
-        (["credentialSubject", "channel", "kind"], "squillo", "google_chat"),
+        (["credentialSubject", "channel", "kind"], "carrier_pigeon", "google_chat"),
         (
           ["credentialSubject", "communication", "contentClass"],
           "Digest",

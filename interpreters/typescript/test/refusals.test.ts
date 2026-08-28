@@ -270,13 +270,13 @@ test('§7.1.5 — a channel kind outside the closed set is refused, and the refu
   // makes it actionable to the producer who has to fix it.
   const value = goldenValue();
   const channel = (value.credentialSubject as JsonObject).channel as JsonObject;
-  channel.kind = 'squillo';
+  channel.kind = 'carrier_pigeon';
   assert.throws(
     () => parseEnvelope(JSON.stringify(value)),
     (error: unknown) =>
       error instanceof AphParseError &&
       error.path === '$.credentialSubject.channel.kind' &&
-      error.message.includes('"squillo"') &&
+      error.message.includes('"carrier_pigeon"') &&
       error.message.includes('closed set') &&
       error.message.includes('google_chat'),
   );
@@ -316,13 +316,13 @@ test('§6.1 — an allowedChannels entry outside the closed set is refused at th
   // corrupt grant and the honest denial two different events.
   const value = goldenValue();
   const mandate = policyOfValue(value).delegationMandate as JsonObject;
-  mandate.allowedChannels = ['slack', 'squillo'];
+  mandate.allowedChannels = ['slack', 'carrier_pigeon'];
   assert.throws(
     () => parseEnvelope(JSON.stringify(value)),
     (error: unknown) =>
       error instanceof AphParseError &&
       error.path === '$.credentialSubject.policy.delegationMandate.allowedChannels[1]' &&
-      error.message.includes('"squillo"') &&
+      error.message.includes('"carrier_pigeon"') &&
       error.message.includes('closed set'),
   );
 });

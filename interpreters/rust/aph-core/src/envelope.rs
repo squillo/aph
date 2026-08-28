@@ -247,12 +247,18 @@ pub enum ChannelKind {
   /// medium, which is why this is a channel kind and not a name for the
   /// agent-to-agent rail that carried it (§1.1.1).
   Service,
+  /// Wire value `squillo` — an in-application messaging surface where a
+  /// human reads the message in that application's client (RFC 0007). A
+  /// peer of [`Self::Slack`] and [`Self::Discord`], not a layer across
+  /// them. NOT the membership-scope value of the same spelling that
+  /// RFC 0004 refused: this names the DELIVERY MEDIUM.
+  Squillo,
 }
 
 impl ChannelKind {
   /// Every member of the closed set, in §7.1.5 order. The ONE enumerable
   /// other surfaces (docs, tests, bindings) derive from.
-  pub const ALL: [Self; 8] = [
+  pub const ALL: [Self; 9] = [
     Self::Slack,
     Self::Email,
     Self::Discord,
@@ -261,6 +267,7 @@ impl ChannelKind {
     Self::GoogleChat,
     Self::Imessage,
     Self::Service,
+    Self::Squillo,
   ];
 
   /// The exact wire spelling. Exhaustive on purpose: adding a channel kind
@@ -275,6 +282,7 @@ impl ChannelKind {
       Self::GoogleChat => "google_chat",
       Self::Imessage => "imessage",
       Self::Service => "service",
+      Self::Squillo => "squillo",
     }
   }
 
@@ -319,6 +327,7 @@ impl std::str::FromStr for ChannelKind {
       "google_chat" => std::result::Result::Ok(Self::GoogleChat),
       "imessage" => std::result::Result::Ok(Self::Imessage),
       "service" => std::result::Result::Ok(Self::Service),
+      "squillo" => std::result::Result::Ok(Self::Squillo),
       other => std::result::Result::Err(std::format!(
         "`{}` is not in the closed set {{{}}}",
         other,
@@ -1914,13 +1923,13 @@ mod closed_vocabulary_tests {
   }
 
   #[test]
-  fn the_closed_sets_hold_exactly_eight_members_each() {
+  fn the_closed_sets_hold_their_declared_census() {
     // A deliberate census tripwire, not bookkeeping: adding a channel kind
     // or content class is a NORMATIVE event with a dozen documentation and
     // fixture surfaces attached. This test failing is the checklist firing.
     // When the service-act revision lands, update this count IN THE SAME
     // CHANGE as the spec tables, the examples inventory, and the bindings.
-    std::assert_eq!(super::ChannelKind::ALL.len(), 8);
+    std::assert_eq!(super::ChannelKind::ALL.len(), 9);
     std::assert_eq!(super::ContentClass::ALL.len(), 8);
   }
 }

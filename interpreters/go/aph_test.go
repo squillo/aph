@@ -415,8 +415,8 @@ func TestAClosedSetValueThisBuildDoesNotDefineIsRefused(t *testing.T) {
 		{
 			name:        "an unrecognized channel kind (§7.1.5)",
 			anchor:      `"kind": "slack",`,
-			replacement: `"kind": "squillo",`,
-			offending:   "squillo",
+			replacement: `"kind": "carrier_pigeon",`,
+			offending:   "carrier_pigeon",
 			member:      "google_chat",
 		},
 		{

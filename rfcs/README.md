@@ -68,3 +68,4 @@ specification guarantee that lives only in prose.
 | [0004](0004-vendor-extension-channel-kind.md) | A vendor-extension arm for `ChannelKind` | Rejected |
 | [0005](0005-recipient-class.md) | Recipient class: who is on the other end of the medium | Draft |
 | [0006](0006-published-guardrail-vocabularies.md) | Published guardrail vocabularies: meaning as a resolvable third party | Draft |
+| [0007](0007-in-app-channel-kind.md) | A channel kind for an in-application messaging surface | **Accepted** |

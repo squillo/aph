@@ -288,7 +288,7 @@ mod tests {
     for (pointer, offending, member) in [
       (
         ["credentialSubject", "channel", "kind"],
-        "squillo",
+        "carrier_pigeon",
         "google_chat",
       ),
       (

@@ -284,7 +284,7 @@ Fields:
 | `delegationMandateId` | string | no | Parent `DelegationMandate.id`, or `null` for one-shot AskEveryTime flow. |
 | `humanPrincipalDid` | string | yes | DID of the human principal (restated for tamper-detect). |
 | `agentDid` | string | yes | DID of the agent sender (restated). |
-| `channelKind` | string | yes | Channel kind (`slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`, `service`). |
+| `channelKind` | string | yes | Channel kind (`slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`, `service`, `squillo`). |
 | `recipientAddressing` | JSON object | yes | Channel-shaped addressing payload (opaque to APH core; see §6.4). |
 | `contentClass` | string | yes | Content classification. The SAME closed enum as the envelope's `communication.contentClass` (§7.1.6): `Reply`, `New`, `Mention`, `DM`, `Channel`, `BulkSend`, `Broadcast`, `Mutation` — and it MUST equal the value the resulting envelope carries. *(Erratum 2026-08-23: this row previously read "etc.", leaving a required, signed field open while §7.1.6 closed it — two conformant notaries could have emitted values the other rejects, and neither would have been wrong.)* |
 | `bodySha256` | string | yes | SHA-256 hex digest of the outbound message body bytes (64 lowercase hex chars). |
@@ -488,7 +488,7 @@ Identifies the channel transport and recipient addressing.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `kind` | string | yes | One of the closed channel-kind enum values: `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`, `service`. New channel kinds are additive in 0.x minor versions. *(Erratum 2026-08-12: earlier drafts spelled this value `googleChat`; every published example and signed fixture emits `google_chat`, so the snake_case form is normative.)* |
+| `kind` | string | yes | One of the closed channel-kind enum values: `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`, `service`, `squillo`. New channel kinds are additive in 0.x minor versions. *(Erratum 2026-08-12: earlier drafts spelled this value `googleChat`; every published example and signed fixture emits `google_chat`, so the snake_case form is normative.)* |
 | `recipientAddressing` | JSON object | yes | Channel-shaped opaque addressing payload. The exact field set is channel-specific; see §7.4 for per-channel shapes. |
 
 `kind` names the END-DELIVERY MEDIUM — where the message lands for its human

@@ -85,6 +85,7 @@ mod blocks Vocabulary {
     GoogleChat,
     Imessage,
     Service,
+    Squillo,
   }
 ```
 

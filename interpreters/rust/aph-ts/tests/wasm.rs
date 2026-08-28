@@ -84,7 +84,7 @@ fn a_closed_set_refusal_crosses_the_real_wasm_boundary_with_its_message_intact()
     .as_string()
     .expect("the refusal must cross the boundary as a string a JS caller can read");
   assert!(
-    message.contains("squillo"),
+    message.contains("carrier_pigeon"),
     "the refusal must name the offending value, got: {}",
     message
   );

@@ -144,7 +144,7 @@ defmodule APHTest do
     # below the taxonomy and a parse dressed as a protocol verdict sends the
     # reader to inspect key material over a typo.
     for {path, offending, member} <- [
-          {["credentialSubject", "channel", "kind"], "squillo", "google_chat"},
+          {["credentialSubject", "channel", "kind"], "carrier_pigeon", "google_chat"},
           {["credentialSubject", "communication", "contentClass"], "Digest", "BulkSend"}
         ] do
       document =

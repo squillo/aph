@@ -281,7 +281,7 @@ mod tests {
     let raw = golden_with(
       "/credentialSubject/channel",
       "kind",
-      serde_json::Value::String("squillo".to_string()),
+      serde_json::Value::String("carrier_pigeon".to_string()),
     );
     // The premise: these bytes really are refused by the strict parser.
     let strict: std::result::Result<aph_core::envelope::NotarizationEnvelope, _> =
@@ -296,7 +296,7 @@ mod tests {
       report.field,
       std::option::Option::Some("credentialSubject.channel.kind")
     );
-    std::assert_eq!(report.value.as_deref(), std::option::Option::Some("squillo"));
+    std::assert_eq!(report.value.as_deref(), std::option::Option::Some("carrier_pigeon"));
     // DERIVED, not restated. A literal list here would be a fourth copy of
     // the vocabulary, and it drifted within hours of being written: this
     // assertion was authored against the seven-member set and `service`
