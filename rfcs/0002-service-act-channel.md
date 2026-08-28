@@ -1,8 +1,34 @@
 # RFC 0002 — A service-act channel binding
 
-- **Status:** Draft
-- **Issue:** _(to be opened via `.github/ISSUE_TEMPLATE/rfc.yml`)_
+- **Status:** Accepted
+- **Issue:** none — predates this directory's issue practice (see
+  `rfcs/README.md`); the design was drafted in place and decided in place.
 - **Spec sections touched:** §7.1.5 (`ChannelDescriptor`), §7.1.6 (`CommunicationDescriptor`), §7.4 (per-channel addressing shapes); non-normative §1.1.1
+
+## Decision
+
+**Accepted 2026-08-28**, by the sole maintainer, with no second reviewer.
+
+**Why now, rather than when it was drafted.** This RFC named its own
+prerequisite: closed-set enforcement had to exist in the reference
+implementation before the vocabularies could be widened, or the addition
+would ship as a live interop split. That enforcement landed on 2026-08-28
+(`57431e6`), which is what changed — not the design, which is unaltered from
+the draft except for the Compatibility bullet recording the discharge.
+
+**The limitations this was decided under, stated because a decision whose
+constraints are hidden gets re-litigated from scratch.** One reviewer, who is
+also the author, in a project whose second-maintainer requirement is open and
+unfilled. No implementer has yet built against the `service` shape, so the
+addressing shape in §7.4 is reviewed but not exercised. And the producer rule
+below — MUST NOT emit `service` until the recipient is known to understand it
+— is the load-bearing safety property of this change and is enforced by
+nothing mechanical; it rests on producers reading it.
+
+**What acceptance does and does not authorize.** It authorizes the normative
+change to move into the specification under the ordinary review rules. It
+does not itself change the specification: until that text lands, `service` is
+not a channel kind and an envelope carrying it is correctly refused.
 
 ## The problem
 
@@ -73,8 +99,8 @@ signature. Recipients can apply policy by content class (§7.1.6), refusing
 standing-authority separation comes from `allowedChannels`: a Delegation
 Mandate that omits `service` cannot authorize a service act at all. What a
 Delegation Mandate can NOT do — deliberately, per §7.1's design statement
-("channel, rate, and time — nothing else") — is constrain by content class, so the
-separation "a human who let their agent send email has not thereby let it
+("channel, rate, and time — nothing else") — is constrain by content class, so
+the separation "a human who let their agent send email has not thereby let it
 modify records" is enforced at the channel boundary, not the content-class
 boundary. This RFC does not change that.
 
@@ -110,14 +136,19 @@ with no A2A involved.
   refuses any unrecognized channel kind. That is the intended conservative
   failure: an old verifier does not silently accept an act it cannot describe.
   The independent TypeScript implementation behaves this way today.
-- **The v0.1 Rust reference implementation does not implement those closed
-  sets** — it types `channel.kind` and `communication.contentClass` as
-  unvalidated strings — so it, and the four language bindings built on it,
-  will silently **accept** a `service` envelope rather than refuse it. Closing
-  that gap is a stated prerequisite of this RFC: the closed-set enforcement
-  MUST land in the reference implementation before or with this widening, or
-  the addition ships as a live interop split in which two conformant-claiming
-  verifiers reach opposite verdicts on the same bytes.
+- **This RFC's prerequisite is DISCHARGED, and that is what unblocked it.**
+  When this was drafted, the Rust reference implementation typed
+  `channel.kind` and `communication.contentClass` as unvalidated strings, so
+  it and the bindings built on it would silently ACCEPT a `service` envelope
+  while the independent TypeScript implementation refused it — two
+  conformant-claiming verifiers reaching opposite verdicts on the same bytes.
+  This RFC therefore made closed-set enforcement in the reference a stated
+  prerequisite of the widening. That enforcement landed
+  (`57431e6`, 2026-08-28): both vocabularies are now closed types whose
+  unrecognized arm is a strict-parse refusal, and the specification's own
+  enumerations are welded to them in both directions. The divergence this
+  bullet was written to prevent no longer exists, and the widening may
+  proceed.
 - Because acceptance-versus-refusal is therefore implementation-dependent in
   v0.1 as deployed, the producer rule is load-bearing, not courtesy:
   producers MUST NOT emit `service` until they have reason to believe the

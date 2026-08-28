@@ -4,6 +4,15 @@
 - **Issue:** link to the RFC issue where this was discussed
 - **Spec sections touched:** the § list, or "none — non-normative"
 
+## Decision
+
+Absent while the status is Draft; required the moment it is anything else.
+Date, who decided, what was decided, and the limitation it was decided under
+— a lone reviewer, an unverified claim taken on trust, a deadline. State the
+limitation even when it is unflattering: a decision whose constraints are
+recorded can be revisited on its merits, and one whose constraints were
+hidden gets re-litigated from scratch by whoever discovers them later.
+
 ## The problem
 
 What breaks, misleads, or cannot be expressed today, with the spec section

@@ -8,6 +8,27 @@
 - **Spec sections touched:** none — rejected; §7.1.5 and Appendix A stand as
   written.
 
+## Decision
+
+**Rejected 2026-08-28**, by the sole maintainer, with no second reviewer.
+
+The rejection of an open vendor arm is PERMANENT rather than "not yet", for
+the reason given below: it is a repeal of the closure, not an extension of the
+set. A future maintainer who reopens it should have to answer that argument
+rather than rediscover it.
+
+**The limitations this was decided under.** One reviewer, who is also the
+author and the maintainer of the implementation that surfaced the problem —
+and, for the specific value in question, a participant in the organization
+that emitted it. That is the least comfortable fact about this decision and
+the reason the document states explicitly that a NAMED first-party variant
+remains admissible through the ordinary process: the refusal here is of the
+open arm, not of the requester.
+
+Decided against three concurrent implementer reports rather than a
+deliberation. Speed was a factor — a downstream build was broken while this
+was open — and a decision made under that pressure deserves to say so.
+
 ## The problem
 
 The problem is real, and it was reported precisely: **the closed set had no
