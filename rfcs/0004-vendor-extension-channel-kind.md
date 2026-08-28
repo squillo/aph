@@ -187,3 +187,22 @@ direction. It does not touch `ContentClass`, whose closure rests on the same
 reasoning and is untested by this report. And it does not prescribe the
 downstream repair beyond the sequencing warning above; where the parse belongs
 in another project's layering is that project's decision, not this one's.
+
+**And it does not make the axis rule mechanically enforceable, because it
+cannot be.** The closed type refuses an unrecognized STRING, which is what
+caught this case. It cannot catch the same error committed with a recognized
+one: a sender that coined `email` to name an internal scope would parse
+cleanly, satisfy every check in §8.3, and bind nothing a recipient can act
+on. The axis is a claim about what the sender MEANT, and no verifier can
+check intent — it can only check the value. So the rule in §7.1.5 is
+addressed to implementers rather than to verifiers, and it is stated as
+guidance for the same reason it is not stated as a MUST: there is no
+conforming behaviour a verifier could adopt that would enforce it.
+
+This is recorded rather than left silent because a reader who finds the rule
+in the specification is entitled to know whether anything checks it. Nothing
+does. What the closed set buys is that the *unrecognized* case — the one that
+actually occurred, three times in one day — becomes loud instead of silent,
+and `spec/aph-0.1.md`'s enumerations are now welded to the reference type's
+in both directions, so the two cannot drift apart while each looks correct
+on its own.
