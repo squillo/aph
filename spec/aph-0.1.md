@@ -461,6 +461,7 @@ The notarized claim. Wraps the human principal, agent, channel, communication de
 | `policy` | object | yes | See §7.1.7. |
 | `notarization` | object | yes | See §7.1.8. |
 | `appleAurAcceptance` | object | no | Registered optional extension; omitted when absent. See §7.5.1. |
+| `actClassification` | object | no | What the sender says this act MEANS, against independently published vocabularies. Omitted when absent. See §7.1.12. |
 
 #### 7.1.3 `HumanPrincipalRef`
 
@@ -985,6 +986,35 @@ Extensions are vendor-originated but protocol-registered: each entry records its
 
 v0.1 registers three extensions.
 
+#### 7.1.12 `ActClassification`
+
+What the sender says this act MEANS, in terms of one or more vocabularies both parties can resolve independently (§8.5). Optional: an envelope making no such claim omits the field entirely and is byte-identical to one written before the field existed, so every signature over those bytes stays valid.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `vocabularies` | array of object | yes | Every vocabulary the verdict depended on, in fold order. See below. |
+| `labels` | array of string | yes | The family-qualified labels this act carries, each written `FAMILY/LABEL`. |
+
+Each entry of `vocabularies`:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | The vocabulary's name, as its published bundle declares it. |
+| `version` | string | yes | The version, as its published bundle declares it. |
+| `digest` | string | yes | The bundle's integrity digest, VERBATIM — the same `sha256-…` string the bundle carries, never a re-encoding of it. |
+
+**Both members are arrays, for different reasons, and neither is arbitrary.** `labels` because one act carries verdicts from several families at once — what kind of act it is, how reversible, how wide its blast radius — and carrying one would discard the verdicts a recipient's policy most wants. `vocabularies` because an OVERLAY is a separate published artifact with its own digest: a classifier that ran against a base and a tightening overlay was produced by two artifacts, and naming only one would put a false statement inside a signature.
+
+**A label MUST be family-qualified.** A bare `ACCESS_GRANT` names nothing — the family is what scopes it, and two vocabularies may both define the same bare word. An unqualified label is a strict-parse rejection under §7.1's rule, at §8.3 step 1.
+
+**The digest is what makes the reference checkable.** Without it a citation points at whatever the publisher serves today, and a publisher — or anyone who compromises their origin — could change what a signed envelope meant after it was signed. A recipient that resolves the vocabulary MUST refuse it when the fetched bytes do not match the digest: absent and corrupt are not the same event.
+
+**⚠ Emitting this field is version-gated, and the rule is load-bearing rather than courtesy.** §7.1's parse is strict: a verifier built before this field existed does not ignore it — it fails at strict parse, BELOW the protocol's own error vocabulary, so the failure is not even reportable as an APH error code. A producer MUST NOT emit `actClassification` until it has reason to believe the recipient understands it. The AgentCard extension declaration (§10.1) is the existing discovery mechanism for forming that belief.
+
+**What a recipient does with it.** A recipient that recognizes the vocabulary and the labels MAY apply policy to them. A recipient that does not MUST treat the envelope exactly as it would have without the field: the classification is additional information, never a precondition, and its absence never changes a verdict.
+
+**What this proves, and what it does not.** It proves WHICH VOCABULARY THE SENDER CITED, inside the signature. It does NOT prove the sender classified correctly — a sender can label a funds transfer as a scheduling proposal and sign it. What the binding buys is that a DISAGREEMENT becomes visible where a MISUNDERSTANDING was invisible: two parties now mean the same thing by a word, and a recipient can check the claim against the payload it accompanies. Implementations MUST NOT present it as integrity of classification.
+
 #### 7.5.1 `credentialSubject.appleAurAcceptance` (object, omitted when absent)
 
 Origin: Apple on-device foundation-model integration (vendor extension). Attests that the human principal accepted Apple's Acceptable Use Requirements (AUR) on the notarizing device before the agent produced this communication with an on-device model.
@@ -1310,6 +1340,45 @@ Recipient applications that store a notary's resolved public key after the first
 
 When pinned-vs-published mismatch occurs, verifiers SHOULD raise a warning, SHOULD validate the envelope against BOTH the pinned key and the currently-published key, and MUST treat mismatch with both as a fatal verification failure.
 
+### 8.5 Vocabulary publication (normative)
+
+§8.4 resolves a notary's KEY from a party with no prior relationship. Publishing a vocabulary is the same problem with a different payload — so it takes the same shape rather than a second discovery story with its own failure modes.
+
+#### 8.5.1 The DNS TXT record
+
+TXT record name: `_aph._vocab.<domain>`, where `<domain>` is the registrable domain of the publisher.
+
+Required tags, in this order, separated by `"; "`:
+
+| Tag | Value |
+|---|---|
+| `v` | `APHv1`, as §8.4.5 |
+| `n` | the vocabulary's name, as its bundle declares it |
+| `ver` | the vocabulary's version, as its bundle declares it |
+| `h` | the bundle's integrity digest, VERBATIM |
+
+```
+_aph._vocab.example.com.  IN  TXT  "v=APHv1; n=aph_guardrails; ver=0.1.0-alpha.1; h=sha256-y6E/EGldCz2ogpVB7wlnS5orbnAjcCpoUBaDietJmXA="
+```
+
+A publisher serving several vocabularies publishes several TXT records at the one name. A resolver selects on `n` and `ver` together, and **MUST refuse rather than guess** when two records claim the same `n`+`ver` pair with different digests: ambiguity about which bytes a name refers to is corruption, not a coin flip.
+
+A record MUST fit a single 255-byte character-string. A digest split across strings would need a concatenation rule, and a concatenation rule nobody implements identically is an interop bug waiting for its first stranger.
+
+#### 8.5.2 What this surface does NOT provide
+
+Stated because the omission is easy to miss and expensive to assume.
+
+**DNS is not append-only.** A publisher can change the record, and a resolver sees only what it is served. This surface answers *what digest does this publisher name TODAY* — it is not a history, it does not establish what the publisher said last week, and it does not prevent a publisher showing one digest to one party and a different digest to another. Implementations MUST NOT describe it as providing either property.
+
+**The failure mode is benign, which is why an unauthenticated lookup is acceptable here at all.** A spoofed or stale record yields a digest that does not match the bytes it names, and those bytes are then refused. The worst outcome is denial, never substitution: an attacker who controls the DNS answer can stop a verifier resolving a vocabulary, and cannot make it accept a different one. That asymmetry holds only because the digest carries the integrity, which is why the digest is required and this record is not.
+
+#### 8.5.3 Resolution posture
+
+A verifier that cannot resolve a vocabulary treats its labels as unrecognized and proceeds under §7.1.12 — absence advances. A verifier that resolves a vocabulary whose bytes do not match the cited digest MUST refuse the classification: absent and corrupt are not the same event, the same distinction §8.4.6 draws for keys and §6.3.3.4 draws for status.
+
+**Resolution SHOULD happen out of band, on a cadence, rather than on receipt of an envelope.** A fetch triggered by inbound traffic is an outbound request made by a verifier while it verifies, and it carries every hazard that implies: server-side request forgery against internal addresses, a slow origin becoming a denial of service on the verify path, and a publisher learning when traffic classified against its vocabulary arrives. A digest-pinned cache has none of these. Implementations that do fetch MUST apply the same outbound controls §6.3.3 requires for status-list retrieval, and MUST NOT open a second, laxer path.
+
 ---
 
 ## 9. Flow State Machines
@@ -1474,6 +1543,8 @@ A full threat model is published as the companion document `security-considerati
 **URI scheme.** APH defines the `aph://` URI scheme for protocol-level extension URIs (e.g., the A2A extension URI `aph://extensions/notarization/v1`). Formal IANA registration of the `aph://` URI scheme is **drafted — `spec/registrations/uri-scheme-aph.md` carries a complete provisional request per the RFC 7595 §7.4 template, and submission is pending.** A draft is not a registration: the scheme is unregistered, and the name is not APH's, until IANA acts. v0.1 uses the scheme by convention only, similar to how `did:` was used in early DID drafts prior to formal registration. Implementations MUST treat `aph://` URIs as opaque identifiers and MUST NOT attempt to dereference them as URLs.
 
 **DNS underscore-prefixed sub-name.** APH §8.4.5 publishes notary public keys at `_aph._notary.<domain>`. v0.1 reserves the underscore-prefixed labels `_aph` and `_aph._notary` by convention. Formal registration in the IANA "Underscored and Globally Scoped DNS Node Names" registry is **drafted — `spec/registrations/dns-underscored-aph.md` carries the request per RFC 8552 §4.1.1, and submission is pending.** A draft is not a registration: the labels are unregistered, and the names are not APH's, until the designated expert acts. The underscore-prefix convention follows established practice in DKIM (`_domainkey`), DMARC (`_dmarc`), and TLSA (`_<port>._<proto>`). One consequence of that registry's rules is not obvious from the sentence above and is worked through in the draft: RFC 8552 registers only the underscored label **closest to the root**, which for `_aph._notary.<domain>` is `_notary`. `_aph` sits subordinate to it — the position a DKIM selector occupies — and is not separately registrable, because APH defines no record directly at `_aph.<domain>`. It does not need to be: that registry gives each registered global name a distinct subordinate namespace, so registering `_notary` carries `_aph` with it. The reservation of `_aph` above is therefore honoured derivatively, as a consequence of holding `_notary` rather than as an independent claim on the label — which also means the first party to register `_notary` owns the namespace `_aph` lives in.
+
+**A SECOND underscored name, for vocabulary publication.** §8.5.1 publishes vocabulary digests at `_aph._vocab.<domain>`. By the same rule, the registrable label there is `_vocab`, not `_aph` — so this is a **separate** registration and not an addendum to the first: holding `_notary` grants the namespace beneath `_notary` and nothing beneath `_vocab`. v0.1 reserves `_vocab` by convention on the same terms; the request is **drafted** at `spec/registrations/dns-underscored-aph-vocab.md`, and submission is pending. The same caveat applies with the same force: a draft is not a registration, and the label is not APH's until the designated expert acts. That draft also records the alternative that was declined — naming the surfaces `_notary._aph` and `_vocab._aph` would have put `_aph` in the registrable position and cost one entry instead of two, and was rejected because `_aph._notary` is already published in live DNS and shipped in released code.
 
 ---
 

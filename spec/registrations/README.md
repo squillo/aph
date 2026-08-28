@@ -7,6 +7,7 @@ by convention. Spec §13 names both; these files are the documents §13 promises
 |---|---|---|
 | `uri-scheme-aph.md` | Uniform Resource Identifier (URI) Schemes | Provisional registration of the `aph` scheme, on the six-field template in RFC 7595 §7.4 (the procedure that consumes it is §7.2) |
 | `dns-underscored-aph.md` | Underscored and Globally Scoped DNS Node Names | A `TXT` entry for `_notary`, per RFC 8552 §4.1.1 — which is the label APH §8.4.5's `_aph._notary.<domain>` actually registers, for the reason below |
+| `dns-underscored-aph-vocab.md` | Underscored and Globally Scoped DNS Node Names | A `TXT` entry for `_vocab`, the label §8.5.1's `_aph._vocab.<domain>` registers. A SECOND request, not an addendum: holding `_notary` grants the namespace beneath `_notary` and nothing beneath `_vocab` |
 
 ## Nothing here is registered
 
