@@ -301,6 +301,27 @@ test('§7.1.6 — a content class outside the closed set is refused, and the ref
   );
 });
 
+test('§7.1.12 — a classification citing no vocabulary is refused on both sides of the weld', () => {
+  // WHY: this implementation refused an empty `vocabularies` from its first
+  // draft, and an audit found the Rust reference ACCEPTING the same bytes —
+  // the divergence class this wave closed for allowedChannels, reintroduced
+  // in a field one day old. The reference was tightened; this pin is the TS
+  // half of the weld, so LOOSENING either side now goes red somewhere.
+  // PINS: an actClassification whose vocabularies array is empty is refused
+  // at the read, with the path naming the member.
+  const value = goldenValue();
+  (value.credentialSubject as JsonObject).actClassification = {
+    vocabularies: [],
+    labels: ['APH_ACT_ACCESS/ACCESS_GRANT'],
+  };
+  assert.throws(
+    () => parseEnvelope(JSON.stringify(value)),
+    (error: unknown) =>
+      error instanceof AphParseError &&
+      error.path === '$.credentialSubject.actClassification.vocabularies',
+  );
+});
+
 test('§6.1 — an allowedChannels entry outside the closed set is refused at the READ', () => {
   // WHY: this member is the one place the closed channel set could be admitted
   // through a side door. §6.1's table spells it "array of strings", so this

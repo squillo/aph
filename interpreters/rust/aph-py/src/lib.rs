@@ -479,6 +479,41 @@ mod tests {
     names
   }
 
+
+  #[test]
+  fn every_conformance_file_strict_parses_through_this_binding() {
+    // WHY: the set-equality test above compares NAMES, and an audit found
+    // that name-level inventory was this binding's ONLY runtime view of the
+    // corpus — a golden carrying a NEW FIELD would pass inventory without
+    // this boundary ever parsing the field. The Go binding's twin of this
+    // gate had exactly that hole, and the throwaway probe that covered it
+    // was, by definition, not standing coverage.
+    //
+    // PINS: every conformance entry strict-parses AND round-trips through
+    // this binding's own entry function, so every FUTURE golden exercises
+    // the boundary the day it lands, with nobody remembering to add a test.
+    let manifest_path = examples_dir().join(MANIFEST_FILE);
+    let raw = std::fs::read_to_string(&manifest_path)
+      .unwrap_or_else(|e| std::panic!("could not read {}: {}", manifest_path.display(), e));
+    let manifest: serde_json::Value = serde_json::from_str(&raw)
+      .unwrap_or_else(|e| std::panic!("the corpus manifest is not valid JSON: {e}"));
+    for entry in manifest
+      .get("conformance")
+      .and_then(serde_json::Value::as_array)
+      .unwrap_or_else(|| std::panic!("the corpus manifest has no `conformance` array"))
+    {
+      let name = entry
+        .as_str()
+        .unwrap_or_else(|| std::panic!("a `conformance` entry is not a string"));
+      let path = examples_dir().join(name);
+      let document = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| std::panic!("could not read {}: {}", path.display(), e));
+      super::roundtrip_envelope_json(&document).unwrap_or_else(|e| {
+        std::panic!("{} is named in the manifest and does not strict-parse: {}", name, e)
+      });
+    }
+  }
+
   #[test]
   fn the_corpus_on_disk_is_exactly_the_corpus_the_manifest_claims() {
     // WHY: the two fixtures above are embedded at COMPILE TIME, which is right

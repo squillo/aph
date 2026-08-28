@@ -148,6 +148,48 @@ pub fn require_attestation_mode(
 
 #[cfg(test)]
 mod tests {
+  /// The corpus directory, resolved at RUNTIME — the compile-time constants
+  /// below name specific files and can never see a new one, which is the
+  /// hole the corpus test closes.
+  fn examples_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
+  }
+
+  #[test]
+  fn every_conformance_file_strict_parses_through_this_binding() {
+    // WHY: until this test, this binding's ONLY view of the corpus was the
+    // fixtures embedded at compile time — a golden carrying a NEW FIELD
+    // would land in `examples/` and this crate would compile and pass having
+    // never parsed it. An audit found the Go binding's corpus gate with
+    // exactly that hole ("is JSON", never parsed), and the same absence here
+    // was just quieter, being no gate at all.
+    //
+    // PINS: every conformance entry in `examples/manifest.json` strict-parses
+    // and round-trips through this binding's own boundary function, so every
+    // FUTURE golden exercises it the day it lands.
+    let manifest_path = examples_dir().join("manifest.json");
+    let raw = std::fs::read_to_string(&manifest_path)
+      .unwrap_or_else(|e| std::panic!("could not read {}: {}", manifest_path.display(), e));
+    let manifest: serde_json::Value = serde_json::from_str(&raw)
+      .unwrap_or_else(|e| std::panic!("the corpus manifest is not valid JSON: {e}"));
+    let entries = manifest
+      .get("conformance")
+      .and_then(serde_json::Value::as_array)
+      .unwrap_or_else(|| std::panic!("the corpus manifest has no `conformance` array"));
+    std::assert!(!entries.is_empty(), "an empty inventory would verify nothing");
+    for entry in entries {
+      let name = entry
+        .as_str()
+        .unwrap_or_else(|| std::panic!("a `conformance` entry is not a string"));
+      let path = examples_dir().join(name);
+      let document = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| std::panic!("could not read {}: {}", path.display(), e));
+      super::roundtrip_envelope_json(&document).unwrap_or_else(|e| {
+        std::panic!("{} is named in the manifest and does not strict-parse: {}", name, e)
+      });
+    }
+  }
+
   /// The published `PrincipalSigned` golden — the chain form of the
   /// `EnvelopeProofs` union, embedded at compile time so the crate's tests
   /// exercise the same bytes the repository publishes.

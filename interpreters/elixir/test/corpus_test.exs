@@ -29,20 +29,21 @@ defmodule APH.CorpusTest do
            "manifest.json claims these files that are not on disk: " <> Enum.join(missing, ", ")
   end
 
-  test "every conformance file the manifest claims is readable and is a JSON object" do
+  test "every conformance file the manifest claims strict-parses through the NIF" do
     # WHY: the set comparison above compares NAMES. A file can be named in both
-    # places and still be a zero-byte stub, at which point the inventory is
-    # honest and the corpus is not.
+    # places and still be a zero-byte stub — and an audit found the old floor
+    # here ("is a JSON object") let a golden carrying a NEW FIELD pass without
+    # the NIF ever seeing the field, so the one gate that runs this boundary
+    # was vouching for bytes it never parsed.
     #
-    # PINS: every conformance entry opens, decodes, and is a JSON OBJECT with
-    # members — the floor every envelope shape sits on. Deeper verification is
-    # the other test files' job; this one only refuses to let a hollow file pass
-    # as a corpus member.
+    # PINS: every conformance entry strict-parses through APH.parse_envelope_json/1,
+    # so every FUTURE golden exercises the NIF the day it lands, with nobody
+    # remembering to add a test.
     for name <- APH.TestCorpus.conformance_files() do
-      document = name |> APH.TestCorpus.read!() |> Jason.decode!()
+      raw = APH.TestCorpus.read!(name)
 
-      assert is_map(document), "#{name} is named in manifest.json and is not a JSON object"
-      assert map_size(document) > 0, "#{name} is named in manifest.json and carries no members"
+      assert {:ok, _normalized} = APH.parse_envelope_json(raw),
+             "#{name} is named in manifest.json and does not strict-parse through the NIF"
     end
   end
 
