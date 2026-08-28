@@ -143,6 +143,108 @@ pub fn cmd_render_did(args: &[std::string::String]) -> i32 {
   }
 }
 
+/// Renders the §8.5.1 DNS TXT tag list publishing one vocabulary's digest.
+///
+/// Reads the digest FROM THE BUNDLE rather than computing it. The compiled
+/// bundle already declares `@snapp.integrity`, and recomputing here would be
+/// a second derivation of one fact — two derivations of one fact drift, and a
+/// drifted digest does not fail loudly: it publishes a value that refuses
+/// bytes which are in fact correct.
+pub fn cmd_render_vocab(args: &[std::string::String]) -> i32 {
+  let mut path: std::option::Option<&str> = std::option::Option::None;
+  let mut domain: std::option::Option<&str> = std::option::Option::None;
+
+  let mut index = 0;
+  while index < args.len() {
+    match args[index].as_str() {
+      "--domain" => {
+        domain = args.get(index + 1).map(std::string::String::as_str);
+        index += 2;
+      }
+      other => {
+        if path.is_none() {
+          path = std::option::Option::Some(other);
+        }
+        index += 1;
+      }
+    }
+  }
+
+  let path = match path {
+    std::option::Option::Some(p) => p,
+    std::option::Option::None => {
+      eprintln!("render-vocab: a compiled bundle path is required");
+      return 2;
+    }
+  };
+
+  let raw = match std::fs::read_to_string(path) {
+    std::result::Result::Ok(r) => r,
+    std::result::Result::Err(e) => {
+      eprintln!("render-vocab: cannot read {}: {}", path, e);
+      return 1;
+    }
+  };
+  let value: serde_json::Value = match serde_json::from_str(&raw) {
+    std::result::Result::Ok(v) => v,
+    std::result::Result::Err(e) => {
+      eprintln!("render-vocab: {} is not valid JSON: {}", path, e);
+      return 1;
+    }
+  };
+
+  let record = match vocabulary_record(&value) {
+    std::result::Result::Ok(r) => r,
+    std::result::Result::Err(message) => {
+      eprintln!("render-vocab: {}", message);
+      return 1;
+    }
+  };
+  if let std::option::Option::Some(host) = domain {
+    eprintln!("record name: _aph._vocab.{}", host);
+  }
+  println!("{}", record);
+  0
+}
+
+/// The §8.5.1 tag list for a compiled bundle: `v`, `n`, `ver`, `h`.
+///
+/// Every value is READ from the bundle's own `@snapp` block. Nothing here
+/// invents, normalizes, or re-encodes — a publication tool that edits what it
+/// publishes is a second author of the artifact.
+fn vocabulary_record(bundle: &serde_json::Value) -> std::result::Result<String, std::string::String> {
+  let meta = bundle
+    .get("@snapp")
+    .and_then(serde_json::Value::as_object)
+    .ok_or_else(|| std::string::String::from("the bundle declares no `@snapp` block"))?;
+  let read = |key: &str| -> std::result::Result<&str, std::string::String> {
+    meta
+      .get(key)
+      .and_then(serde_json::Value::as_str)
+      .ok_or_else(|| std::format!("the bundle's `@snapp` declares no `{}`", key))
+  };
+  let name = read("name")?;
+  let version = read("version")?;
+  let integrity = read("integrity")?;
+
+  let record = std::format!(
+    "v=APHv1; n={}; ver={}; h={}",
+    name, version, integrity
+  );
+  // §8.5.1 requires one 255-byte character-string. Refusing here rather than
+  // at the nameserver is the difference between an error an operator reads
+  // and a publication that silently truncates.
+  if record.len() > 255 {
+    return std::result::Result::Err(std::format!(
+      "the record is {} bytes and a TXT character-string holds 255; \
+       splitting a digest across strings needs a concatenation rule that two \
+       implementations will read differently",
+      record.len()
+    ));
+  }
+  std::result::Result::Ok(record)
+}
+
 /// Decodes a `did:key` into the public key the renderers publish.
 ///
 /// The decode is `aph-core`'s, not a second implementation of multibase and
@@ -218,6 +320,68 @@ mod tests {
       .expect("a decodable key renders");
     std::assert!(value.contains("v=APHv1"), "the tag list names its version: {}", value);
     std::assert!(value.contains("kid=k1"), "a supplied kid must reach the record: {}", value);
+  }
+
+  #[test]
+  fn the_shipped_guardrail_bundle_renders_its_own_record() {
+    // WHY: pinned against the REAL committed bundle, not a fixture. A
+    // renderer tested only against a synthetic input has never met the
+    // artifact it exists to publish — and this one exists to publish exactly
+    // this file. If the bundle is re-exported and its digest moves, this
+    // reads the new one, because it reads rather than remembers.
+    //
+    // PINS: the tag list is assembled from `@snapp`'s own name, version and
+    // integrity, in §8.5.1 order, and the digest is carried VERBATIM.
+    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0-alpha.1.json");
+    let bundle: serde_json::Value =
+      serde_json::from_str(raw).expect("the committed bundle is valid JSON");
+    let record = super::vocabulary_record(&bundle).expect("a shipped bundle renders");
+
+    let integrity = bundle["@snapp"]["integrity"]
+      .as_str()
+      .expect("the bundle declares an integrity digest");
+    std::assert!(record.starts_with("v=APHv1; "), "the version tag leads: {}", record);
+    std::assert!(record.contains("n=aph_guardrails; "), "the name is the bundle's: {}", record);
+    std::assert!(
+      record.ends_with(&std::format!("h={}", integrity)),
+      "the digest must be carried verbatim, not re-encoded: {}",
+      record
+    );
+  }
+
+  #[test]
+  fn a_record_fits_one_txt_character_string() {
+    // WHY: §8.5.1 requires one 255-byte character-string, and the reason is
+    // interop rather than tidiness — a digest split across strings needs a
+    // concatenation rule, and a concatenation rule two implementations read
+    // differently is a defect that only ever surfaces between strangers.
+    // Refusing in the renderer is the difference between an error an operator
+    // reads and a publication that silently truncates.
+    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0-alpha.1.json");
+    let bundle: serde_json::Value = serde_json::from_str(raw).expect("valid JSON");
+    let record = super::vocabulary_record(&bundle).expect("it renders");
+    std::assert!(
+      record.len() <= 255,
+      "a shipped bundle's record must fit one character-string, got {} bytes",
+      record.len()
+    );
+  }
+
+  #[test]
+  fn a_bundle_missing_its_metadata_is_refused_rather_than_published() {
+    // WHY: publishing is one-way. A record assembled from absent metadata
+    // would name a vocabulary nobody can resolve, and it would sit in DNS
+    // until someone noticed resolution had been failing.
+    let empty = serde_json::json!({});
+    std::assert!(
+      super::vocabulary_record(&empty).is_err(),
+      "a bundle with no `@snapp` block must not render"
+    );
+    let partial = serde_json::json!({"@snapp": {"name": "x", "version": "1"}});
+    std::assert!(
+      super::vocabulary_record(&partial).is_err(),
+      "a bundle with no integrity digest must not render"
+    );
   }
 
   #[test]

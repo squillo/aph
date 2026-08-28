@@ -6,6 +6,7 @@
 //! - `aph golden [index]` — list conformance fixtures, or print one raw.
 //! - `aph render-txt <did:key>` — the §8.4.5 DNS TXT value for a notary key.
 //! - `aph render-did <did:web> <did:key#kid>…` — the §8.4.4 DID Document.
+//! - `aph render-vocab <bundle.json>` — the §8.5.1 vocabulary digest record.
 //! - `aph help` — usage, plus the `--json` verdict contract.
 //!
 //! `validate` reads stdin as `-`, which is what makes it usable as a gate on
@@ -28,6 +29,8 @@ commands:
                                [--kid K] [--not-before T] [--not-after T] [--domain D]
   render-did <did:web> <k>...  the DID Document publishing those keys (\u{a7}8.4.4);
                                each key is a did:key with its kid as fragment
+  render-vocab <bundle.json>   the DNS TXT value publishing that vocabulary's
+                               digest (\u{a7}8.5.1)  [--domain D]
   help                         show this message";
 
 /// The `--json` verdict contract, printed by `aph help` and by nothing else.
@@ -95,6 +98,7 @@ fn main() {
     std::option::Option::Some("golden") => cmd_golden(args.get(1).map(String::as_str)),
     std::option::Option::Some("render-txt") => publish::cmd_render_txt(&args[1..]),
     std::option::Option::Some("render-did") => publish::cmd_render_did(&args[1..]),
+    std::option::Option::Some("render-vocab") => publish::cmd_render_vocab(&args[1..]),
     std::option::Option::Some("help") | std::option::Option::Some("--help") | std::option::Option::Some("-h") => {
       outln(USAGE);
       outln(&json_contract());

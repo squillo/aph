@@ -292,8 +292,16 @@ cargo run -p aph-cli -- render-txt did:key:z6Mk... --kid k1 --domain notary.exam
 cargo run -p aph-cli -- render-did did:web:notary.example.com did:key:z6Mk...#k1
 ```
 
+```sh
+# the DNS TXT value publishing a vocabulary's digest (§8.5.1)
+cargo run -p aph-cli -- render-vocab "snapp/aph_guardrails@0.1.0-alpha.1.json" --domain squillo.com
+```
+
 `render-did` takes several keys so a rotation overlap (§8.4.7) can be published
-in one document. The record name goes to stderr and the value to stdout, so a
+in one document. `render-vocab` READS the digest from the bundle's own
+`@snapp.integrity` rather than recomputing it — two derivations of one fact
+drift, and a drifted digest does not fail loudly: it publishes a value that
+refuses bytes which are in fact correct. The record name goes to stderr and the value to stdout, so a
 name cannot be captured into the record's content by a redirect.
 
 **Both take PUBLIC key material only.** A `did:key` IS a public key; nothing
