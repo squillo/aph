@@ -1,4 +1,5 @@
-//! The INDEPENDENT implementation as a fourth populator of the closed sets.
+//! The populators of the closed sets that are NOT the spec, the reference,
+//! or the Snapp: the independent implementation, and the agent skill.
 //!
 //! WHY THIS EXISTS. Four artifacts now declare the same two vocabularies: the
 //! specification, the Rust reference types, the N Lang Snapp, and the
@@ -18,6 +19,12 @@
 //! implementation without the other and this goes red. It reads the
 //! TypeScript source rather than its build output, so it holds whether or not
 //! anything has been compiled.
+//!
+//! The agent skill is the fifth, and it is the one a reader is most likely
+//! to believe without checking. `skills/spec/SKILL.md` is what an agent loads
+//! to answer protocol questions, so a stale vocabulary there does not merely
+//! sit wrong in a file — it is actively taught. It was stale, by two values,
+//! when this was written.
 //!
 //! ZERO `#[ignore]`.
 
@@ -97,4 +104,68 @@ fn the_independent_implementation_agrees_on_the_content_class_vocabulary() {
     .map(aph_core::ContentClass::label)
     .collect();
   assert_same_membership(&declared("CONTENT_CLASSES"), &reference, "content classes");
+}
+
+/// The agent skill's declaration of one vocabulary.
+///
+/// Read from the skill's "Closed enums" list. The entries are backticked and
+/// comma-separated, and each MAY carry a parenthetical gloss naming the RFC
+/// that admitted it — the gloss is prose and is skipped, because what is
+/// under test is membership, not how it is described.
+fn skill_declared(bullet: &str) -> std::vec::Vec<String> {
+  let path = repo_root().join("skills/spec/SKILL.md");
+  let source = std::fs::read_to_string(&path)
+    .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
+  let line = source
+    .lines()
+    .find(|line| line.starts_with(bullet))
+    .unwrap_or_else(|| std::panic!("the skill no longer opens a line with `{}`", bullet));
+  let start = line
+    .find("): ")
+    .unwrap_or_else(|| std::panic!("the `{}` line has no `): ` list opener:\n{}", bullet, line))
+    + 3;
+  let mut out = std::vec::Vec::new();
+  let mut rest = &line[start..];
+  while let std::option::Option::Some(open) = rest.find('`') {
+    let after = &rest[open + 1..];
+    let close = match after.find('`') {
+      std::option::Option::Some(index) => index,
+      std::option::Option::None => break,
+    };
+    out.push(after[..close].to_string());
+    rest = &after[close + 1..];
+  }
+  std::assert!(
+    !out.is_empty(),
+    "the `{}` line enumerates nothing; it has been rewritten:\n{}",
+    bullet,
+    line
+  );
+  out
+}
+
+#[test]
+fn the_agent_skill_agrees_on_the_channel_kind_vocabulary() {
+  let reference: std::vec::Vec<&'static str> = aph_core::ChannelKind::ALL
+    .iter()
+    .map(aph_core::ChannelKind::label)
+    .collect();
+  assert_same_membership(
+    &skill_declared("- **Channel kinds**"),
+    &reference,
+    "channel kinds",
+  );
+}
+
+#[test]
+fn the_agent_skill_agrees_on_the_content_class_vocabulary() {
+  let reference: std::vec::Vec<&'static str> = aph_core::ContentClass::ALL
+    .iter()
+    .map(aph_core::ContentClass::label)
+    .collect();
+  assert_same_membership(
+    &skill_declared("- **contentClass**"),
+    &reference,
+    "content classes",
+  );
 }

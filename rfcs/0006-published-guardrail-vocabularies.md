@@ -201,6 +201,56 @@ labels well-chosen. It establishes that you are reading the bytes a named
 publisher published at a known time. That is necessary and it is not
 sufficient, and the distinction belongs anywhere this is described.
 
+### 2d. A publisher-operated log, and what it actually guarantees
+
+The layering above says the transparency log should not be one this project
+operates. The obvious next question is whether a PUBLISHER may operate the log
+for their own vocabularies, on the same infrastructure already serving their
+`did:web` document and their DNS zone. **Yes — and the guarantee it provides
+is narrower than it looks, in a way worth stating before anyone builds it.**
+
+The shape is an append-only Merkle log: each published vocabulary digest is a
+leaf, the publisher signs the tree head, and consumers ask for an **inclusion
+proof** (this digest is in the tree) and a **consistency proof** (the tree I
+see now extends the tree I saw before, with nothing removed or rewritten).
+This is the Certificate Transparency shape, and it is worth copying because it
+has survived contact with adversaries.
+
+**A self-operated log gives TAMPER-EVIDENCE, not tamper-proofness.** The
+operator can still equivocate — serve one tree to you and another to your
+counterparty — because nothing in a log stops its own operator from keeping
+two. What defeats equivocation is not the log; it is **other people comparing
+what they were shown.** In Certificate Transparency that is monitors and
+gossip, and the logs are run by the very parties whose behaviour is being
+constrained. The guarantee is emergent, not intrinsic.
+
+So the useful framing is: a publisher-operated log makes a publisher's history
+**checkable by anyone who kept a receipt.** A consumer that recorded a signed
+tree head last month can demand a consistency proof today, and a publisher who
+rewrote history cannot produce one. That converts silent revision into a
+detectable, attributable event — which is most of what is wanted, and is not
+the same as making revision impossible.
+
+**Two things follow, and both belong in any concrete design.**
+
+First, **the signed tree head is the thing worth publishing widely**, more
+than any individual digest — it commits to the whole history in one small
+value. The DNS record in §2c is the natural carrier: a tree head is
+digest-sized, so `_aph._vocab` can carry the current head alongside or instead
+of a single vocabulary's digest, and every consumer resolving DNS then holds a
+receipt they did not have to ask for.
+
+Second, **consumers must actually keep and compare heads**, or the property
+does not exist. A log nobody audits is a database with extra steps. Any
+implementation guidance MUST say so plainly rather than let the presence of a
+log imply the guarantee its presence does not create.
+
+**Where an independent log still earns its place:** a counterparty who does
+not trust the publisher's infrastructure at all, and who wants a witness with
+no stake in the vocabulary. Publisher-operated and independent are not rivals
+— the first is cheap and covers the common case, the second is what you point
+a skeptic at.
+
 ### 3. The reference is a logical identifier plus a digest — never a path
 
 An envelope references a vocabulary by **name, version, and content digest**,

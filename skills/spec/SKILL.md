@@ -68,8 +68,8 @@ A complete worked example lives at spec §7.3.
 
 ## Closed enums
 
-- **Channel kinds** (§7.1.5): `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`.
-- **contentClass** (§7.1.6): `Reply`, `New`, `Mention`, `DM`, `Channel`, `BulkSend`, `Broadcast`.
+- **Channel kinds** (§7.1.5): `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`, `service` (RFC 0002 — a service endpoint an agent delivers a state-changing act to), `squillo` (RFC 0007 — an in-application messaging surface where a human reads in that application's client).
+- **contentClass** (§7.1.6): `Reply`, `New`, `Mention`, `DM`, `Channel`, `BulkSend`, `Broadcast`, `Mutation` (RFC 0002 — this act changes state rather than carrying a message).
 - **Policy decisions** (§7.1.7): `AlwaysAllow`, `AskEveryTime`, `NeverAllow`. (`NeverAllow` is recorded but never yields an envelope.)
 - **Proof types** (§7.1.11): `DataIntegrityProof` or `JsonWebSignature2020`.
 - **Roles** (§5.1): `HumanPrincipal`, `AgentSender`, `NotaryService`, `ChannelAdapter`, `RecipientEndpoint`. **Operations** (§5.2): `IssueDelegationMandate`, `IssueCommunicationMandate`, `Notarize`, `Transport`, `Verify`, `Reject`.
