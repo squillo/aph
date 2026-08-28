@@ -2,12 +2,46 @@
 
 *Meaning as a resolvable third party.*
 
-- **Status:** Draft
+- **Status:** Accepted
 - **Author:** Scott Wyatt
 - **Issue:** [#3](https://github.com/squillo/aph/issues/3) — the first RFC in
   this directory with one, per the lifecycle in `rfcs/README.md`.
 - **Spec sections touched:** none yet — design only. It would touch §7.1
   (a reference field), §8.3 (a recipient step), and reuse §8.4 wholesale.
+
+## Decision
+
+**Accepted 2026-08-28**, by the sole maintainer, with no second reviewer.
+
+**What changed between draft and acceptance.** The draft deliberately left the
+wire binding open, which made it a design nobody could adopt: a vocabulary
+reference that cannot be carried is a comment. §5 now settles it, and the
+governing fact turned out to decide the shape before any field was named —
+every wire struct in the reference implementation carries
+`deny_unknown_fields`, so there is NO place in the envelope that tolerates an
+unrecognized member, and any binding is a version-gated addition rather than a
+quiet one.
+
+**One error corrected rather than carried.** An earlier draft claimed the DNS
+name would cost "one line in the same registration". RFC 8552 registers the
+label closest to the root, so `_aph._vocab` needs its own `_vocab`
+registration — a second request, for a more generic label than the first. The
+cost is accepted and the name shape kept, because the sibling `_aph._notary`
+surface is already live in DNS and shipped in code.
+
+**The limitations this was decided under.** One reviewer, who is also the
+author, in a project whose second-maintainer requirement is open and unfilled
+— the third acceptance in one day under that constraint. No vocabulary has yet
+been published by anyone, so the publication design is reviewed and not
+exercised; the first real publisher will find things this document did not.
+And the accuracy gates the guardrail vocabulary carries remain declarations of
+intent, which publication makes look more official than they are.
+
+**What acceptance authorizes.** The normative change to move into the
+specification under the ordinary review rules, and the publication surfaces to
+be implemented. It does not itself change the specification: until that text
+lands, `actClassification` is not a field and an envelope carrying it is
+correctly refused.
 
 ## The problem
 
@@ -171,9 +205,18 @@ It fits comfortably: the example above is well inside a single 255-byte
 character-string, which matters because a digest split across strings is a
 concatenation rule nobody will implement identically.
 
-`_aph._vocab` would need adding to the underscored names §13 reserves
-alongside `_aph` and `_aph._notary` — one line in the same registration,
-not a second registration.
+**The registration cost, corrected.** An earlier draft of this section said
+this would be "one line in the same registration". That was wrong, and the
+error is worth recording because it is the kind that is cheap now and
+expensive after submission. RFC 8552 registers only the underscored label
+CLOSEST TO THE ROOT: for `_aph._notary.<domain>` that is `_notary`, with
+`_aph` subordinate to it. So for `_aph._vocab.<domain>` the registrable label
+is `_vocab` — a SECOND registration, and a more generic label than the first.
+Ruled 2026-08-28: take the second registration and keep the name shape
+consistent with the live `_aph._notary` surface, which is already published in
+DNS and shipped in code. §13 gains the entry and
+`spec/registrations/` gains the request, both before the pending submission
+rather than after it.
 
 **What this buys.** A second, independent path to the digest, which is the
 shape §8.4.6's multi-mechanism resolution already assumes; DNSSEC where the
@@ -286,6 +329,70 @@ This is the same posture §8.4.6 takes toward discovery: **absence advances,
 corruption refuses.** A vocabulary that cannot be fetched is an unrecognized
 term. A vocabulary that is fetched and fails its digest is a refusal, because
 absent and corrupt are not the same event.
+
+### 5. The wire binding
+
+An earlier draft left this open. It is settled here, because a design that
+cannot be carried is a design nobody can adopt.
+
+**The governing fact, which decides the compatibility story before any field
+is named.** Every wire struct in the reference implementation carries
+`deny_unknown_fields`. There is therefore NO place in the envelope that
+tolerates an unrecognized member: an older verifier meeting a new field does
+not "verify but not understand" — it fails at strict parse, before the
+protocol's own error vocabulary is reachable. This is the same producer rule
+that governs a new closed-vocabulary value, one level up, and it is not
+courtesy:
+
+> A producer MUST NOT emit this field until it has reason to believe the
+> recipient understands it. The AgentCard extension declaration (§10.1) is
+> the existing mechanism for forming that belief.
+
+**Where it sits: `credentialSubject.actClassification`, optional, omitted when
+absent.** In `credentialSubject` because a classification is a fact ABOUT THIS
+ACT, the same category as `channel` and `communication` — and because
+`credentialSubject` is covered by the proof, which is the whole point: an
+unsigned classification is a suggestion. Optional and omitted so that an
+envelope not making the claim is byte-identical to one written before the
+field existed, and every existing signature stays valid.
+
+```json
+"actClassification": {
+  "vocabularies": [
+    {
+      "name": "aph_guardrails",
+      "version": "0.1.0-alpha.1",
+      "digest": "sha256-y6E/EGldCz2ogpVB7wlnS5orbnAjcCpoUBaDietJmXA="
+    }
+  ],
+  "labels": ["APH_ACT_ACCESS/ACCESS_GRANT", "APH_RISK_IRREVERSIBILITY/REVERSIBLE"]
+}
+```
+
+**`labels` is a list because one act has several classifications** — a guardrail
+run produces verdicts from the act family, the risk families, and the routing
+family at once, and carrying only one would discard the verdicts a recipient's
+policy most wants. Each is FAMILY-QUALIFIED, because a bare label is ambiguous
+across families and across vocabularies.
+
+**`vocabularies` is a list for a sharper reason: an overlay is a separate
+published artifact with its own digest.** The extension model in §1 is
+base-plus-overlay, so a classifier that ran against a base and a tightening
+overlay was produced by TWO artifacts. Naming only one would put a false
+statement inside a signature — the defect RFC 0002 rejected under "borrow an
+existing channel kind", and this document will not reintroduce it one field
+over. A producer names every artifact the verdict depended on, in fold order.
+
+**What a recipient does** is unchanged from §4: recognize and MAY apply policy;
+do not recognize and treat the envelope exactly as it would today. Absence
+advances; a digest that does not match the fetched bytes refuses.
+
+**What this binding deliberately excludes: the mandate side.** A Delegation
+Mandate that could constrain by label — *my agent may propose times but may not
+move funds* — is a strictly larger and more valuable idea than a sender's
+classification, and it needs its own argument about what a human is agreeing
+to when they sign a vocabulary reference. It is not foreclosed here; it is not
+granted here either.
 
 ## Alternatives considered
 
