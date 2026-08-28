@@ -518,6 +518,24 @@ pub struct CredentialSubject {
   /// deserialize cleanly).
   #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
   pub apple_aur_acceptance: std::option::Option<AppleAurAcceptanceClaim>,
+  /// Last-position additive field. What the sender says this act MEANS, in
+  /// terms of one or more independently published vocabularies (RFC 0006).
+  ///
+  /// Omitted when absent, so an envelope making no such claim is
+  /// byte-identical to one written before the field existed and every
+  /// signature over those bytes stays valid.
+  ///
+  /// ⚠ EMITTING THIS IS VERSION-GATED, and the reason is structural rather
+  /// than stylistic: every wire struct in this module carries
+  /// `deny_unknown_fields`, so a verifier built before this field existed
+  /// does not ignore it — it fails at STRICT PARSE, below the protocol's own
+  /// error vocabulary. A producer MUST NOT emit this until it has reason to
+  /// believe the recipient understands it; the AgentCard extension
+  /// declaration (§10.1) is the existing mechanism for forming that belief.
+  /// Adding the field to this type is safe for everyone. Putting it on the
+  /// wire is not, and that asymmetry is the whole of the rule.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub act_classification: std::option::Option<ActClassification>,
 }
 
 /// Reference to the human on whose behalf the agent acted.
@@ -810,6 +828,180 @@ pub struct AppleAurAcceptanceClaim {
   pub document_kind: String,
 }
 
+/// What a sender says an act MEANS, against vocabularies both parties can
+/// resolve independently (RFC 0006).
+///
+/// # What this proves, and what it does not
+///
+/// It proves WHICH VOCABULARY THE SENDER CITED, inside the signature. It does
+/// NOT prove the sender classified correctly: a sender can label a funds
+/// transfer as a scheduling proposal and sign it. What the binding buys is
+/// that a DISAGREEMENT becomes visible where a MISUNDERSTANDING was
+/// invisible — two parties now mean the same thing by a word, and a recipient
+/// can check the claim against the payload it accompanies. That is worth
+/// having, it is not integrity of classification, and no caller should
+/// present it as the latter.
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActClassification {
+  /// Every vocabulary the verdict depended on, in fold order.
+  ///
+  /// A LIST because an overlay is a separate published artifact with its own
+  /// digest: a classifier that ran against a base and a tightening overlay
+  /// was produced by TWO artifacts, and naming only one would put a false
+  /// statement inside a signature.
+  pub vocabularies: std::vec::Vec<VocabularyRef>,
+  /// The family-qualified labels this act carries.
+  ///
+  /// A LIST because one act carries verdicts from several families at once —
+  /// what kind of act it is, how reversible, how wide its blast radius, what
+  /// routing it implies. Carrying one would discard the verdicts a
+  /// recipient's policy most wants.
+  pub labels: std::vec::Vec<ActLabel>,
+}
+
+/// One family-qualified label: `FAMILY/LABEL`.
+///
+/// A TYPE rather than a `String` with a comment, for the reason this whole
+/// wave exists: a rule that lives only in prose is open in every
+/// implementation that never read the prose. An unqualified label is
+/// ambiguous — `ACCESS_GRANT` means nothing without the family that scopes
+/// it, and two vocabularies may both define a bare word — so an unqualified
+/// one is refused at parse rather than carried and disambiguated later by
+/// whoever guesses.
+///
+/// # What is validated, and what deliberately is not
+///
+/// The STRUCTURE is ours: exactly one separator, neither side empty. The
+/// SPELLING is the vocabulary's — no character set is imposed, because a
+/// third-party vocabulary may name its families in a convention this project
+/// has not thought of, and refusing those would make the extension model in
+/// RFC 0006 a formality. Refuse what is meaningless; do not legislate taste.
+#[derive(std::fmt::Debug, std::clone::Clone, std::cmp::PartialEq, std::cmp::Eq)]
+pub struct ActLabel {
+  family: String,
+  label: String,
+}
+
+impl ActLabel {
+  /// The family that scopes this label.
+  pub fn family(&self) -> &str {
+    &self.family
+  }
+
+  /// The label within that family.
+  pub fn label(&self) -> &str {
+    &self.label
+  }
+
+  /// The wire spelling, `FAMILY/LABEL`.
+  pub fn qualified(&self) -> std::string::String {
+    std::format!("{}/{}", self.family, self.label)
+  }
+}
+
+impl std::fmt::Display for ActLabel {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::write!(f, "{}", self.qualified())
+  }
+}
+
+impl std::str::FromStr for ActLabel {
+  type Err = std::string::String;
+
+  /// The ONE place the qualified form is matched. The error is a plain
+  /// message rather than an [`crate::errors::AphError`], for the same reason
+  /// the closed vocabularies' is: §8.3 step 1 classifies a malformed value as
+  /// a STRICT-PARSE rejection, the layer below the protocol's closed set of
+  /// error codes.
+  fn from_str(raw: &str) -> std::result::Result<Self, Self::Err> {
+    let (family, label) = match raw.split_once('/') {
+      std::option::Option::Some(parts) => parts,
+      std::option::Option::None => {
+        return std::result::Result::Err(std::format!(
+          "`{}` is not family-qualified: a label is written `FAMILY/LABEL`",
+          raw
+        ));
+      }
+    };
+    if family.is_empty() || label.is_empty() {
+      return std::result::Result::Err(std::format!(
+        "`{}` has an empty family or label; both sides of the `/` are required",
+        raw
+      ));
+    }
+    if label.contains('/') {
+      return std::result::Result::Err(std::format!(
+        "`{}` has more than one `/`; a label names exactly one family",
+        raw
+      ));
+    }
+    std::result::Result::Ok(Self {
+      family: family.to_string(),
+      label: label.to_string(),
+    })
+  }
+}
+
+impl serde::Serialize for ActLabel {
+  fn serialize<S: serde::Serializer>(
+    &self,
+    serializer: S,
+  ) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(&self.qualified())
+  }
+}
+
+impl<'de> serde::Deserialize<'de> for ActLabel {
+  fn deserialize<D: serde::Deserializer<'de>>(
+    deserializer: D,
+  ) -> std::result::Result<Self, D::Error> {
+    let raw = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
+    <Self as std::str::FromStr>::from_str(&raw).map_err(serde::de::Error::custom)
+  }
+}
+
+/// A published vocabulary, named and pinned.
+///
+/// Deliberately NOT a path into a serialization. The name identifies the
+/// thing; a path identifies one encoding of it, and encodings move — this
+/// project watched a bundle's blocks change nesting under a toolchain bump
+/// with no source change at all. A signature cannot be re-pointed afterward,
+/// so a reference must name the vocabulary rather than its current shape.
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VocabularyRef {
+  /// The vocabulary's name, as its bundle declares it.
+  pub name: String,
+  /// The version, as its bundle declares it.
+  pub version: String,
+  /// The bundle's integrity digest, VERBATIM — the same `sha256-…` string
+  /// the compiled bundle already carries, never a re-encoding of it.
+  ///
+  /// Carrying it verbatim keeps ONE spelling of a digest across the whole
+  /// system. A re-encoding is a second derivation of one fact, and two
+  /// derivations of one fact drift. The digest is also what makes the
+  /// reference checkable at all: without it a citation points at whatever
+  /// the publisher serves today, and a publisher — or anyone who compromises
+  /// their origin — could change what a signed envelope meant after it was
+  /// signed.
+  pub digest: String,
+}
+
 #[cfg(test)]
 mod tests {
   // -------- helpers --------
@@ -918,6 +1110,7 @@ mod tests {
       policy: sample_policy(),
       notarization: sample_notarization_metadata(),
       apple_aur_acceptance: std::option::Option::None,
+      act_classification: std::option::Option::None,
     }
   }
 
@@ -1576,6 +1769,7 @@ mod tests {
       policy: sample_policy(),
       notarization: sample_notarization_metadata(),
       apple_aur_acceptance: std::option::Option::Some(claim.clone()),
+      act_classification: std::option::Option::None,
     };
     let s = serde_json::to_string(&subject).unwrap();
     // wire form must use camelCase key
@@ -1853,6 +2047,115 @@ mod tests {
     let back: super::NotarizationEnvelope =
       serde_json::from_str(&s).expect("a PrincipalSigned chain envelope must parse");
     std::assert_eq!(envelope, back);
+  }
+}
+
+#[cfg(test)]
+mod act_classification_tests {
+  // WHY THIS MODULE EXISTS. `actClassification` is the first field added to
+  // `credentialSubject` since every wire struct in this module acquired
+  // `deny_unknown_fields`, which makes EMITTING it a version-gated event: a
+  // verifier built before the field existed fails at strict parse rather than
+  // ignoring it. Adding the field to the type is safe for everyone; putting
+  // it on the wire is not. These tests pin the half that must stay safe.
+
+  /// A published golden, which predates this field and must stay untouched.
+  fn golden() -> std::string::String {
+    std::include_str!("../../../../examples/slack_reply_envelope.json").to_string()
+  }
+
+  #[test]
+  fn an_envelope_without_the_claim_round_trips_byte_identically() {
+    // THE PIN THAT MATTERS, and it is verified by mutation rather than by
+    // observing green: dropping `skip_serializing_if` from the field turns
+    // this red. `skip_serializing_if` is a claim about OUTPUT, and a claim
+    // about output is worth exactly as much as the byte comparison nobody
+    // ran. Every published envelope predates this field — if it leaked into
+    // serialization as `"actClassification": null`, every existing signature
+    // over those bytes would break at once, and it would break SILENTLY,
+    // because the envelope still parses.
+    let raw = golden();
+    let parsed: super::NotarizationEnvelope =
+      serde_json::from_str(&raw).expect("a published golden must parse");
+    std::assert!(
+      parsed.credential_subject.act_classification.is_none(),
+      "a published golden predates this field and must carry no claim"
+    );
+    let reserialized = serde_json::to_string(&parsed).expect("it serializes");
+    std::assert!(
+      !reserialized.contains("actClassification"),
+      "an absent claim must not appear in output at all: {}",
+      reserialized
+    );
+  }
+
+  #[test]
+  fn a_classification_round_trips_through_serde() {
+    // Pins that the serde delegation is wired for the nested types, including
+    // `ActLabel`'s hand-written impls — a derive would have put a STRUCT on
+    // the wire here instead of the `FAMILY/LABEL` string.
+    let claim = super::ActClassification {
+      vocabularies: std::vec![super::VocabularyRef {
+        name: "aph_guardrails".to_string(),
+        version: "0.1.0-alpha.1".to_string(),
+        digest: "sha256-y6E/EGldCz2ogpVB7wlnS5orbnAjcCpoUBaDietJmXA=".to_string(),
+      }],
+      labels: std::vec![
+        "APH_ACT_ACCESS/ACCESS_GRANT".parse().expect("a qualified label parses"),
+      ],
+    };
+    let json = serde_json::to_string(&claim).expect("it serializes");
+    std::assert!(
+      json.contains("\"APH_ACT_ACCESS/ACCESS_GRANT\""),
+      "a label rides the wire as its qualified STRING, not as a struct: {}",
+      json
+    );
+    let back: super::ActClassification =
+      serde_json::from_str(&json).expect("it round-trips");
+    std::assert_eq!(claim, back);
+  }
+
+  #[test]
+  fn an_unqualified_label_is_refused_at_parse() {
+    // WHY: a bare `ACCESS_GRANT` names nothing — the family is what scopes
+    // it, and two vocabularies may both define the same bare word. Refusing
+    // at parse is what stops the ambiguity being resolved later by whoever
+    // guesses.
+    let refused = "ACCESS_GRANT".parse::<super::ActLabel>();
+    std::assert!(refused.is_err(), "an unqualified label must be refused");
+    let message = refused.unwrap_err();
+    std::assert!(
+      message.contains("family-qualified"),
+      "the refusal must say what shape was expected: {}",
+      message
+    );
+  }
+
+  #[test]
+  fn a_label_with_an_empty_side_or_two_separators_is_refused() {
+    // The structural errors that would otherwise yield a label naming an
+    // empty family, or one whose family is itself ambiguous.
+    for raw in ["/ACCESS_GRANT", "APH_ACT_ACCESS/", "A/B/C"] {
+      std::assert!(
+        raw.parse::<super::ActLabel>().is_err(),
+        "`{}` is structurally meaningless and must be refused",
+        raw
+      );
+    }
+  }
+
+  #[test]
+  fn a_third_party_spelling_is_accepted_because_only_structure_is_ours() {
+    // WHY: RFC 0006's extension model lets anyone publish a vocabulary. A
+    // character-set rule imposed here would make that a formality — a
+    // vocabulary naming its families in a convention this project did not
+    // anticipate would be unusable. Refuse what is meaningless; do not
+    // legislate taste.
+    let parsed: super::ActLabel = "acme.finance/wire-transfer.initiate"
+      .parse()
+      .expect("an unfamiliar but well-formed spelling must be accepted");
+    std::assert_eq!(parsed.family(), "acme.finance");
+    std::assert_eq!(parsed.label(), "wire-transfer.initiate");
   }
 }
 

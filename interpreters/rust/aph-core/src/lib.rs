@@ -92,9 +92,10 @@ pub use credential_status::{
 };
 pub use delegation_mandate::DelegationMandate;
 pub use envelope::{
-  AgentRef, AttestationMode, ChannelDescriptor, ChannelKind, CommunicationDescriptor,
-  ContentClass, CredentialSubject, EnvelopeProof, EnvelopeProofs, HumanPrincipalRef,
-  LinkedMandate, NotarizationEnvelope, NotarizationMetadata, NotaryServiceRef, PolicyDescriptor,
+  ActClassification, ActLabel, AgentRef, AttestationMode, ChannelDescriptor, ChannelKind,
+  CommunicationDescriptor, ContentClass, CredentialSubject, EnvelopeProof, EnvelopeProofs,
+  HumanPrincipalRef, LinkedMandate, NotarizationEnvelope, NotarizationMetadata, NotaryServiceRef,
+  PolicyDescriptor, VocabularyRef,
 };
 pub use errors::AphError;
 pub use human_not_present_flow::{

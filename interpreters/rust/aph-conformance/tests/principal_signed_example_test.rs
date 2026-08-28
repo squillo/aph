@@ -264,6 +264,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         decision_latency_ms: 12,
       },
       apple_aur_acceptance: std::option::Option::None,
+      act_classification: std::option::Option::None,
     },
     linked_mandate: std::option::Option::None,
     // Pattern A (§7.1.1): absent here means NO `credentialStatus` key on

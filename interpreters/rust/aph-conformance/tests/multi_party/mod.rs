@@ -485,6 +485,7 @@ impl Party {
           decision_latency_ms: 12,
         },
         apple_aur_acceptance: std::option::Option::None,
+        act_classification: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,
       credential_status: request.status_index.map(|index| aph_core::CredentialStatusEntry {
