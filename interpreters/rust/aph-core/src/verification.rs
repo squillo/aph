@@ -305,38 +305,6 @@ pub fn require_mode(
   }
 }
 
-/// Enforces the closed §7.1.5 / §7.1.6 vocabularies on an envelope
-/// (§8.3 step 1's value-level half).
-///
-/// **Why this exists.** §7.1's strict parse closes the set of FIELD NAMES —
-/// `deny_unknown_fields` — but `channel.kind` and
-/// `communication.contentClass` are `String`s, so their VALUE sets were
-/// closed only in prose. The spec is explicit that an unrecognized
-/// `channelKind` is rejected exactly as an unrecognized `statusPurpose` is,
-/// and the independent TypeScript implementation enforces that at parse.
-/// This crate did not, so the same envelope verified differently across the
-/// two implementations. Until the closed types become the field types (a
-/// deliberate, separate breaking change), this function is the value-level
-/// check, and §8.3 step 1 is where a verifier calls it.
-///
-/// The error is a plain message rather than an
-/// [`crate::errors::AphError`], for the reason
-/// [`crate::envelope::ChannelKind::from_str`] documents: strict-parse
-/// rejection sits below the protocol's closed set of error codes, and the
-/// TypeScript implementation models the identical failure as a parse error.
-pub fn require_closed_vocabulary(
-  envelope: &crate::envelope::NotarizationEnvelope,
-) -> std::result::Result<(), std::string::String> {
-  let _: crate::envelope::ChannelKind =
-    envelope.credential_subject.channel.kind.parse()?;
-  let _: crate::envelope::ContentClass = envelope
-    .credential_subject
-    .communication
-    .content_class
-    .parse()?;
-  std::result::Result::Ok(())
-}
-
 /// Binds an embedded Delegation Mandate to the envelope carrying it
 /// (§7.1.7.1 steps 3-4, §8.3.1 step 1d). Signature checking is NOT here.
 ///
@@ -400,9 +368,9 @@ pub fn verify_embedded_mandate_binding(
   // and time and NOTHING else — it cannot express a recipient allow-list or
   // a content class, so this is a channel-and-window check and must not be
   // described as more.
-  if !mandate.allows_channel(&subject.channel.kind) {
+  if !mandate.allows_channel(subject.channel.kind) {
     return std::result::Result::Err(crate::errors::AphError::channel_not_allowed(
-      subject.channel.kind.as_str(),
+      subject.channel.kind.label(),
     ));
   }
 
@@ -566,10 +534,7 @@ mod tests {
       id: std::string::String::from(MANDATE_ID),
       human_principal_did: std::string::String::from(HUMAN_DID),
       agent_did: std::string::String::from(AGENT_DID),
-      allowed_channels: std::vec![
-        std::string::String::from("slack"),
-        std::string::String::from("email"),
-      ],
+      allowed_channels: std::vec![crate::envelope::ChannelKind::Slack, crate::envelope::ChannelKind::Email],
       rate_limit_per_hour: std::option::Option::Some(12),
       valid_from: std::string::String::from("2026-05-01T00:00:00Z"),
       valid_until: std::string::String::from("2026-06-01T00:00:00Z"),
@@ -607,11 +572,11 @@ mod tests {
           version: std::string::String::from("1.0"),
         },
         channel: crate::envelope::ChannelDescriptor {
-          kind: std::string::String::from("slack"),
+          kind: crate::envelope::ChannelKind::Slack,
           recipient_addressing: serde_json::json!({"teamId": "T01234567"}),
         },
         communication: crate::envelope::CommunicationDescriptor {
-          content_class: std::string::String::from("Reply"),
+          content_class: crate::envelope::ContentClass::Reply,
           body_sha256: std::string::String::from(
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           ),
@@ -1166,7 +1131,7 @@ mod tests {
     // E011 here would tell an operator the signature was bad when the
     // signature was fine and the SCOPE was wrong.
     let mut envelope = single_proof_envelope();
-    envelope.credential_subject.channel.kind = std::string::String::from("discord");
+    envelope.credential_subject.channel.kind = crate::envelope::ChannelKind::Discord;
     envelope.credential_subject.policy.delegation_mandate = std::option::Option::Some(mandate());
     let err = super::verify_embedded_mandate_binding(&envelope)
       .expect_err("a channel outside allowedChannels must not bind");
@@ -1320,41 +1285,3 @@ mod tests {
   }
 }
 
-#[cfg(test)]
-mod closed_vocabulary_verification_tests {
-  // Why: require_closed_vocabulary is the value-level half of §8.3 step 1,
-  // added because this crate accepted channel kinds the TypeScript
-  // implementation refused. One golden proves conformant envelopes still
-  // pass; one mutation proves the refusal is real.
-
-  fn golden() -> crate::envelope::NotarizationEnvelope {
-    serde_json::from_str(std::include_str!("../tests/golden/slack_reply_envelope.json"))
-      .expect("the slack golden must parse")
-  }
-
-  #[test]
-  fn a_conformant_envelope_passes_the_vocabulary_check() {
-    let envelope = golden();
-    std::assert!(super::require_closed_vocabulary(&envelope).is_ok());
-  }
-
-  #[test]
-  fn an_envelope_with_an_unrecognized_kind_is_refused() {
-    // `service` is the live case: the first service-act draft wants to emit
-    // it, and until the specification admits it a verifier must refuse it
-    // rather than silently verify an act it cannot describe.
-    let mut envelope = golden();
-    envelope.credential_subject.channel.kind = std::string::String::from("service");
-    let err = super::require_closed_vocabulary(&envelope)
-      .expect_err("an unrecognized channel kind must be refused");
-    std::assert!(err.contains("closed set"), "must name the closed set: {err}");
-  }
-
-  #[test]
-  fn an_envelope_with_an_unrecognized_content_class_is_refused() {
-    let mut envelope = golden();
-    envelope.credential_subject.communication.content_class =
-      std::string::String::from("Mutation");
-    std::assert!(super::require_closed_vocabulary(&envelope).is_err());
-  }
-}

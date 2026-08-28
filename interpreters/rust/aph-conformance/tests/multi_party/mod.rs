@@ -357,8 +357,8 @@ impl Party {
         "urn:uuid:00000000-0000-4000-8000-00000000{}f2",
         self.id_tag
       ),
-      channel: String::from("slack"),
-      allowed_channels: std::vec![String::from("slack")],
+      channel: aph_core::ChannelKind::Slack,
+      allowed_channels: std::vec![aph_core::ChannelKind::Slack],
       body_sha256: String::from(EMPTY_BODY_SHA256),
       preview: std::format!("{} says the rollout finished", self.display_name),
       mandate_valid_from: String::from(MANDATE_VALID_FROM),
@@ -452,14 +452,14 @@ impl Party {
           version: String::from("1.0"),
         },
         channel: aph_core::ChannelDescriptor {
-          kind: request.channel.clone(),
+          kind: request.channel,
           recipient_addressing: serde_json::json!({
             "channelId": "C01234567",
             "teamId": "T01234567"
           }),
         },
         communication: aph_core::CommunicationDescriptor {
-          content_class: String::from("Reply"),
+          content_class: aph_core::ContentClass::Reply,
           body_sha256: request.body_sha256.clone(),
           body_size: 0,
           preview_lines: 1,
@@ -568,9 +568,9 @@ pub struct Mint {
   /// `id` of the notary countersignature.
   pub notary_proof_id: String,
   /// Channel this envelope is for.
-  pub channel: String,
+  pub channel: aph_core::ChannelKind,
   /// Channels the mandate permits.
-  pub allowed_channels: std::vec::Vec<String>,
+  pub allowed_channels: std::vec::Vec<aph_core::ChannelKind>,
   /// `credentialSubject.communication.bodySha256`.
   pub body_sha256: String,
   /// The preview line the recipient displays.

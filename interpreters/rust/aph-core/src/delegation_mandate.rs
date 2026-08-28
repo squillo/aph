@@ -28,7 +28,15 @@ pub struct DelegationMandate {
   /// DID of the agent receiving authority.
   pub agent_did: String,
   /// Channel kinds permitted under this mandate (e.g., `["slack", "email"]`).
-  pub allowed_channels: Vec<String>,
+  ///
+  /// TYPED, and the choice is load-bearing. As `Vec<String>` a stored grant
+  /// naming a channel this build does not define loaded silently and failed
+  /// later at `allows_channel`, which returns `false` — indistinguishable
+  /// from a channel that is simply out of scope. One handler, two events:
+  /// a corrupt grant and a legitimate denial reported identically, with the
+  /// operator shown the wrong one. Typed, the unknown value is refused where
+  /// it is READ, and the two events stay separate.
+  pub allowed_channels: Vec<crate::envelope::ChannelKind>,
   /// Per-channel max-send rate (per hour). `None` = unlimited.
   #[serde(default)]
   pub rate_limit_per_hour: std::option::Option<u32>,
@@ -67,8 +75,13 @@ impl DelegationMandate {
   }
 
   /// Returns `true` if `channel_kind` is in `allowed_channels`.
-  pub fn allows_channel(&self, channel_kind: &str) -> bool {
-    self.allowed_channels.iter().any(|c| c == channel_kind)
+  ///
+  /// A pure set-membership test now that both sides are the closed type.
+  /// It can no longer be reached with an unparseable channel: that value is
+  /// refused at deserialization, so a `false` here means exactly one thing —
+  /// this grant does not cover this channel.
+  pub fn allows_channel(&self, channel_kind: crate::envelope::ChannelKind) -> bool {
+    self.allowed_channels.contains(&channel_kind)
   }
 }
 
@@ -79,7 +92,7 @@ mod tests {
       id: String::from("urn:uuid:00000000-0000-4000-8000-000000000001"),
       human_principal_did: String::from("did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy"),
       agent_did: String::from("did:web:agent.squillo.com"),
-      allowed_channels: std::vec![String::from("slack"), String::from("email")],
+      allowed_channels: std::vec![crate::envelope::ChannelKind::Slack, crate::envelope::ChannelKind::Email],
       rate_limit_per_hour: std::option::Option::Some(60),
       valid_from: String::from("2026-05-21T00:00:00Z"),
       valid_until: String::from("2026-05-22T00:00:00Z"),
@@ -198,8 +211,8 @@ mod tests {
     // first — a scope check that only ever matched allowed_channels[0]
     // would silently narrow what the human authorized.
     let m = sample();
-    std::assert!(m.allows_channel("slack"));
-    std::assert!(m.allows_channel("email"));
+    std::assert!(m.allows_channel(crate::envelope::ChannelKind::Slack));
+    std::assert!(m.allows_channel(crate::envelope::ChannelKind::Email));
   }
 
   #[test]
@@ -208,8 +221,13 @@ mod tests {
     // and the empty string, the classic accidental-match case — must be
     // refused, or an agent could send anywhere under a narrow delegation.
     let m = sample();
-    std::assert!(!m.allows_channel("discord"));
-    std::assert!(!m.allows_channel(""));
+    std::assert!(!m.allows_channel(crate::envelope::ChannelKind::Discord));
+    // The former companion assertion passed `""` — a value the type no
+    // longer admits. That case did not disappear, it MOVED: an
+    // unparseable channel is refused at deserialization now, pinned in
+    // `envelope::closed_vocabulary_deserialization_tests`, so it can
+    // never reach this function at all.
+    std::assert!(!m.allows_channel(crate::envelope::ChannelKind::Imessage));
   }
 
   #[test]

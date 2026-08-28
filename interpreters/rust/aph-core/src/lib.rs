@@ -120,6 +120,6 @@ pub use crate::crypto::jws_detached::{create_detached_jws, verify_detached_jws};
 pub use crate::crypto::signing::{sign_mandate, verify_mandate};
 pub use crate::crypto::proof_base::{ProofRole, mandate_signing_base, signing_base};
 pub use crate::verification::{
-  require_closed_vocabulary, require_mode, verify_embedded_mandate_binding,
-  verify_proof_structure, verify_timestamp_order,
+  require_mode, verify_embedded_mandate_binding, verify_proof_structure,
+  verify_timestamp_order,
 };

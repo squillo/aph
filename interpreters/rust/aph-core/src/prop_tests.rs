@@ -61,11 +61,11 @@ fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
         version: std::string::String::from("1.0"),
       },
       channel: crate::envelope::ChannelDescriptor {
-        kind: std::string::String::from("slack"),
+        kind: crate::envelope::ChannelKind::Slack,
         recipient_addressing: serde_json::json!({"opaque": "addressing"}),
       },
       communication: crate::envelope::CommunicationDescriptor {
-        content_class: std::string::String::from("Reply"),
+        content_class: crate::envelope::ContentClass::Reply,
         body_sha256: std::string::String::from(FIXED_BODY_SHA256),
         body_size: 1842,
         preview_lines: 3,
@@ -132,8 +132,15 @@ proptest! {
     display_name in "[a-z]{1,20}",
     agent_display_name in "[a-z]{1,20}",
     agent_version in "[a-z]{1,20}",
-    channel_kind in "[a-z]{1,20}",
-    content_class in "[a-z]{1,20}",
+    // INVERTED 2026-08-28. These drew `"[a-z]{1,20}"` and the body
+    // asserted the envelope PARSED — so the suite carried a green test
+    // claiming this implementation accepts channel kinds no published
+    // spec defines, `service` among them, which is the exact divergence
+    // the closed types were built to end. They now draw MEMBERS, and the
+    // refusal of a non-member is pinned separately in
+    // `envelope::closed_vocabulary_deserialization_tests`.
+    channel_kind in proptest::sample::select(crate::envelope::ChannelKind::ALL.to_vec()),
+    content_class in proptest::sample::select(crate::envelope::ContentClass::ALL.to_vec()),
     preview in "[a-z]{1,20}",
     decision in "[a-z]{1,20}",
     matched_scope in "[a-z]{1,20}",
@@ -166,11 +173,11 @@ proptest! {
           version: agent_version.clone(),
         },
         channel: crate::envelope::ChannelDescriptor {
-          kind: channel_kind.clone(),
+          kind: channel_kind,
           recipient_addressing: serde_json::json!({"opaque": "addressing"}),
         },
         communication: crate::envelope::CommunicationDescriptor {
-          content_class: content_class.clone(),
+          content_class: content_class,
           body_sha256: std::string::String::from(FIXED_BODY_SHA256),
           body_size: 1842,
           preview_lines: 3,
@@ -286,7 +293,13 @@ proptest! {
     id_tail in "[a-z]{1,20}",
     human_did_tail in "[a-z]{1,20}",
     agent_did_tail in "[a-z]{1,20}",
-    channels in proptest::collection::vec("[a-z]{1,15}", 1..=3),
+    // Members, for the same reason the kind/class generators were
+    // inverted: an arbitrary string here is no longer representable,
+    // and drawing one asserted a grant this build cannot hold.
+    channels in proptest::collection::vec(
+      proptest::sample::select(crate::envelope::ChannelKind::ALL.to_vec()),
+      1..=3,
+    ),
     signature in "[a-z]{1,40}",
   ) {
     let mandate = crate::delegation_mandate::DelegationMandate {
@@ -316,8 +329,9 @@ proptest! {
     id_tail in "[a-z]{1,20}",
     human_did_tail in "[a-z]{1,20}",
     agent_did_tail in "[a-z]{1,20}",
-    channel_kind in "[a-z]{1,15}",
-    content_class in "[a-z]{1,15}",
+    // Inverted for the same reason as the envelope generator above.
+    channel_kind in proptest::sample::select(crate::envelope::ChannelKind::ALL.to_vec()),
+    content_class in proptest::sample::select(crate::envelope::ContentClass::ALL.to_vec()),
     policy_decision in "[a-z]{1,15}",
     signature in "[a-z]{1,40}",
   ) {
@@ -326,9 +340,9 @@ proptest! {
       delegation_mandate_id: std::option::Option::None,
       human_principal_did: std::format!("did:key:{}", human_did_tail),
       agent_did: std::format!("did:web:{}", agent_did_tail),
-      channel_kind: channel_kind.clone(),
+      channel_kind: channel_kind,
       recipient_addressing: serde_json::json!({"opaque": "addressing"}),
-      content_class: content_class.clone(),
+      content_class: content_class,
       body_sha256: std::string::String::from(FIXED_BODY_SHA256),
       body_size: 1842,
       policy_decision: policy_decision.clone(),
@@ -387,7 +401,7 @@ fn golden_slack_reply_parses() {
   let raw = std::include_str!("../tests/golden/slack_reply_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("slack golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "slack");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::Slack);
 }
 
 #[test]
@@ -398,7 +412,7 @@ fn golden_email_reply_parses() {
   let raw = std::include_str!("../tests/golden/email_reply_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("email golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "email");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::Email);
 }
 
 #[test]
@@ -408,7 +422,7 @@ fn golden_discord_dm_parses() {
   let raw = std::include_str!("../tests/golden/discord_dm_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("discord golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "discord");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::Discord);
 }
 
 #[test]
@@ -418,7 +432,7 @@ fn golden_teams_channel_parses() {
   let raw = std::include_str!("../tests/golden/teams_channel_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("teams golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "teams");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::Teams);
 }
 
 #[test]
@@ -428,7 +442,7 @@ fn golden_whatsapp_parses() {
   let raw = std::include_str!("../tests/golden/whatsapp_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("whatsapp golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "whatsapp");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::Whatsapp);
 }
 
 #[test]
@@ -438,7 +452,7 @@ fn golden_google_chat_parses() {
   let raw = std::include_str!("../tests/golden/google_chat_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("google_chat golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "google_chat");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::GoogleChat);
 }
 
 #[test]
@@ -448,7 +462,7 @@ fn golden_imessage_parses() {
   let raw = std::include_str!("../tests/golden/imessage_envelope.json");
   let env: crate::envelope::NotarizationEnvelope =
     serde_json::from_str(raw).expect("imessage golden parses");
-  std::assert_eq!(env.credential_subject.channel.kind, "imessage");
+  std::assert_eq!(env.credential_subject.channel.kind, crate::envelope::ChannelKind::Imessage);
 }
 
 // ============================================================

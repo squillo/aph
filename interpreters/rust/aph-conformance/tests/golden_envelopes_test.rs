@@ -51,7 +51,7 @@ fn first_envelope_is_minimal_email_shape() {
   let parsed: aph_core::NotarizationEnvelope =
     serde_json::from_str(envelopes[0]).expect("minimal email envelope parses");
   std::assert_eq!(parsed.aph_version, "0.1");
-  std::assert_eq!(parsed.credential_subject.channel.kind, "email");
+  std::assert_eq!(parsed.credential_subject.channel.kind, aph_core::ChannelKind::Email);
   std::assert!(
     parsed.linked_mandate.is_none(),
     "envelope #1 must have no linkedMandate"
@@ -70,7 +70,7 @@ fn second_envelope_carries_linked_ap2_mandate() {
   let envelopes = aph_conformance::golden_envelopes();
   let parsed: aph_core::NotarizationEnvelope =
     serde_json::from_str(envelopes[1]).expect("slack+ap2 envelope parses");
-  std::assert_eq!(parsed.credential_subject.channel.kind, "slack");
+  std::assert_eq!(parsed.credential_subject.channel.kind, aph_core::ChannelKind::Slack);
   let linked = parsed
     .linked_mandate
     .as_ref()
@@ -157,7 +157,7 @@ fn sixth_envelope_recipient_addressing_carries_attachment_metadata() {
   let envelopes = aph_conformance::golden_envelopes();
   let parsed: aph_core::NotarizationEnvelope =
     serde_json::from_str(envelopes[5]).expect("discord+attachment envelope parses");
-  std::assert_eq!(parsed.credential_subject.channel.kind, "discord");
+  std::assert_eq!(parsed.credential_subject.channel.kind, aph_core::ChannelKind::Discord);
   std::assert!(
     parsed
       .credential_subject
@@ -178,7 +178,7 @@ fn seventh_envelope_recipient_addressing_carries_retention_policy() {
   let envelopes = aph_conformance::golden_envelopes();
   let parsed: aph_core::NotarizationEnvelope =
     serde_json::from_str(envelopes[6]).expect("imessage+retention envelope parses");
-  std::assert_eq!(parsed.credential_subject.channel.kind, "imessage");
+  std::assert_eq!(parsed.credential_subject.channel.kind, aph_core::ChannelKind::Imessage);
   std::assert!(
     parsed
       .credential_subject

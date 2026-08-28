@@ -14,7 +14,7 @@ fn main() {
     id: String::from("urn:uuid:00000000-0000-4000-8000-0000000000a1"),
     human_principal_did: String::from("did:key:zAlice"),
     agent_did: String::from("did:web:agent.example"),
-    allowed_channels: vec![String::from("slack"), String::from("email")],
+    allowed_channels: vec![aph_core::ChannelKind::Slack, aph_core::ChannelKind::Email],
     rate_limit_per_hour: Some(12),
     valid_from: String::from("2026-05-21T00:00:00Z"),
     valid_until: String::from("2026-05-22T00:00:00Z"),
@@ -28,8 +28,12 @@ fn main() {
   };
 
   println!("scope checks:");
-  for channel in ["slack", "email", "discord"] {
-    println!("  {:<8} allowed: {}", channel, mandate.allows_channel(channel));
+  for channel in [
+    aph_core::ChannelKind::Slack,
+    aph_core::ChannelKind::Email,
+    aph_core::ChannelKind::Discord,
+  ] {
+    println!("  {:<8} allowed: {}", channel.label(), mandate.allows_channel(channel));
   }
 
   println!("\nvalidity window:");

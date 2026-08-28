@@ -134,7 +134,7 @@ fn signed_mandate() -> aph_core::DelegationMandate {
     id: std::string::String::from(MANDATE_ID),
     human_principal_did: std::string::String::from(PRINCIPAL_DID),
     agent_did: std::string::String::from("did:web:agent.squillo.com"),
-    allowed_channels: std::vec![std::string::String::from("slack")],
+    allowed_channels: std::vec![aph_core::ChannelKind::Slack],
     rate_limit_per_hour: std::option::Option::Some(20),
     valid_from: std::string::String::from("2026-05-20T00:00:00Z"),
     valid_until: std::string::String::from("2026-05-22T00:00:00Z"),
@@ -216,7 +216,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         version: std::string::String::from("1.0"),
       },
       channel: aph_core::ChannelDescriptor {
-        kind: std::string::String::from("slack"),
+        kind: aph_core::ChannelKind::Slack,
         // Keys in sorted order: serde_json objects are BTreeMaps, so the
         // serializer emits them sorted and the golden must match.
         recipient_addressing: serde_json::json!({
@@ -226,7 +226,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         }),
       },
       communication: aph_core::CommunicationDescriptor {
-        content_class: std::string::String::from("Reply"),
+        content_class: aph_core::ContentClass::Reply,
         // The ONE published envelope whose body-hash binding is real: these
         // two values are the SHA-256 and exact byte length of the committed
         // `examples/principal_signed_body.txt`, so §8.3 step 8 finally has a

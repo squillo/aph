@@ -485,3 +485,112 @@ fn wire_key_mapping_handles_the_documented_exceptions() {
   std::assert_eq!(wire_key_to_prop("bodySha256"), "body_sha256");
   std::assert_eq!(wire_key_to_prop("ap2IntentMandateUri"), "ap2_intent_mandate_uri");
 }
+
+/// Every `SCREAMING`/PascalCase variant the Snapp's `Vocabulary` block
+/// declares, mapped to its u8 discriminant.
+///
+/// The Snapp flattens both closed vocabularies into one `Vocabulary` enum, so
+/// this returns the union and the callers below select their own members by
+/// name. Returning the union rather than guessing a split is deliberate: a
+/// split that guessed wrong would fail for the wrong reason.
+fn snapp_vocabulary_discriminants() -> std::collections::BTreeMap<String, u64> {
+  let blocks = snapp_blocks();
+  let vocabulary = blocks
+    .get("Vocabulary")
+    .and_then(serde_json::Value::as_object)
+    .unwrap_or_else(|| std::panic!("the Snapp has no `Vocabulary` block"));
+  let variants = vocabulary
+    .get("enum")
+    .and_then(serde_json::Value::as_object)
+    .unwrap_or_else(|| std::panic!("`Vocabulary` declares no `enum`"));
+
+  let mut out = std::collections::BTreeMap::new();
+  for (name, body) in variants {
+    if let std::option::Option::Some(discriminant) =
+      body.get("const").and_then(serde_json::Value::as_u64)
+    {
+      out.insert(name.clone(), discriminant);
+    }
+  }
+  out
+}
+
+#[test]
+fn the_snapp_and_the_reference_agree_on_the_channel_kind_vocabulary() {
+  // WHY THIS EXISTS. The Snapp is a SECOND POPULATOR of the same closed
+  // vocabulary: `aph-core` declares `ChannelKind` and the Snapp declares u8
+  // discriminants for the same members, and until this test nothing compared
+  // them. A type is a claim about what COULD be written; only a populator
+  // says what IS — so two populators with no reconciliation is not a
+  // duplication smell, it is a drift channel with no alarm on it.
+  //
+  // WHAT IT PINS, and the ordering is the point: it is armed BEFORE the
+  // service-act revision widens the set. When that revision adds a member to
+  // `ChannelKind::ALL`, THIS TEST GOES RED until the Snapp's `Vocabulary`
+  // block gains the matching variant. That is the whole purpose — a widening
+  // that moved only one populator would otherwise ship two vocabularies
+  // numbered differently, and the discriminants are wire-adjacent.
+  //
+  // Membership is compared, not discriminant VALUES: the Snapp assigns
+  // positions across a flattened union, so the values are its business. What
+  // must never diverge is WHICH MEMBERS EXIST.
+  let snapp = snapp_vocabulary_discriminants();
+  let mut missing_from_snapp = std::vec::Vec::new();
+  for kind in aph_core::ChannelKind::ALL {
+    // The Snapp spells variants in PascalCase; the wire spelling is the
+    // reference's `label()`. `GoogleChat` <-> `google_chat` is the pair most
+    // likely to drift, which is why the mapping is derived rather than typed.
+    let pascal: String = kind
+      .label()
+      .split('_')
+      .map(|part| {
+        let mut chars = part.chars();
+        match chars.next() {
+          std::option::Option::Some(first) => {
+            first.to_uppercase().collect::<String>() + chars.as_str()
+          }
+          std::option::Option::None => String::new(),
+        }
+      })
+      .collect();
+    if !snapp.contains_key(&pascal) {
+      missing_from_snapp.push(std::format!("{} (expected Snapp variant `{}`)", kind.label(), pascal));
+    }
+  }
+  std::assert!(
+    missing_from_snapp.is_empty(),
+    "the reference declares channel kinds the Snapp's `Vocabulary` block does not: {:?}\n\
+     Add the variant to the Snapp in the SAME change that widened the reference.",
+    missing_from_snapp
+  );
+}
+
+#[test]
+fn the_snapp_and_the_reference_agree_on_the_content_class_vocabulary() {
+  // The twin of the channel-kind pin above; see it for the full reasoning.
+  // `DM` is this set's drift candidate — it is the one member whose wire
+  // spelling is not PascalCase, so a naive transform yields `Dm` and the
+  // populators part company on a value that still looks right.
+  let snapp = snapp_vocabulary_discriminants();
+  let mut missing_from_snapp = std::vec::Vec::new();
+  for class in aph_core::ContentClass::ALL {
+    // The Snapp spells this set exactly as the wire does EXCEPT `DM`, which
+    // it writes `Dm`; both spellings are accepted here because the Snapp's
+    // casing is its own and only MEMBERSHIP is under test.
+    let label = class.label();
+    let alternate = std::format!(
+      "{}{}",
+      label.chars().next().unwrap_or(' ').to_uppercase(),
+      label.chars().skip(1).collect::<String>().to_lowercase()
+    );
+    if !snapp.contains_key(label) && !snapp.contains_key(&alternate) {
+      missing_from_snapp.push(label.to_string());
+    }
+  }
+  std::assert!(
+    missing_from_snapp.is_empty(),
+    "the reference declares content classes the Snapp's `Vocabulary` block does not: {:?}\n\
+     Add the variant to the Snapp in the SAME change that widened the reference.",
+    missing_from_snapp
+  );
+}

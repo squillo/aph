@@ -160,7 +160,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         version: std::string::String::from("1.0"),
       },
       channel: aph_core::ChannelDescriptor {
-        kind: std::string::String::from("email"),
+        kind: aph_core::ChannelKind::Email,
         // Keys in sorted order: serde_json objects are BTreeMaps, so the
         // serializer emits them sorted and the published file must match.
         recipient_addressing: serde_json::json!({
@@ -170,7 +170,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         }),
       },
       communication: aph_core::CommunicationDescriptor {
-        content_class: std::string::String::from("Reply"),
+        content_class: aph_core::ContentClass::Reply,
         // The SHA-256 of the empty string, as every shape-only example in the
         // corpus carries. This vector is about the §8.2 CARRIAGE, not about
         // §8.3's body-hash binding, and claiming otherwise would overstate it.

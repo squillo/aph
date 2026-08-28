@@ -23,12 +23,22 @@ pub struct CommunicationMandate {
   pub human_principal_did: String,
   /// DID of the agent sender (re-stated).
   pub agent_did: String,
-  /// Channel kind (`slack`, `email`, `discord`, ...).
-  pub channel_kind: String,
+  /// Channel kind, drawn from the closed set (§7.1.5).
+  ///
+  /// Typed to match the envelope's field for the same reason as
+  /// `content_class` below: §6.2 requires this value EQUAL the value
+  /// the resulting envelope carries, and that equality is only
+  /// checkable by the compiler if both sides are the same type.
+  pub channel_kind: crate::envelope::ChannelKind,
   /// Recipient addressing (channel-shaped JSON; opaque to APH core).
   pub recipient_addressing: serde_json::Value,
-  /// Content classification (`Reply`, `New`, `Mention`, `DM`, `Channel`, ...).
-  pub content_class: String,
+  /// Content classification, drawn from the closed set (§7.1.6).
+  ///
+  /// Typed to match the envelope's field: §6.2 requires the mandate value
+  /// EQUAL the value the resulting envelope carries, and an equality between
+  /// two `String`s that are meant to be the same closed vocabulary is an
+  /// equality the compiler cannot help with.
+  pub content_class: crate::envelope::ContentClass,
   /// SHA-256 hex of the outbound message body bytes (lowercase, no `0x`).
   pub body_sha256: String,
   /// Body size in bytes.
@@ -53,13 +63,13 @@ mod tests {
       )),
       human_principal_did: String::from("did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy"),
       agent_did: String::from("did:web:agent.squillo.com"),
-      channel_kind: String::from("slack"),
+      channel_kind: crate::envelope::ChannelKind::Slack,
       recipient_addressing: serde_json::json!({
         "teamId": "T01234567",
         "channelId": "C01234567",
         "parentTs": "1716249600.000100"
       }),
-      content_class: String::from("Reply"),
+      content_class: crate::envelope::ContentClass::Reply,
       // 64-char lowercase hex SHA-256 (the empty-string SHA-256).
       body_sha256: String::from("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
       body_size: 1842,

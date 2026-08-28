@@ -305,6 +305,31 @@ impl std::str::FromStr for ChannelKind {
   }
 }
 
+// serde for ChannelKind DELEGATES to `label()` / `from_str` rather than
+// restating the wire spellings in attributes. A `rename_all` or a set of
+// `#[serde(rename = ...)]` lines would be a SECOND mapping of the same
+// vocabulary, free to drift from the first — and the spellings here are
+// exactly the irregular ones a second copy gets wrong (`google_chat` is
+// snake_case among single words; `DM` is upper among PascalCase). One
+// mapping, two directions.
+impl serde::Serialize for ChannelKind {
+  fn serialize<S: serde::Serializer>(
+    &self,
+    serializer: S,
+  ) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(self.label())
+  }
+}
+
+impl<'de> serde::Deserialize<'de> for ChannelKind {
+  fn deserialize<D: serde::Deserializer<'de>>(
+    deserializer: D,
+  ) -> std::result::Result<Self, D::Error> {
+    let raw = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
+    <Self as std::str::FromStr>::from_str(&raw).map_err(serde::de::Error::custom)
+  }
+}
+
 /// The closed content-class vocabulary (§7.1.6), as a TYPE.
 ///
 /// Same repair, same reasons as [`ChannelKind`] above: the wire field is a
@@ -379,6 +404,31 @@ impl std::str::FromStr for ContentClass {
         other
       )),
     }
+  }
+}
+
+// serde for ContentClass DELEGATES to `label()` / `from_str` rather than
+// restating the wire spellings in attributes. A `rename_all` or a set of
+// `#[serde(rename = ...)]` lines would be a SECOND mapping of the same
+// vocabulary, free to drift from the first — and the spellings here are
+// exactly the irregular ones a second copy gets wrong (`google_chat` is
+// snake_case among single words; `DM` is upper among PascalCase). One
+// mapping, two directions.
+impl serde::Serialize for ContentClass {
+  fn serialize<S: serde::Serializer>(
+    &self,
+    serializer: S,
+  ) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(self.label())
+  }
+}
+
+impl<'de> serde::Deserialize<'de> for ContentClass {
+  fn deserialize<D: serde::Deserializer<'de>>(
+    deserializer: D,
+  ) -> std::result::Result<Self, D::Error> {
+    let raw = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
+    <Self as std::str::FromStr>::from_str(&raw).map_err(serde::de::Error::custom)
   }
 }
 
@@ -465,8 +515,12 @@ pub struct AgentRef {
 )]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChannelDescriptor {
-  /// Channel kind: `"slack" | "email" | "discord" | ...`.
-  pub kind: String,
+  /// Channel kind, drawn from the closed set (§7.1.5).
+  ///
+  /// Typed rather than `String`: an unrecognized value is now a parse
+  /// failure, which is what §8.3 step 1 has always required and what the
+  /// independent TypeScript implementation already did.
+  pub kind: ChannelKind,
   /// Channel-shaped opaque blob (opaque to APH core).
   pub recipient_addressing: serde_json::Value,
 }
@@ -483,8 +537,11 @@ pub struct ChannelDescriptor {
 )]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CommunicationDescriptor {
-  /// Content classification (`"Reply"`, `"New"`, `"DM"`, ...).
-  pub content_class: String,
+  /// Content classification, drawn from the closed set (§7.1.6).
+  ///
+  /// Typed for the same reason as `ChannelDescriptor.kind`: the closed set
+  /// lived in prose while the field admitted any string.
+  pub content_class: ContentClass,
   /// SHA-256 of the message body, 64 lowercase hex characters.
   pub body_sha256: String,
   /// Body length in bytes.
@@ -722,7 +779,7 @@ mod tests {
 
   fn sample_channel() -> super::ChannelDescriptor {
     super::ChannelDescriptor {
-      kind: "slack".to_string(),
+      kind: super::ChannelKind::Slack,
       recipient_addressing: serde_json::json!({
         "teamId": "T01234567",
         "channelId": "C01234567",
@@ -733,7 +790,7 @@ mod tests {
 
   fn sample_communication() -> super::CommunicationDescriptor {
     super::CommunicationDescriptor {
-      content_class: "Reply".to_string(),
+      content_class: super::ContentClass::Reply,
       body_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
       body_size: 1842,
       preview_lines: 3,
@@ -1815,5 +1872,74 @@ mod closed_vocabulary_tests {
     // CHANGE as the spec tables, the examples inventory, and the bindings.
     std::assert_eq!(super::ChannelKind::ALL.len(), 7);
     std::assert_eq!(super::ContentClass::ALL.len(), 7);
+  }
+}
+
+#[cfg(test)]
+mod closed_vocabulary_deserialization_tests {
+  // WHERE THE GUARANTEE MOVED. Before the field types closed, a separate
+  // `require_closed_vocabulary` helper walked a parsed envelope and validated
+  // two `String`s. That helper is gone — not because the check stopped
+  // mattering, but because it is now unreachable-by-construction: a
+  // `NotarizationEnvelope` cannot exist holding a value outside either closed
+  // set, so the check happens at DESERIALIZATION and nothing downstream can
+  // observe a violation. These tests are that helper's refusal cases, moved
+  // to the boundary that now enforces them. Keeping them here is what stops
+  // the swap from silently deleting the evidence a refusal was ever required.
+
+  fn golden() -> std::string::String {
+    std::include_str!("../tests/golden/slack_reply_envelope.json").to_string()
+  }
+
+  #[test]
+  fn a_conformant_envelope_still_parses_after_the_types_closed() {
+    // The swap must not narrow what the corpus admits. If this fails, the
+    // wire spellings drifted from `label()` — the exact failure the serde
+    // delegation exists to make impossible.
+    let parsed: std::result::Result<super::NotarizationEnvelope, _> =
+      serde_json::from_str(&golden());
+    std::assert!(parsed.is_ok(), "the slack golden must still parse: {parsed:?}");
+  }
+
+  #[test]
+  fn an_envelope_naming_an_unrecognized_channel_is_refused_at_parse() {
+    // `service` is the live case: the service-act revision wants to emit it,
+    // and until the specification admits it a verifier must refuse rather
+    // than silently verify an act it cannot describe. Before this swap the
+    // reference implementation ACCEPTED this document while the independent
+    // TypeScript implementation refused it.
+    let doc = golden().replace("\"kind\": \"slack\"", "\"kind\": \"service\"");
+    let parsed: std::result::Result<super::NotarizationEnvelope, _> =
+      serde_json::from_str(&doc);
+    let err = parsed.expect_err("an unrecognized channel kind must be refused at parse");
+    let msg = err.to_string();
+    std::assert!(msg.contains("closed set"), "must name the closed set: {msg}");
+  }
+
+  #[test]
+  fn an_envelope_naming_an_unrecognized_content_class_is_refused_at_parse() {
+    let doc = golden().replace("\"contentClass\": \"Reply\"", "\"contentClass\": \"Mutation\"");
+    let parsed: std::result::Result<super::NotarizationEnvelope, _> =
+      serde_json::from_str(&doc);
+    std::assert!(parsed.is_err(), "an unrecognized content class must be refused at parse");
+  }
+
+  #[test]
+  fn the_wire_spellings_survive_a_round_trip_through_serde() {
+    // serde delegates to `label()`/`from_str`, so this pins that the
+    // delegation is actually wired: a derive with a `rename_all` would pass
+    // the tests above and still emit `Dm` for `DM`.
+    for kind in super::ChannelKind::ALL {
+      let json = serde_json::to_string(&kind).expect("a channel kind serializes");
+      std::assert_eq!(json, std::format!("\"{}\"", kind.label()));
+      let back: super::ChannelKind = serde_json::from_str(&json).expect("and parses back");
+      std::assert_eq!(kind, back);
+    }
+    for class in super::ContentClass::ALL {
+      let json = serde_json::to_string(&class).expect("a content class serializes");
+      std::assert_eq!(json, std::format!("\"{}\"", class.label()));
+      let back: super::ContentClass = serde_json::from_str(&json).expect("and parses back");
+      std::assert_eq!(class, back);
+    }
   }
 }
