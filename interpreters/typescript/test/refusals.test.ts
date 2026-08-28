@@ -301,6 +301,26 @@ test('§7.1.6 — a content class outside the closed set is refused, and the ref
   );
 });
 
+test('§7.1.7 — a policy decision outside the closed set is refused, and the refusal names it', () => {
+  // WHY: this implementation closed the decision set from its first draft
+  // while the reference accepted any string — the divergence an audit
+  // surfaced, and the reason the reference now carries PolicyDecision as a
+  // type. This pin is the TS half of that weld: PINS the same three facts as
+  // its channel and content-class siblings, on the third closed member, so a
+  // fix applied to two fields and not the third is caught.
+  const value = goldenValue();
+  const policy = (value.credentialSubject as JsonObject).policy as JsonObject;
+  policy.decision = 'Sometimes';
+  assert.throws(
+    () => parseEnvelope(JSON.stringify(value)),
+    (error: unknown) =>
+      error instanceof AphParseError &&
+      error.path === '$.credentialSubject.policy.decision' &&
+      error.message.includes('"Sometimes"') &&
+      error.message.includes('closed set'),
+  );
+});
+
 test('§7.1.12 — a classification citing no vocabulary is refused on both sides of the weld', () => {
   // WHY: this implementation refused an empty `vocabularies` from its first
   // draft, and an audit found the Rust reference ACCEPTING the same bytes —

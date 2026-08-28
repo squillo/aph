@@ -637,7 +637,7 @@ pub struct CommunicationDescriptor {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PolicyDescriptor {
   /// `"AlwaysAllow" | "AskEveryTime" | "NeverAllow"`.
-  pub decision: String,
+  pub decision: PolicyDecision,
   /// e.g., `"per-channel" | "per-recipient" | "global"`.
   pub matched_scope: String,
   /// Parent delegation mandate, absent for one-shot AskEveryTime grants.
@@ -826,6 +826,99 @@ pub struct AppleAurAcceptanceClaim {
   pub accepted_at: String,
   /// `"foundation_models_framework_aur"` for forward-compat with future Apple legal documents.
   pub document_kind: String,
+}
+
+/// The closed §7.1.7 policy-decision vocabulary, as a type.
+///
+/// Same repair, same reasons as [`ChannelKind`] above, found by the same
+/// audit discipline one field over: the wire field was a bare `String` the
+/// reference validated NOWHERE, while the independent TypeScript
+/// implementation refused an unrecognized value at parse — two
+/// conformant-claiming implementations reaching opposite verdicts on the
+/// same bytes. The reference was the permissive surface, and per the
+/// standing guardrail the permissive surface is the wrong one. The Snapp
+/// had declared this vocabulary as an enum all along; the reference was the
+/// LAST populator without the type.
+///
+/// The doc-comment on the wire field (§7.1.7) carries the semantic warning:
+/// this records the human's standing CONFIGURATION, never the verdict on
+/// this act.
+#[derive(std::fmt::Debug, std::clone::Clone, std::marker::Copy, std::cmp::PartialEq, std::cmp::Eq)]
+pub enum PolicyDecision {
+  /// Wire value `AlwaysAllow`.
+  AlwaysAllow,
+  /// Wire value `AskEveryTime` — and it stays `AskEveryTime` after the
+  /// human approves; the mandate's existence is what asserts the approval
+  /// (§9.1 admits no path to issuance that bypasses `Approved`).
+  AskEveryTime,
+  /// Wire value `NeverAllow` — recorded, but never yields an envelope.
+  NeverAllow,
+}
+
+impl PolicyDecision {
+  /// Every member of the closed set, in §7.1.7 order.
+  pub const ALL: [Self; 3] = [Self::AlwaysAllow, Self::AskEveryTime, Self::NeverAllow];
+
+  /// The exact wire spelling. Exhaustive on purpose.
+  pub fn label(&self) -> &'static str {
+    match self {
+      Self::AlwaysAllow => "AlwaysAllow",
+      Self::AskEveryTime => "AskEveryTime",
+      Self::NeverAllow => "NeverAllow",
+    }
+  }
+
+  /// The whole closed set, comma-joined, for the strict-parse refusal
+  /// message — DERIVED from [`Self::ALL`], per the siblings' reasoning.
+  fn labels_for_error() -> std::string::String {
+    Self::ALL
+      .iter()
+      .map(Self::label)
+      .collect::<std::vec::Vec<&'static str>>()
+      .join(", ")
+  }
+}
+
+impl std::fmt::Display for PolicyDecision {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::write!(f, "{}", self.label())
+  }
+}
+
+impl std::str::FromStr for PolicyDecision {
+  type Err = std::string::String;
+
+  /// The inverse of [`PolicyDecision::label`]. Error shape per
+  /// [`ChannelKind::from_str`]'s documentation: a plain message, because
+  /// §8.3 step 1 classifies an unrecognized value as a strict-parse
+  /// rejection, below the protocol's closed set of error codes.
+  fn from_str(label: &str) -> std::result::Result<Self, Self::Err> {
+    match label {
+      "AlwaysAllow" => std::result::Result::Ok(Self::AlwaysAllow),
+      "AskEveryTime" => std::result::Result::Ok(Self::AskEveryTime),
+      "NeverAllow" => std::result::Result::Ok(Self::NeverAllow),
+      other => std::result::Result::Err(std::format!(
+        "`{}` is not in the closed set {{{}}}",
+        other,
+        Self::labels_for_error()
+      )),
+    }
+  }
+}
+
+impl serde::Serialize for PolicyDecision {
+  fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(self.label())
+  }
+}
+
+impl<'de> serde::Deserialize<'de> for PolicyDecision {
+  fn deserialize<D: serde::Deserializer<'de>>(
+    deserializer: D,
+  ) -> std::result::Result<Self, D::Error> {
+    let raw = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
+    <Self as std::str::FromStr>::from_str(&raw).map_err(serde::de::Error::custom)
+  }
 }
 
 /// What a sender says an act MEANS, against vocabularies both parties can
@@ -1071,7 +1164,7 @@ mod tests {
 
   fn sample_policy() -> super::PolicyDescriptor {
     super::PolicyDescriptor {
-      decision: "AskEveryTime".to_string(),
+      decision: super::PolicyDecision::AskEveryTime,
       matched_scope: "per-channel".to_string(),
       delegation_mandate_id: std::option::Option::None,
       act_chain: std::vec::Vec::new(),
@@ -2242,6 +2335,36 @@ mod closed_vocabulary_tests {
   }
 
   #[test]
+  fn every_policy_decision_wire_spelling_round_trips() {
+    // The §7.1.7 set joins the closure late — an audit found this crate
+    // validating it NOWHERE while the independent implementation refused at
+    // parse — so it gets the same round-trip weld its two older siblings
+    // have: label() and from_str() are two halves of one mapping, and this
+    // is what keeps them from parting.
+    for decision in super::PolicyDecision::ALL {
+      let back: super::PolicyDecision = decision
+        .label()
+        .parse()
+        .expect("every published wire spelling must parse");
+      std::assert_eq!(decision, back);
+    }
+  }
+
+  #[test]
+  fn an_unrecognized_policy_decision_is_refused_and_names_the_closed_set() {
+    // `Sometimes` is a value no revision has ever defined and none will —
+    // the durable form of a refusal pin, per the graduation lesson: pins
+    // written against values someone is actively requesting have short
+    // lives. A decision outside the set is how a producer would route past
+    // policy keyed on one.
+    let err = "Sometimes"
+      .parse::<super::PolicyDecision>()
+      .expect_err("a value outside the closed set must be refused");
+    std::assert!(err.contains("closed set"), "must name the closed set: {err}");
+    std::assert!(err.contains("AskEveryTime"), "must list the members: {err}");
+  }
+
+  #[test]
   fn an_unrecognized_channel_kind_is_refused_and_names_the_closed_set() {
     // The divergence pin. This test was written against `service`, which
     // was then the exact value a draft wanted to emit and the reference
@@ -2277,6 +2400,7 @@ mod closed_vocabulary_tests {
     // CHANGE as the spec tables, the examples inventory, and the bindings.
     std::assert_eq!(super::ChannelKind::ALL.len(), 9);
     std::assert_eq!(super::ContentClass::ALL.len(), 8);
+    std::assert_eq!(super::PolicyDecision::ALL.len(), 3);
   }
 }
 

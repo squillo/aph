@@ -164,6 +164,26 @@ const CONTENT_CLASS_SITES: [Restatement; 2] = [
   },
 ];
 
+/// Both places the spec enumerates the policy decisions. §7.1.7 defines;
+/// §6.2 restates for the communication mandate. This vocabulary joined the
+/// welds late — an audit found the reference validating it nowhere while
+/// the spec and the independent implementation both closed it — so it gets
+/// the same two-site membership check its older siblings have.
+const POLICY_DECISION_SITES: [Restatement; 2] = [
+  Restatement {
+    heading: "#### 7.1.7 ",
+    field: "decision",
+    marker: "Closed enum:",
+    cite: "§7.1.7 `PolicyDescriptor.decision`",
+  },
+  Restatement {
+    heading: "### 6.2 ",
+    field: "policyDecision",
+    marker: "produced this mandate:",
+    cite: "§6.2 `CommunicationMandate.policyDecision`",
+  },
+];
+
 /// Compares one restatement's members against the reference type's, in both
 /// directions, and reports each direction as the distinct defect it is.
 fn assert_membership_matches(site: &Restatement, spec: &str, reference: &[&'static str]) {
@@ -280,4 +300,17 @@ fn the_reference_lists_content_classes_in_the_order_the_spec_writes_them() {
     listed, reference,
     "`ContentClass::ALL` documents itself as being in §7.1.6 order; it is not"
   );
+}
+
+#[test]
+fn the_spec_and_the_reference_agree_on_the_policy_decision_vocabulary() {
+  // Same membership weld as its siblings, both spec sites, both directions.
+  let spec = spec_markdown();
+  let reference: std::vec::Vec<&'static str> = aph_core::PolicyDecision::ALL
+    .iter()
+    .map(aph_core::PolicyDecision::label)
+    .collect();
+  for site in &POLICY_DECISION_SITES {
+    assert_membership_matches(site, &spec, &reference);
+  }
 }

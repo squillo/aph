@@ -72,7 +72,7 @@ fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
         preview: std::string::String::from("preview"),
       },
       policy: crate::envelope::PolicyDescriptor {
-        decision: std::string::String::from("AskEveryTime"),
+        decision: crate::envelope::PolicyDecision::AskEveryTime,
         matched_scope: std::string::String::from("per-channel"),
         delegation_mandate_id: std::option::Option::None,
         act_chain: std::vec::Vec::new(),
@@ -143,7 +143,7 @@ proptest! {
     channel_kind in proptest::sample::select(crate::envelope::ChannelKind::ALL.to_vec()),
     content_class in proptest::sample::select(crate::envelope::ContentClass::ALL.to_vec()),
     preview in "[a-z]{1,20}",
-    decision in "[a-z]{1,20}",
+    decision in proptest::sample::select(crate::envelope::PolicyDecision::ALL.to_vec()),
     matched_scope in "[a-z]{1,20}",
     notary_name in "[a-z]{1,20}",
     notary_version in "[a-z]{1,20}",
@@ -185,7 +185,7 @@ proptest! {
           preview: preview.clone(),
         },
         policy: crate::envelope::PolicyDescriptor {
-          decision: decision.clone(),
+          decision: decision,
           matched_scope: matched_scope.clone(),
           delegation_mandate_id: std::option::Option::None,
           act_chain: std::vec::Vec::new(),
@@ -334,7 +334,7 @@ proptest! {
     // Inverted for the same reason as the envelope generator above.
     channel_kind in proptest::sample::select(crate::envelope::ChannelKind::ALL.to_vec()),
     content_class in proptest::sample::select(crate::envelope::ContentClass::ALL.to_vec()),
-    policy_decision in "[a-z]{1,15}",
+    policy_decision in proptest::sample::select(crate::envelope::PolicyDecision::ALL.to_vec()),
     signature in "[a-z]{1,40}",
   ) {
     let mandate = crate::communication_mandate::CommunicationMandate {
@@ -347,7 +347,7 @@ proptest! {
       content_class: content_class,
       body_sha256: std::string::String::from(FIXED_BODY_SHA256),
       body_size: 1842,
-      policy_decision: policy_decision.clone(),
+      policy_decision: policy_decision,
       issued_at: std::string::String::from(FIXED_VALID_FROM),
       expires_at: std::string::String::from(FIXED_VALID_UNTIL),
       notary_signature: signature.clone(),

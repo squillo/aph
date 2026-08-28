@@ -741,3 +741,30 @@ fn the_snapp_and_the_reference_agree_on_the_content_class_vocabulary() {
     missing_from_snapp
   );
 }
+
+#[test]
+fn the_snapp_and_the_reference_agree_on_the_policy_decision_vocabulary() {
+  // The Snapp declared `PolicyDecision` as an enum from the start; the
+  // REFERENCE was the last populator carrying it as an unvalidated String,
+  // which an audit found only because the independent implementation
+  // disagreed with it. Welded like its two siblings above; the spellings
+  // are PascalCase on the wire and in the Snapp alike, so no casing
+  // alternate is needed.
+  let snapp = snapp_vocabulary_discriminants("PolicyDecision");
+  let mut missing_from_snapp = std::vec::Vec::new();
+  for decision in aph_core::PolicyDecision::ALL {
+    if !snapp.contains_key(decision.label()) {
+      missing_from_snapp.push(decision.label());
+    }
+  }
+  std::assert!(
+    missing_from_snapp.is_empty(),
+    "the reference declares policy decisions the Snapp's `Vocabulary` block does not: {:?}",
+    missing_from_snapp
+  );
+  std::assert_eq!(
+    snapp.len(),
+    aph_core::PolicyDecision::ALL.len(),
+    "the Snapp declares policy decisions the reference does not"
+  );
+}

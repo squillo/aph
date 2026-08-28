@@ -95,7 +95,7 @@ pub use envelope::{
   ActClassification, ActLabel, AgentRef, AttestationMode, ChannelDescriptor, ChannelKind,
   CommunicationDescriptor, ContentClass, CredentialSubject, EnvelopeProof, EnvelopeProofs,
   HumanPrincipalRef, LinkedMandate, NotarizationEnvelope, NotarizationMetadata, NotaryServiceRef,
-  PolicyDescriptor, VocabularyRef,
+  PolicyDecision, PolicyDescriptor, VocabularyRef,
 };
 pub use errors::AphError;
 pub use human_not_present_flow::{

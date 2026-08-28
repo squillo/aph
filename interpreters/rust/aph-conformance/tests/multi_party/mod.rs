@@ -466,7 +466,7 @@ impl Party {
           preview: request.preview.clone(),
         },
         policy: aph_core::PolicyDescriptor {
-          decision: String::from("AlwaysAllow"),
+          decision: aph_core::PolicyDecision::AlwaysAllow,
           matched_scope: String::from("per-channel"),
           delegation_mandate_id: std::option::Option::Some(request.mandate_id.clone()),
           act_chain: std::vec::Vec::new(),

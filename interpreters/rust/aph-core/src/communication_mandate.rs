@@ -44,7 +44,7 @@ pub struct CommunicationMandate {
   /// Body size in bytes.
   pub body_size: u64,
   /// Policy decision the human made (`AlwaysAllow`, `AskEveryTime`, `NeverAllow`).
-  pub policy_decision: String,
+  pub policy_decision: crate::envelope::PolicyDecision,
   /// RFC 3339 issuance timestamp.
   pub issued_at: String,
   /// RFC 3339 expiry timestamp.
@@ -73,7 +73,7 @@ mod tests {
       // 64-char lowercase hex SHA-256 (the empty-string SHA-256).
       body_sha256: String::from("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
       body_size: 1842,
-      policy_decision: String::from("AskEveryTime"),
+      policy_decision: crate::envelope::PolicyDecision::AskEveryTime,
       issued_at: String::from("2026-05-21T00:00:00Z"),
       expires_at: String::from("2026-05-21T01:00:00Z"),
       notary_signature: String::from("z3WgvA9JHkbV3qLZHcM4FxBp4xHfQVnVnPKKDdyazQwQGdGzxsRdmZW"),

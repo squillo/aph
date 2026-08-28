@@ -182,7 +182,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         preview: std::string::String::from("Confirming the Thursday freeze window."),
       },
       policy: aph_core::PolicyDescriptor {
-        decision: std::string::String::from("AlwaysAllow"),
+        decision: aph_core::PolicyDecision::AlwaysAllow,
         matched_scope: std::string::String::from("per-channel"),
         delegation_mandate_id: std::option::Option::None,
         act_chain: std::vec::Vec::new(),

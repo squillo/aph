@@ -397,6 +397,7 @@ mod tests {
     pyo3::Python::attach(|py| {
       for (pointer, offending, member) in [
         (["credentialSubject", "channel", "kind"], "carrier_pigeon", "google_chat"),
+        (["credentialSubject", "policy", "decision"], "Sometimes", "NeverAllow"),
         (
           ["credentialSubject", "communication", "contentClass"],
           "Digest",

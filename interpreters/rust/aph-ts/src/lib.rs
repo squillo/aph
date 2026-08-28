@@ -338,6 +338,11 @@ mod tests {
         "Digest",
         "BulkSend",
       ),
+      (
+        ["credentialSubject", "policy", "decision"],
+        "Sometimes",
+        "NeverAllow",
+      ),
     ] {
       let mut document: serde_json::Value =
         serde_json::from_str(LEGACY_SLACK_REPLY).expect("the legacy envelope parses as JSON");

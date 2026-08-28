@@ -420,6 +420,13 @@ func TestAClosedSetValueThisBuildDoesNotDefineIsRefused(t *testing.T) {
 			member:      "google_chat",
 		},
 		{
+			name:        "an unrecognized policy decision (§7.1.7)",
+			anchor:      `"decision": "AskEveryTime",`,
+			replacement: `"decision": "Sometimes",`,
+			offending:   "Sometimes",
+			member:      "NeverAllow",
+		},
+		{
 			name:        "an unrecognized content class (§7.1.6)",
 			anchor:      `"contentClass": "Reply",`,
 			replacement: `"contentClass": "Digest",`,

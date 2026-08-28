@@ -585,7 +585,7 @@ mod tests {
           preview: std::string::String::from("hello world"),
         },
         policy: crate::envelope::PolicyDescriptor {
-          decision: std::string::String::from("AskEveryTime"),
+          decision: crate::envelope::PolicyDecision::AskEveryTime,
           matched_scope: std::string::String::from("per-channel"),
           delegation_mandate_id: std::option::Option::None,
           act_chain: std::vec::Vec::new(),

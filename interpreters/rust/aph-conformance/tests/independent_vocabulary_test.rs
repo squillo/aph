@@ -169,3 +169,16 @@ fn the_agent_skill_agrees_on_the_content_class_vocabulary() {
     "content classes",
   );
 }
+
+#[test]
+fn the_independent_implementation_agrees_on_the_policy_decision_vocabulary() {
+  // The vocabulary whose divergence motivated its closure: the independent
+  // implementation refused an unrecognized decision from its first draft
+  // while the reference accepted any string. Welded here so the two cannot
+  // part again without a red gate.
+  let reference: std::vec::Vec<&'static str> = aph_core::PolicyDecision::ALL
+    .iter()
+    .map(aph_core::PolicyDecision::label)
+    .collect();
+  assert_same_membership(&declared("POLICY_DECISIONS"), &reference, "policy decisions");
+}

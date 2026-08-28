@@ -225,6 +225,21 @@ impl Refusal {
     if let std::option::Option::Some(hit) = content_class {
       return Self::ClosedSet(hit);
     }
+    // The §7.1.7 set joined the closure after the first two; a consumer's CI
+    // reading `--json` deserves the same precise refusal for it, not
+    // "malformed".
+    let decision_allowed: std::vec::Vec<&'static str> = aph_core::envelope::PolicyDecision::ALL
+      .into_iter()
+      .map(|decision| decision.label())
+      .collect();
+    let decision = out_of_set::<aph_core::envelope::PolicyDecision>(
+      "credentialSubject.policy.decision",
+      subject.get("policy").and_then(|policy| policy.get("decision")),
+      &decision_allowed,
+    );
+    if let std::option::Option::Some(hit) = decision {
+      return Self::ClosedSet(hit);
+    }
     Self::Malformed
   }
 }

@@ -193,7 +193,7 @@ mod tests {
         ),
         access_intent: super::AccessIntent::OneShot,
         policy: crate::envelope::PolicyDescriptor {
-          decision: ::std::string::String::from("AlwaysAllow"),
+          decision: crate::envelope::PolicyDecision::AlwaysAllow,
           matched_scope: ::std::string::String::from("per-credential"),
           delegation_mandate_id: ::std::option::Option::None,
           act_chain: ::std::vec::Vec::new(),

@@ -145,6 +145,7 @@ defmodule APHTest do
     # reader to inspect key material over a typo.
     for {path, offending, member} <- [
           {["credentialSubject", "channel", "kind"], "carrier_pigeon", "google_chat"},
+          {["credentialSubject", "policy", "decision"], "Sometimes", "NeverAllow"},
           {["credentialSubject", "communication", "contentClass"], "Digest", "BulkSend"}
         ] do
       document =

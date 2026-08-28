@@ -243,7 +243,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         preview: std::string::String::from("prod rollout finished at 14:02 UTC"),
       },
       policy: aph_core::PolicyDescriptor {
-        decision: std::string::String::from("AlwaysAllow"),
+        decision: aph_core::PolicyDecision::AlwaysAllow,
         matched_scope: std::string::String::from("per-channel"),
         delegation_mandate_id: std::option::Option::Some(std::string::String::from(MANDATE_ID)),
         act_chain: std::vec::Vec::new(),

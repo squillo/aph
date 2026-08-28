@@ -218,7 +218,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         preview: std::string::String::from("prod rollout finished at 14:02 UTC"),
       },
       policy: aph_core::PolicyDescriptor {
-        decision: std::string::String::from("AlwaysAllow"),
+        decision: aph_core::PolicyDecision::AlwaysAllow,
         matched_scope: std::string::String::from("per-channel"),
         // No mandate, embedded or referenced: see the file docs. §7.1.7.1's
         // binding rule is exercised by the Ed25519 golden.
