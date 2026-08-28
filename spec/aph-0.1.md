@@ -491,6 +491,27 @@ Identifies the channel transport and recipient addressing.
 | `kind` | string | yes | One of the closed channel-kind enum values: `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`. New channel kinds are additive in 0.x minor versions. *(Erratum 2026-08-12: earlier drafts spelled this value `googleChat`; every published example and signed fixture emits `google_chat`, so the snake_case form is normative.)* |
 | `recipientAddressing` | JSON object | yes | Channel-shaped opaque addressing payload. The exact field set is channel-specific; see §7.4 for per-channel shapes. |
 
+`kind` names the END-DELIVERY MEDIUM — where the message lands for its human
+recipient — and never the subsystem that emitted it, the agent-to-agent rail
+that relayed it (§1.1.1), or an internal permission scope that authorized it.
+Those are different axes, and a value from one of them placed in `kind` makes
+an envelope look channel-bound while binding nothing a recipient can act on.
+Where a sender's own routing concept has no entry in the enum above, the
+closure already decides the question: the correct value is the kind naming the
+medium the message ultimately delivers on, not a coinage for the routing
+concept.
+
+Requesting a new value for this or any other closed vocabulary in §7.1 is an
+ordinary change request, not a private extension: open an RFC
+(`rfcs/README.md`). The set is closed against unrecognized values so that a
+verifier refuses what it does not know, and extensible through that process so
+the vocabulary can still grow — the closure governs what a VERIFIER does with
+an unknown value, while additivity governs how the SET changes. Both hold at
+once. A vendor arm carrying an arbitrary string was considered for exactly
+this purpose and rejected in `rfcs/0004-vendor-extension-channel-kind.md`,
+because it would let a producer disable a recipient's check by writing a word
+that recipient has never seen.
+
 #### 7.1.6 `CommunicationDescriptor`
 
 Binds the outbound payload.
