@@ -1,0 +1,13 @@
+{
+  "title": "Guards — A Consent That Was Never Freely Given",
+  "tags": [
+    "guards",
+    "consent",
+    "precedence",
+    "sealed",
+    "guardrails"
+  ],
+  "nlang_code": "classifiers \"APH_GUARD_CONSENT\" {\n  labels {\n    CONSENT_FORMATION_DEFECTIVE {\n      description = \"A consent was given, but the circumstances of its GIVING are defective: it was obtained under coercion, duress, or threat; the grantor showed apparent incapacity; or the grantor is believed to be a minor. This concerns how the consent was FORMED, not what it covers or whether it still stands, and it takes precedence over every other label in this family including CONSENT_WITHDRAWN — a consent that was never freely given cannot be cured by still being in force. This label records facts about the consent event and is NOT a legal determination of validity in any jurisdiction.\"\n      examples    = [\"They only agreed after I told them I would go to their manager if they refused.\",\n                     \"He signed it but he was clearly not tracking the conversation and asked me twice what year it was.\",\n                     \"She said yes; she also mentioned she is fourteen and using her mother's account.\"]\n    }\n    EXPLICIT_CONTEMPORANEOUS {\n      description = \"The human explicitly authorized THIS act, close in time to it, with the act's material terms in front of them. The strongest form; the semantic twin of an APH PrincipalSigned claim. This label asserts a FREELY GIVEN authorization by a human with apparent capacity; where the consent event itself is defective, CONSENT_FORMATION_DEFECTIVE takes precedence.\"\n      examples    = [\"I asked and Jordan just said, yes, go ahead and cancel the reservation.\",\n                     \"The user confirmed in this session with a plain 'send it' after I read back the recipient.\",\n                     \"Holly approved this exact charge a moment ago when I quoted her the amount.\"]\n    }\n  }\n}",
+  "note": "This family resolves MOST-DEFECTIVE-FIRST, and formation defect sits above every other rung including withdrawal — a consent obtained under coercion, or from a grantor showing apparent incapacity, cannot be cured by still being in force. Note what the strongest label had to gain to make that true: EXPLICIT_CONTEMPORANEOUS now asserts a FREELY GIVEN authorization by a human with apparent capacity, because a label meaning 'they said yes' without that qualifier would admit a yes extracted under threat. The family is sealed, so this ladder cannot be amended by overlay — which is exactly why it is stated in full in the family's own rationale rather than left to be inferred.",
+  "book_ref": "APH Guardrails: consent standing"
+}

@@ -1,0 +1,12 @@
+{
+  "title": "Acts — Predicate Selection Is the Fact, Not the Operation",
+  "tags": [
+    "acts",
+    "mutation",
+    "precedence",
+    "guardrails"
+  ],
+  "nlang_code": "classifiers \"APH_ACT_DATA_MUTATION\" {\n  labels {\n    RECORD_FIELD_UPDATE {\n      description = \"Changes one or more named fields on a single, already-identified existing record, leaving every unnamed field at its current value. This is the partial-patch case. If the act clears or overwrites fields it did not name, it is RECORD_REPLACE; if the target is a set selected by filter rather than one identified record, it is BULK_UPDATE.\"\n      examples    = [\"Change the shipping address on order 88213 to the Portland warehouse.\",\n                     \"Set the account's renewal date to March 14 and leave everything else exactly as it is.\",\n                     \"Update just the phone number on Dana's contact card — the rest of it is still correct.\"]\n    }\n    BULK_UPDATE {\n      description = \"Applies a change to a set of records selected by predicate, filter, or query rather than by enumerated identity, so the exact number of affected records is not fixed by the act itself. Takes precedence over the single-record update labels whenever the target is predicate-selected. If the bulk act deletes rather than edits, it is BULK_DELETE; if it alters the record type rather than the rows, it is SCHEMA_CHANGE; if it only brings new records into existence, it is BULK_CREATE.\"\n      examples    = [\"Set the region to EMEA on every account whose billing country is in the EU.\",\n                     \"Re-tag all tickets older than ninety days as stale across the whole queue.\",\n                     \"Apply the new tax rate to each open invoice that hasn't been sent out yet.\"]\n    }\n  }\n}",
+  "note": "The precedence rule here keys on HOW THE TARGET SET WAS CHOSEN, not on what the operation does. An update to one identified record and an update to every record matching a filter are the same verb; what differs is that the second act's blast radius is not fixed by the act itself — nobody, including the sender, knows how many rows move until it runs. That is the fact a verifier needs, so the bulk label wins whenever selection is predicate-based. The same rule governs creation and deletion, which is why the bulk labels are a family rather than one special case.",
+  "book_ref": "APH Guardrails: data-mutation acts"
+}

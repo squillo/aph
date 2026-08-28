@@ -25,6 +25,29 @@ severity and reversibility families), and it does NOT decide what to do about
 the pressure (that is APH_HUMAN_LOOP). MANUFACTURED_URGENCY names an
 unverifiable claim structure, not a finding of intent or fraud.
 
+PRECEDENCE INVARIANT, and it is the load-bearing sentence in this file. This
+family is open to overlays, which means a later contributor may ADD a label —
+and the label most worth draining is MANUFACTURED_URGENCY, because it is the
+one that resists the pressure lever. A plausible-sounding addition such as a
+verified-executive or pre-authorized-rush bucket would load cleanly: adding a
+label breaks no rule in the lattice, and nothing in an enumerated ladder
+detects semantic widening. So the invariant is stated over the MESSAGE rather
+than over the label set: a message demanding speed with no date, no cutoff,
+and no named ongoing condition is MANUFACTURED_URGENCY, regardless of any
+label a later overlay adds, and no overlay-added label may claim such a
+message. Any label not named in this family's enumerated set ranks with
+MANUFACTURED_URGENCY for precedence purposes, never below it.
+
+ABSTAIN IS `escalate`, not the inherited `unknown`, and the reason is
+composition. Every other family in this vocabulary abstains to a human or
+escalates; this one carries the detector that social engineering must defeat.
+A consumer that folds urgency into a routing decision reads an `unknown` as
+contributing nothing, so a pressure-laden message the ladder could not resolve
+would produce no upward pressure on the human involvement required — the
+attacker's preferred outcome, reached by the classifier declining to answer.
+Escalating instead makes an unresolved urgency question behave like the
+finding it might have been.
+
 ## Extension
 
 This family is open to overlays. A later entry for this namespace may **add a
@@ -96,6 +119,7 @@ classifiers "APH_URGENCY" {
   escalate t0_signals    >= 950
   escalate t1_embedding  >= 880
   escalate t3_local_llm  >= 820
+  abstain      = "escalate"
   golden_set   = "eval/aph_urgency.golden.json"
   min_accuracy = 930
 }

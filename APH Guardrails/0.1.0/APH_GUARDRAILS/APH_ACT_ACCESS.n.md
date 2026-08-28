@@ -27,7 +27,19 @@ ACCESS_GRANT and ACCESS_REVOKE. It deliberately does NOT classify
 authentication or credential lifecycle acts (password resets, MFA enrollment,
 key rotation), nor any change to the resource itself, which belongs to
 APH_ACT_DATA_MUTATION, nor severity, sensitivity, or routing, which are
-separate families.
+separate families. RESIDUAL RULE, which closes a hole the precedence order
+would otherwise carry: this family is open to overlays, an overlay may ADD a
+label, and an added label sits nowhere in the order above — so a rule stated
+only over the enumerated set is uncomputable for it, and the permissive
+reading wins by default. Therefore any label not named in that order ranks at
+the MOST-EXPOSING position for precedence, and a consumer that receives a
+label it does not recognize MUST treat the act as widening reach rather than
+narrowing it. Three boundary facts hold regardless of any label a later
+overlay adds: an act extending reach past the organization's trust boundary is
+a boundary-crossing share, an act minting possession-based access is a link
+creation, and an act opening a resource to an unbounded audience is a
+publication. No overlay-added label may claim a message carrying one of those
+facts.
 
 ## Extension
 
@@ -102,10 +114,16 @@ classifiers "APH_ACT_ACCESS" {
                      "Drop the former vendor's account from the project members."]
     }
     GRANT_EXTEND {
-      description = "Pushes out the expiry of an access that already exists, without changing its scope, its permission level, or who holds it. Renewals of time-boxed grants and share links land here. If the act also widens scope, adds a permission, or names a new principal, it is ACCESS_GRANT instead."
+      description = "Pushes out the expiry of an access that already exists, without changing its scope, its permission level, or who holds it. Renewals of time-boxed grants and share links land here. If the act also widens scope, adds a permission, or names a new principal, it is ACCESS_GRANT instead. BOUNDARY against APH_ACT_AUTHORITY::EXTEND_SCOPE, which a reader will otherwise conflate: the object of THIS label is a RESOURCE GRANT's reach in time — extending someone's read window on a dataset confers no power to act on anyone's behalf. The object of EXTEND_SCOPE is the DELEGATION CHAIN, where lifetime is a dimension of authority, so pushing a mandate's expiry later widens who may act for whom and belongs to that family. The two are not the same act with the verb order flipped, and one message may legitimately produce a label from each family."
       examples    = ["Push the auditor's access out another two weeks — same permissions, just longer.",
                      "The vendor's link expires tomorrow; renew it through the end of the month.",
                      "Extend Maya's temporary admin window until the migration is done, nothing more."]
+    }
+    ACCESS_NARROW {
+      description = "Reduces an existing access without ending it — a shorter expiry, a lower permission level, a smaller set of resources, or a tighter condition — so the resulting permission set is a strict subset of the prior one and the principal retains something. The inverse of GRANT_EXTEND, and the label a consumer needs to tell 'less' from 'none': withdrawing the access entirely is ACCESS_REVOKE, and any change that adds a permission or a principal while removing another is not this label, because a mixed change is not a narrowing."
+      examples    = ["Drop the contractor from editor to viewer on that folder; keep the access.",
+                     "Cut the auditor's window from ninety days to two weeks — same permissions.",
+                     "Restrict that service account to the billing tables only, not the whole schema."]
     }
     SHARE_LINK_CREATE {
       description = "Mints a URL, token, or invite code that confers access to whoever possesses it, rather than to an identified principal. Possession-based access is the operative fact, so this label outranks every other in the family when a link or token is created — including when the link is described as internal-only or expiring. Disabling an existing link is ACCESS_REVOKE."

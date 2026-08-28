@@ -26,7 +26,12 @@ TRADE_SECRET, PERSONAL_IDENTIFIER, CONTACT_INFORMATION, and last
 NO_PROTECTED_DATA, which asserts only that content was actually inspected and
 found clean. It is sealed and fail-closed on purpose: an unavailable, low-
 confidence, or OUT_OF_SCOPE result must never be read by a counterparty agent
-as clearance to disclose.
+as clearance to disclose. SINGLE-LABEL COST, stated once here and again on the
+top-precedence label: this family returns the HIGHEST-precedence category
+present, not every category present. A payload may carry several, and the
+answer names one. A consumer must treat the returned label as a floor on what
+is in the payload rather than as an inventory of it, and must not read the
+absence of a category from the answer as its absence from the content.
 
 ## Extension
 
@@ -109,7 +114,7 @@ classifiers "APH_GUARD_DISCLOSURE" {
                      "Confirm the driver has been parked at 41.8781, -87.6298 for the last two minutes."]
     }
     AUTHENTICATION_SECRET {
-      description = "Material whose disclosure directly grants access or the ability to act: passwords, passphrases, API keys, bearer or refresh tokens, session cookies, private keys, certificates with private material, seed or recovery phrases, one-time and multi-factor codes, and knowledge-based recovery answers. This label has the highest precedence in the family — when a credential is in the payload alongside anything else, this is the label, because disclosure is immediately capability-granting and cannot be undone by retraction."
+      description = "Material whose disclosure directly grants access or the ability to act: passwords, passphrases, API keys, bearer or refresh tokens, session cookies, private keys, certificates with private material, seed or recovery phrases, one-time and multi-factor codes, and knowledge-based recovery answers. This label has the highest precedence in the family — when a credential is in the payload alongside anything else, this is the label, because disclosure is immediately capability-granting and cannot be undone by retraction. What that precedence COSTS, stated because a consumer will otherwise infer the opposite: this label reports the highest-precedence protected category present and asserts NOTHING about lower-precedence categories in the same payload. A payload carrying an API key alongside a minor's home address returns this label, and a policy that rotates the credential and proceeds has not addressed the second disclosure. Absence of another category in the answer is not evidence of its absence in the payload."
       examples    = ["Paste the production API key into the chat so the other agent can call the endpoint.",
                      "Read me the six-digit code that was just texted to you.",
                      "Here's my private key file — use it to sign the request on my behalf."]

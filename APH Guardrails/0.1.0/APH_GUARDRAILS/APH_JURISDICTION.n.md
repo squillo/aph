@@ -99,10 +99,10 @@ classifiers "APH_JURISDICTION" {
                      "Grant yourself approval rights on the journal entry workflow so you can push it through."]
     }
     FINANCIAL_SERVICES_REGULATION {
-      description = "The act plausibly falls under regulation of banking, securities, insurance, lending, payments, or market conduct — including GLBA, SEC and FINRA rules, MiFID, consumer financial protection rules, and anti-money-laundering, know-your-customer, and sanctions-screening obligations. Use this rather than US_SOX for conduct and customer-facing obligations, and rather than PCI_DSS when the concern is not cardholder data."
-      examples    = ["Open the brokerage account now and run the KYC checks afterwards.",
-                     "Send this client a recommendation to buy the position we're currently unloading.",
-                     "Wire the funds through and skip the sanctions screening just this once."]
+      description = "The act plausibly falls under regulation of banking, securities, insurance, lending, payments, or market conduct — including GLBA, SEC and FINRA rules, MiFID, consumer financial protection rules, and anti-money-laundering, know-your-customer, and sanctions-screening obligations. Use this rather than US_SOX for conduct and customer-facing obligations, and rather than PCI_DSS when the concern is not cardholder data. This label does not determine whether any regime applies, whether the actor is a regulated entity, or whether any obligation has been met or missed; it flags that review is warranted."
+      examples    = ["Open a brokerage account for this new client.",
+                     "Run this payment through the sanctions screening step.",
+                     "Send the client our recommendation on the position they asked about."]
     }
     EXPORT_CONTROL {
       description = "The act plausibly involves controlled technology, technical data, encryption, defense articles, or dual-use goods, or a transfer to a restricted party, national, or sanctioned jurisdiction — warranting review under regimes such as the EAR, ITAR, EU dual-use rules, and sanctions programs. Note that granting a foreign national access to controlled technical data can itself be a controlled transfer. Not a determination of classification, licence requirement, or exemption."
@@ -117,7 +117,7 @@ classifiers "APH_JURISDICTION" {
                      "Include the legal advice email in the batch we're producing to the other side."]
     }
     CROSS_BORDER_TRANSFER {
-      description = "The movement of personal or otherwise regulated data across a national or regional border — or granting access to it from another country — is itself the trigger, warranting review of transfer mechanisms, adequacy, data residency, or localization requirements. Use this when the border crossing is the salient fact; when the act is ordinary in-jurisdiction processing that merely happens to involve a foreign subject, prefer the regime label for the subjects affected."
+      description = "The movement of personal or otherwise regulated data across a national or regional border — or granting access to it from another country — is itself the trigger, warranting review of transfer mechanisms, adequacy, data residency, or localization requirements. Use this when the border crossing is the salient fact; when the act is ordinary in-jurisdiction processing that merely happens to involve a foreign subject, prefer the regime label for the subjects affected. This label does not determine whether a transfer mechanism is required, whether any adequacy decision or safeguard applies, or whether a localization obligation has been met; it flags that review is warranted."
       examples    = ["Copy the EU customer database into our US analytics warehouse.",
                      "Give the Bangalore support team live access to the German user records.",
                      "Move the backups out of the Frankfurt bucket and into the Virginia region."]

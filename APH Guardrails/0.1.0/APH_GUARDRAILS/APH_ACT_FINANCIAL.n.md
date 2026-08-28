@@ -18,10 +18,19 @@ APH_ACT_FINANCIAL names what an agent is DOING when the operative effect of
 its message is that money moves, is committed to move, or is priced. The
 boundary is effect, not topic: discussing, reporting, or forecasting money is
 not a financial act, and only the sender's own act is classified — never the
-recipient's expected response. It deliberately does not classify acts whose
-operative effect falls on legal rights rather than on money (accepting
-contract terms, executing an NDA, giving notice, waiving a right); those
-belong to APH_ACT_LEGAL and are OUT_OF_SCOPE here. It also does not encode
+recipient's expected response. It does not classify the effect an act has on
+legal rights — accepting contract terms, executing an NDA, giving notice,
+waiving a right — which is APH_ACT_LEGAL's subject. EVALUATION IS INDEPENDENT,
+stated because the earlier wording invited the opposite reading and the
+failure it produced is silent: families are evaluated SEPARATELY over the same
+message, and OUT_OF_SCOPE here means THIS family's operative effect is absent,
+never that another family owns the message. A settlement is the worked case:
+'We accept responsibility for the outage and will wire 50,000 in settlement'
+carries a payment label from this family AND LIABILITY_ACCEPT from
+APH_ACT_LEGAL, returned in parallel. A reader who treats either family's
+OUT_OF_SCOPE as a hand-off gets two out-of-scope verdicts on the single most
+consequential message either family will ever see, and concludes that no
+financial act and no legal act occurred. It also does not encode
 amount, currency, severity, authority, or routing — a payment of one cent and
 a payment of one million share the label PAYMENT_AUTHORIZE, and everything
 else is a separate family's job. PRIVACY POSTURE, stated because it is a
@@ -105,7 +114,7 @@ classifiers "APH_ACT_FINANCIAL" {
                      "I'm putting the order through for the annual licences on the agreed terms."]
     }
     PRICE_TERMS_AGREE {
-      description = "The sender agrees a price, rate, discount, or other monetary term as a standing basis for future transactions, outside the issuance or acceptance of a specific quote or order. The operative content is the number or the formula, not a particular purchase."
+      description = "The sender agrees a price, rate, discount, or other monetary term as a standing basis for future transactions, outside the issuance or acceptance of a specific quote or order. The operative content is the number or the formula, not a particular purchase. BOUNDARY against APH_ACT_LEGAL::CONTRACT_TERMS_ACCEPT: this label names assent to the NUMBER — what a unit costs, what the rate is, how the discount computes. That label names assent to the INSTRUMENT — being bound by a set of terms as written. A signed agreement that fixes a rate does both, and per the independence rule above it returns both labels, one from each family. Neither is the other's fallback: agreeing a rate in a message that binds nobody to anything is this label alone."
       examples    = ["Agreed — 12% off list on any order above 500 units.",
                      "We'll lock the rate at 165 an hour for the next twelve months.",
                      "Deal on the 5% early-payment discount."]
@@ -123,7 +132,7 @@ classifiers "APH_ACT_FINANCIAL" {
                      "Turn off auto-renewal on the annual plan."]
     }
     OUT_OF_SCOPE {
-      description = "The message performs no financial act of this family. Reporting balances, acknowledging receipt, forecasting spend, or merely discussing money lands here, as does any act whose operative effect is legal rather than monetary — those belong to APH_ACT_LEGAL. This is the terminal for 'money is mentioned but nothing financial is being done'."
+      description = "The message performs no financial act of this family: no money moves, is committed, is priced, or is disputed. Reporting balances, acknowledging receipt, forecasting spend, or merely discussing money lands here. This terminal asserts ONLY that this family's operative effect is absent — it is never a hand-off, and it says nothing about what another family will return for the same message. A message that accepts contract terms and nothing else is OUT_OF_SCOPE here because no money moved, not because the legal family claimed it; a message that does both returns a label from each."
       examples    = ["Our current account balance is 42,110 USD as of this morning.",
                      "Let's move the budget review meeting to Thursday.",
                      "We accept the confidentiality terms as drafted."]

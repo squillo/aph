@@ -20,10 +20,19 @@ accepting or proposing terms, executing a confidentiality agreement, giving
 notice, terminating, waiving, asserting or answering a claim, licensing,
 accepting liability, or making a representation. The boundary is operative
 effect, not vocabulary: summarizing law, requesting a document, or reasoning
-about a contract changes nothing and is OUT_OF_SCOPE. It deliberately does not
-classify acts whose operative effect is that money moves, is committed, or is
-priced — those belong to APH_ACT_FINANCIAL and must return OUT_OF_SCOPE here,
-so that the two families remain disjoint over one message. It also carries no
+about a contract changes nothing and is OUT_OF_SCOPE. It does not classify the
+monetary effect of an act — that a payment is authorized, a price agreed, a
+refund issued — which is APH_ACT_FINANCIAL's subject. EVALUATION IS
+INDEPENDENT, stated because the earlier wording invited the opposite reading
+and the failure it produced is silent: families are evaluated SEPARATELY over
+the same message, and OUT_OF_SCOPE here means THIS family's operative effect
+is absent, never that another family owns the message. A settlement is the
+worked case: 'We accept responsibility for the outage and will wire 50,000 in
+settlement' carries LIABILITY_ACCEPT from this family AND a payment label from
+APH_ACT_FINANCIAL, returned in parallel. A reader who treats either family's
+OUT_OF_SCOPE as a hand-off gets two out-of-scope verdicts on the single most
+consequential message either family will ever see, and concludes that no legal
+act and no financial act occurred. It also carries no
 view on severity, jurisdiction, enforceability, or whether the sender was
 actually authorized to bind anyone; those are separate determinations and
 separate families. PRIVACY POSTURE, stated because it is a deliberate
@@ -53,7 +62,7 @@ classifiers "APH_ACT_LEGAL" {
   description = "Which non-financial legal act an agent is performing on behalf of its principal when rights or obligations change"
   labels {
     CONTRACT_TERMS_ACCEPT {
-      description = "The sender assents to terms that the counterparty has put forward, intending to be bound by them as written. The terms originated on the other side; this act closes on them rather than altering them."
+      description = "The sender assents to terms that the counterparty has put forward, intending to be bound by them as written. The terms originated on the other side; this act closes on them rather than altering them. BOUNDARY against APH_ACT_FINANCIAL::PRICE_TERMS_AGREE: this label names assent to the INSTRUMENT — being bound by a set of terms. That label names assent to the NUMBER — the rate, the discount, the formula. A signed agreement that fixes a rate does both, and per the independence rule above it returns both labels, one from each family. Neither is the other's fallback: accepting a master agreement that names no price at all is this label alone."
       examples    = ["We accept the master services agreement as drafted — treat this as our acceptance.",
                      "Agreed to your terms in version 4; no further changes from our side.",
                      "Consider it signed on our end. We're bound by clauses 1 through 19."]
@@ -119,7 +128,7 @@ classifiers "APH_ACT_LEGAL" {
                      "We warrant the deliverables will conform to the specification for ninety days after acceptance."]
     }
     OUT_OF_SCOPE {
-      description = "The message performs no legal act of this family. Explaining the law, asking for a document, summarizing a contract, or expressing an intention to seek advice lands here, as does any act whose operative effect is monetary — payments, refunds, invoices, quotes, and pricing belong to APH_ACT_FINANCIAL. This is the terminal for 'legal language is present but no right or obligation moves'."
+      description = "The message performs no legal act of this family: no right or obligation is created, altered, waived, asserted, answered, or ended. Explaining the law, asking for a document, summarizing a contract, or expressing an intention to seek advice lands here. This terminal asserts ONLY that this family's operative effect is absent — it is never a hand-off, and it says nothing about what another family will return for the same message. A message that authorizes a payment and nothing else is OUT_OF_SCOPE here because no right moved, not because the financial family claimed it; a message that does both returns a label from each."
       examples    = ["Authorize the 12,400 EUR wire so the settlement clears this week.",
                      "Here's a short summary of what an NDA usually covers.",
                      "Could you send me the current version of the contract to read?"]

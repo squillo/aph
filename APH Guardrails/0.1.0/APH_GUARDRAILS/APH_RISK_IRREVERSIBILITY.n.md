@@ -28,7 +28,15 @@ more than one rung could be argued, the classifier MUST return the rung
 furthest down that ladder, because the correct answer is the hardest reversal
 path actually required, not the easiest one imaginable. This family does NOT
 classify natural-language requests, questions, or opinions — only acts with an
-effect on the world; anything else is OUT_OF_SCOPE.
+effect on the world; anything else is OUT_OF_SCOPE. RESIDUAL RULE, which
+closes a hole the ladder would otherwise carry: this family is open to
+overlays, an overlay may ADD a label, and an added label has no rung in the
+ladder above — so a rule stated only over the enumerated set is uncomputable
+for it, and the permissive reading wins by default. Therefore any label not
+named in this ladder ranks at the MOST-RESTRICTIVE position for precedence,
+and a consumer that receives a label it does not recognize MUST treat the act
+as IRREVERSIBLE. An unknown reversibility answer is never evidence that an act
+can be undone.
 
 ## Extension
 

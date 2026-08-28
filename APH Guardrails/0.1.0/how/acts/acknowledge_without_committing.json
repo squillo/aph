@@ -1,0 +1,12 @@
+{
+  "title": "Acts — Acknowledging Receipt Is Not Agreeing",
+  "tags": [
+    "acts",
+    "commitment",
+    "boundary",
+    "guardrails"
+  ],
+  "nlang_code": "classifiers \"APH_ACT_COMMITMENT\" {\n  labels {\n    RECEIPT_ACKNOWLEDGED_NO_COMMITMENT {\n      description = \"Confirms that the message was received and possibly understood, and creates NO obligation of any kind. A counterparty must not treat this as agreement, as a conditional agreement, or as a promise to answer by any particular time. Any downstream system that infers commitment from this label is misreading the wire value.\"\n      examples    = [\"Got it, thanks — I'll read through it.\",\n                     \"Received and noted. To be clear, that isn't an agreement, just confirming it landed.\",\n                     \"Understood. I'm not saying yes or no yet.\"]\n    }\n    COMMITMENT_UNCONDITIONAL {\n      description = \"Binds the principal to the obligation exactly as presented, with no stated condition, carve-out, or future decision point. A counterparty may rely on this immediately.\"\n      examples    = [\"Yes, we'll do it — you have my commitment.\",\n                     \"Agreed to the terms as written; consider it done.\",\n                     \"I'm signing off on this, no strings attached.\"]\n    }\n  }\n}",
+  "note": "Most systems conflate these two, and the conflation is expensive in exactly one direction: reading an acknowledgement as an agreement manufactures consent nobody gave. 'Got it, thanks' and 'Received — I'll review this week' move no obligation at all, which is why the vocabulary gives that state its own wire value rather than leaving it to fall through to a generic terminal. An agent negotiating on a human's behalf must be able to say 'I have seen this and I am not bound' in a word a stranger's agent will read the same way.",
+  "book_ref": "APH Guardrails: commitment acts"
+}

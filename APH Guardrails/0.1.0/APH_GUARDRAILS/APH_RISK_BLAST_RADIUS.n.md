@@ -29,7 +29,15 @@ return the latest applicable rung in the ladder, counting parties who would
 be affected even if the act succeeds as intended for everyone else. This family does NOT count
 observers or recipients of a mere notification as affected parties, does NOT
 classify who is authorized to act, and returns OUT_OF_SCOPE for anything that
-is not an act with consequences.
+is not an act with consequences. RESIDUAL RULE, which closes a hole the ladder
+would otherwise carry: this family is open to overlays, an overlay may ADD a
+label, and an added label has no rung in the ladder above — so a rule stated
+only over the enumerated set is uncomputable for it, and the permissive
+reading wins by default. Therefore any label not named in this ladder ranks at
+the MOST-RESTRICTIVE position for precedence, and a consumer that receives a
+label it does not recognize MUST treat the act as reaching the widest
+population this family can name. An unknown blast-radius answer is never
+evidence that an act is contained.
 
 ## Extension
 

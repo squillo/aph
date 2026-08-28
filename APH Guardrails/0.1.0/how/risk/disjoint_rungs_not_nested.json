@@ -1,0 +1,12 @@
+{
+  "title": "Risk — Blast-Radius Rungs Are Disjoint Categories, Not Nested Sets",
+  "tags": [
+    "risk",
+    "blast-radius",
+    "precedence",
+    "guardrails"
+  ],
+  "nlang_code": "classifiers \"APH_RISK_BLAST_RADIUS\" {\n  labels {\n    ORGANIZATION_WIDE {\n      description = \"Members of the principal's own organisation are affected generally — every employee, every user of an internal system, or an open-ended internal population rather than a named list. The effect stops at the organisational boundary; nobody outside it experiences the change.\"\n      examples    = [\"Changed the company-wide password policy; every employee will be forced to re-enrol.\",\n                     \"Took the internal wiki offline for maintenance — nobody at the company can reach it.\",\n                     \"Updated the default expense approval chain across all departments.\"]\n    }\n    ORGANIZATION_CUSTOMERS {\n      description = \"Customers or end users of the principal's organisation are affected — parties outside the organisational boundary who are reached through the organisation's product, service, or billing relationship. Use this whenever the affected set is the customer base or a large open segment of it, even if only some customers notice.\"\n      examples    = [\"Deployed the pricing change that every paying customer will see on their next invoice.\",\n                     \"This migration will sign out all end users of the mobile app.\",\n                     \"Sent the outage notice to the entire customer mailing list.\"]\n    }\n  }\n}",
+  "note": "A containment reading of this ladder fails on its own definitions, which is why the family says PRECEDENCE rather than containment. An organization-wide effect stops AT the trust boundary; a customer effect sits OUTSIDE it. Neither contains the other, so an act reaching every employee plus one partner matches no single rung under a nesting rule. The family resolves by returning the LATEST APPLICABLE rung in the declared order, counting parties affected even when the act succeeds as intended for everyone else — and the ceiling overrides everything: if a safety-of-life system is in scope at all, that is the answer regardless of how many people the act appears to touch.",
+  "book_ref": "APH Guardrails: blast radius"
+}

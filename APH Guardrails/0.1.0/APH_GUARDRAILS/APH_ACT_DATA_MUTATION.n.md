@@ -24,7 +24,18 @@ classify changes to who may reach a record (that is APH_ACT_ACCESS), nor
 message sends, payments, scheduling, or approval-workflow steps; severity and
 routing are separate families. READ_ONLY_QUERY is carried here on purpose, so
 a stranger's agent can assert 'this envelope covers a read and nothing more'
-in the same vocabulary it would use to assert a purge.
+in the same vocabulary it would use to assert a purge. RESIDUAL RULE, which
+closes a hole the precedence language would otherwise carry: this family is
+open to overlays, an overlay may ADD a label, and an added label sits nowhere
+in the precedence relations above — so a rule stated only over the enumerated
+set is uncomputable for it, and the permissive reading wins by default.
+Therefore any label not named in those relations ranks at the LEAST-REVERSIBLE
+position for precedence, and a consumer that receives a label it does not
+recognize MUST NOT treat the act as a read, as recoverable, or as
+single-record. Two facts hold regardless of any label a later overlay adds: an
+act whose target set is selected by predicate rather than enumerated is a bulk
+act, and an act that leaves no recoverable copy is a permanent deletion. No
+overlay-added label may claim a message carrying either fact.
 
 ## Extension
 
@@ -92,8 +103,14 @@ classifiers "APH_ACT_DATA_MUTATION" {
                      "Undelete the client record we archived last week — it was the wrong one.",
                      "Restore revision 12 of the onboarding checklist; the current one lost the compliance steps."]
     }
+    BULK_CREATE {
+      description = "Brings a set of new records into existence from a source the act names rather than from enumerated content — an import, a feed, a generated range, or a copy of a queried set — so the exact number created is not fixed by the act itself. Takes precedence over RECORD_CREATE whenever the created set is source-selected rather than spelled out, for the same reason the other bulk labels take precedence: the blast radius, not the operation, is the fact a verifier needs. If the act edits rows that already exist it is BULK_UPDATE, and if it both imports and overwrites on conflict it is BULK_UPDATE, because the destructive half governs."
+      examples    = ["Import every contact from that CSV into the customer table.",
+                     "Create a draft invoice for each account that closed a deal this quarter.",
+                     "Copy all of last year's active projects into the new workspace as fresh records."]
+    }
     BULK_UPDATE {
-      description = "Applies a change to a set of records selected by predicate, filter, or query rather than by enumerated identity, so the exact number of affected records is not fixed by the act itself. Takes precedence over the single-record update labels whenever the target is predicate-selected. If the bulk act deletes rather than edits, it is BULK_DELETE; if it alters the record type rather than the rows, it is SCHEMA_CHANGE."
+      description = "Applies a change to a set of records selected by predicate, filter, or query rather than by enumerated identity, so the exact number of affected records is not fixed by the act itself. Takes precedence over the single-record update labels whenever the target is predicate-selected. If the bulk act deletes rather than edits, it is BULK_DELETE; if it alters the record type rather than the rows, it is SCHEMA_CHANGE; if it only brings new records into existence, it is BULK_CREATE."
       examples    = ["Set the region to EMEA on every account whose billing country is in the EU.",
                      "Re-tag all tickets older than ninety days as stale across the whole queue.",
                      "Apply the new tax rate to each open invoice that hasn't been sent out yet."]

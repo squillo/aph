@@ -1,0 +1,12 @@
+{
+  "title": "Acts — A Replacement Time Someone Can Book, Versus One They Cannot",
+  "tags": [
+    "acts",
+    "scheduling",
+    "boundary",
+    "guardrails"
+  ],
+  "nlang_code": "classifiers \"APH_ACT_SCHEDULING\" {\n  labels {\n    TIME_COUNTER_PROPOSED {\n      description = \"Rejects the proposed time and names one or more specific replacement times the sender will honor if accepted. The replacement is a live offer, so the counterparty accepting it completes the commitment with no further exchange. Distinguished from TIME_DECLINED_WITH_AVAILABILITY, which names no bindable slot.\"\n      examples    = [\"Tuesday doesn't work, but I can hold Wednesday at 2pm instead — say the word and it's booked.\",\n                     \"Instead of Friday morning, let's do Thursday at 4pm Pacific.\",\n                     \"Not 9am. I'll take 11am the same day if you'll take it.\"]\n    }\n    TIME_DECLINED_WITH_AVAILABILITY {\n      description = \"Refuses the proposed time and describes general availability, constraints, or preferred windows that are NOT themselves acceptable-as-stated offers. The counterparty cannot complete a booking from this message alone; a further proposal is still required.\"\n      examples    = [\"Tuesday's out for me. I'm generally open later that week, though nothing firm yet.\",\n                     \"Can't do the 14th; my afternoons after the 20th tend to be clearer.\",\n                     \"That won't work — mornings are usually better, but I'd have to check before naming a slot.\"]\n    }\n  }\n}",
+  "note": "The single most confusable pair in the scheduling family, and the distinction is operational rather than linguistic: can the counterparty's agent complete a booking from this message ALONE? A counter-proposal names a slot the sender will honor, so accepting it closes the commitment with no further exchange — one message, one round trip saved. Availability describes windows that are not offers, so the counterparty must still propose, and an agent that treats the two alike will either book a slot nobody offered or waste a round trip re-asking for a time already on the table. Both refuse the original proposal, which is why a classifier keying on refusal alone gets this wrong; the discriminator is bindability, not sentiment.",
+  "book_ref": "APH Guardrails: scheduling acts"
+}
