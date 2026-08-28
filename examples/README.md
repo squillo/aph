@@ -1,6 +1,6 @@
 # APH Envelope Examples
 
-This directory contains 12 example APH `NotarizationEnvelope` JSON files:
+This directory contains 13 example APH `NotarizationEnvelope` JSON files:
 one per supported channel kind (7), one exercising the §7.5 registered
 optional extensions, **three signed vectors — one for each of the signing
 paths §8.1/§8.2 make MUST-support** — and `ts_minted_envelope.json`, which
@@ -19,6 +19,8 @@ no wire value for a service act (see RFC 0002) — so it is excluded from every
 ## Files
 
 - `slack_reply_envelope.json` — Slack thread reply
+- `act_classification_envelope.json` — the §7.1.12 `actClassification` claim,
+  citing the shipped guardrail bundle by its own digest
 - `email_reply_envelope.json` — Email reply (with `In-Reply-To`)
 - `discord_dm_envelope.json` — Discord direct message
 - `teams_channel_envelope.json` — Microsoft Teams channel post
@@ -45,16 +47,16 @@ no wire value for a service act (see RFC 0002) — so it is excluded from every
 - `type`: `["VerifiableCredential", "AgentSendAuthorizationCredential"]`
 - `validFrom` / `validUntil`: 24-hour window
 - `agent`: a sample agent DID
-- `communication.bodySha256`: a fixed 64-char lowercase hex in **eleven of the
-  twelve** files (the SHA-256 of an empty string, used as an anchor for
+- `communication.bodySha256`: a fixed 64-char lowercase hex in **twelve of the
+  thirteen** files (the SHA-256 of an empty string, used as an anchor for
   deterministic round-trip testing — DOES NOT represent a real message body).
   `ts_minted_envelope.json` is the exception and carries a real digest of a
   real body.
 
 `proof` is the one block that varies by design, because §8.1 and §8.2 define
-more than one way to make one. Eleven of the twelve files use the Data
-Integrity form, `"type": "DataIntegrityProof"`: ten declare `eddsa-jcs-2022`
-(the seven channel files, the extensions file,
+more than one way to make one. Twelve of the thirteen files use the Data
+Integrity form, `"type": "DataIntegrityProof"`: eleven declare `eddsa-jcs-2022`
+(the seven channel files, the extensions file, the `actClassification` file,
 `principal_signed_envelope.json` and `ts_minted_envelope.json`) and
 `es256_signed_envelope.json` declares `ecdsa-jcs-2019`. The twelfth,
 `detached_jws_envelope.json`, uses the other §8.2 format —

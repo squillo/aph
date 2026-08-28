@@ -138,6 +138,17 @@ export const CORPUS: readonly CorpusRow[] = [
   shapeOnlyFixture('google_chat_envelope.json', 'Google Chat space'),
   shapeOnlyFixture('imessage_envelope.json', 'iMessage'),
   {
+    file: 'act_classification_envelope.json',
+    required: true,
+    verdict: { kind: 'refuse', code: 'APH_E001' },
+    proves:
+      '§7.1.12 `actClassification` parses in the INDEPENDENT implementation — the ' +
+      'family-qualified labels and the pinned vocabulary reference — and that carrying ' +
+      'the claim does not change the verdict, which stays the shape-only signature ' +
+      'refusal. The digest is the shipped guardrail bundle\'s own, so this fixture also ' +
+      'proves the two artifacts agree on what that bundle is called',
+  },
+  {
     file: 'slack_new_with_extensions_envelope.json',
     required: true,
     verdict: { kind: 'refuse', code: 'APH_E001' },

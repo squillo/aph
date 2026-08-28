@@ -1,5 +1,6 @@
 {
   "conformance": [
+    "act_classification_envelope.json",
     "detached_jws_envelope.json",
     "discord_dm_envelope.json",
     "email_reply_envelope.json",

@@ -78,6 +78,45 @@ mod blocks CredentialSubject {
     // Registered optional extension (§7.5.1).
     #[optional(true)]
     apple_aur_acceptance: AppleAurAcceptanceClaim,
+    // What the sender says this act MEANS (§7.1.12). Omitted when absent, so
+    // an envelope making no claim is byte-identical to one written before the
+    // field existed.
+    #[optional(true)]
+    act_classification: ActClassification,
+  }
+}
+```
+
+### Act classification
+
+What the sender says this act means, against vocabularies both parties can
+resolve independently (§7.1.12, §8.5). Both members are lists: `labels`
+because one act carries verdicts from several families at once, and
+`vocabularies` because an overlay is a separate published artifact with its
+own digest — a verdict folded from a base and a tightening overlay came from
+two artifacts, and naming one would put a false statement inside a signature.
+
+The digest is the published bundle's own `integrity` value, carried verbatim.
+It is what makes the reference checkable: without it a citation points at
+whatever the publisher serves today.
+
+```nlang
+mod blocks ActClassification {
+  props {
+    // `Directional` is this bundle's ordered-list idiom, as `@context` and
+    // `act_chain` already use — not a second spelling for the same thing.
+    // Fold order is meaningful for `vocabularies`: a verdict folded from a
+    // base and an overlay names both, in the order they were applied.
+    vocabularies: Directional<VocabularyRef>,
+    labels: Directional<str>,
+  }
+}
+
+mod blocks VocabularyRef {
+  props {
+    name: str,
+    version: str,
+    digest: str,
   }
 }
 ```

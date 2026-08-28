@@ -310,7 +310,7 @@ function parseCredentialSubject(value: unknown, path: string): void {
     value,
     path,
     ['humanPrincipal', 'agent', 'channel', 'communication', 'policy', 'notarization'],
-    ['appleAurAcceptance'],
+    ['appleAurAcceptance', 'actClassification'],
   );
   parseHumanPrincipal(record.humanPrincipal, `${path}.humanPrincipal`);
   parseAgent(record.agent, `${path}.agent`);
@@ -321,6 +321,47 @@ function parseCredentialSubject(value: unknown, path: string): void {
   if ('appleAurAcceptance' in record) {
     parseAppleAurAcceptance(record.appleAurAcceptance, `${path}.appleAurAcceptance`);
   }
+  if ('actClassification' in record) {
+    parseActClassification(record.actClassification, `${path}.actClassification`);
+  }
+}
+
+/**
+ * §7.1.12. The labels are validated for STRUCTURE, not spelling: each must be
+ * `FAMILY/LABEL`, because a bare `ACCESS_GRANT` names nothing — the family is
+ * what scopes it, and two vocabularies may both define the same bare word.
+ *
+ * No character set is imposed. RFC 0006's extension model lets anyone publish
+ * a vocabulary, and one naming its families in a convention this project did
+ * not anticipate would be unusable under a stricter rule. Refuse what is
+ * meaningless; do not legislate taste.
+ */
+function parseActClassification(value: unknown, path: string): void {
+  const record = members(value, path, ['vocabularies', 'labels'], []);
+  const vocabularies = record.vocabularies;
+  if (!Array.isArray(vocabularies) || vocabularies.length === 0) {
+    throw new AphParseError(`${path}.vocabularies`, 'expected a non-empty array');
+  }
+  vocabularies.forEach((entry, index) => {
+    const ref = members(entry, `${path}.vocabularies[${index}]`, ['name', 'version', 'digest'], []);
+    for (const key of ['name', 'version', 'digest']) {
+      str(ref, `${path}.vocabularies[${index}]`, key);
+    }
+  });
+  const labels = stringArray(record, path, 'labels');
+  labels.forEach((label, index) => {
+    const separator = label.indexOf('/');
+    if (
+      separator <= 0 ||
+      separator === label.length - 1 ||
+      label.indexOf('/', separator + 1) !== -1
+    ) {
+      throw new AphParseError(
+        `${path}.labels[${index}]`,
+        `"${label}" is not family-qualified: a label is written \`FAMILY/LABEL\``,
+      );
+    }
+  });
 }
 
 function parseLinkedMandate(value: unknown, path: string): void {

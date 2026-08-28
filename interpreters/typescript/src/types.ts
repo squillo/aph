@@ -151,6 +151,31 @@ export interface CredentialSubject {
   policy: PolicyDescriptor;
   notarization: NotarizationMetadata;
   appleAurAcceptance?: AppleAurAcceptance;
+  actClassification?: ActClassification;
+}
+
+/**
+ * §7.1.12: what the sender says this act MEANS, against vocabularies both
+ * parties can resolve independently.
+ *
+ * Both members are arrays for different reasons. `labels` because one act
+ * carries verdicts from several families at once. `vocabularies` because an
+ * overlay is a separate published artifact with its own digest — a verdict
+ * folded from a base and a tightening overlay came from two artifacts, and
+ * naming one would put a false statement inside a signature.
+ */
+export interface ActClassification {
+  vocabularies: VocabularyRef[];
+  /** Each `FAMILY/LABEL`. A bare label names nothing: the family scopes it. */
+  labels: string[];
+}
+
+/** §7.1.12: a published vocabulary, named and pinned by its own digest. */
+export interface VocabularyRef {
+  name: string;
+  version: string;
+  /** The bundle's `integrity` value, verbatim — never a re-encoding. */
+  digest: string;
 }
 
 export interface VaultMutation {
