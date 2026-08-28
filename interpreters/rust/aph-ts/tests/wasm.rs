@@ -76,7 +76,7 @@ fn a_closed_set_refusal_crosses_the_real_wasm_boundary_with_its_message_intact()
     1,
     "the derivation must edit exactly one place in the published golden"
   );
-  let refused = PRINCIPAL_SIGNED_GOLDEN.replace(ANCHOR, "\"kind\": \"squillo\",");
+  let refused = PRINCIPAL_SIGNED_GOLDEN.replace(ANCHOR, "\"kind\": \"carrier_pigeon\",");
 
   let err = aph_ts::parse_envelope_json(&refused)
     .expect_err("a channel kind outside the closed set must be refused, never carried");
