@@ -93,7 +93,14 @@ export interface DelegationMandate {
   id: string;
   humanPrincipalDid: string;
   agentDid: string;
-  allowedChannels: string[];
+  /**
+   * §6.1 channel scope. TYPED to the §7.1.5 closed set, not `string[]`: the
+   * only question ever asked of this list is whether a `channel.kind` — itself
+   * closed — is in it, so an entry outside the set is unmatchable, and a
+   * `string[]` would let this implementation MINT a grant the reference
+   * refuses to read. The parser closes the same set on the way in.
+   */
+  allowedChannels: ChannelKind[];
   rateLimitPerHour?: number | null;
   validFrom: string;
   validUntil: string;

@@ -123,4 +123,46 @@ defmodule APHTest do
     refute String.starts_with?(message, "APH_E"),
            "a shape refusal must not claim a protocol code, got: #{message}"
   end
+
+  test "a value outside a closed set is refused, and the refusal names the value" do
+    # WHY: §7.1.5 and §7.1.6 close the channel and content-class vocabularies,
+    # and `aph-core` models them as closed TYPES — so an unrecognized value is
+    # a strict-parse refusal (§8.3 step 1) rather than a string that rides
+    # through to a delivery decision no verifier can evaluate. What needs a
+    # test HERE is the term hop: the refusal is a `serde_json` custom error,
+    # stringified in Rust and encoded as a binary, and `mix test` is the only
+    # gate that ever sees the term — so nothing else can say whether the
+    # offending value and the closed set are still in what a BEAM caller reads.
+    # A message flattened to "invalid value" would still refuse and would still
+    # be useless to the producer who has to fix it.
+    #
+    # PINS, per field: the refusal arrives as `{:error, message}`; the offending
+    # VALUE survives the boundary; the closed SET survives, including the
+    # irregular spellings a producer most plausibly gets wrong (`google_chat`
+    # is snake_case among single words, `BulkSend` camel among short names);
+    # and the message claims NO `APH_E` code, because §8.3 step 1 is the layer
+    # below the taxonomy and a parse dressed as a protocol verdict sends the
+    # reader to inspect key material over a typo.
+    for {path, offending, member} <- [
+          {["credentialSubject", "channel", "kind"], "squillo", "google_chat"},
+          {["credentialSubject", "communication", "contentClass"], "Digest", "BulkSend"}
+        ] do
+      document =
+        APH.TestCorpus.legacy_slack_reply()
+        |> Jason.decode!()
+        |> put_in(path, offending)
+        |> Jason.encode!()
+
+      assert {:error, message} = APH.parse_envelope_json(document)
+
+      assert String.contains?(message, offending),
+             "the refusal must name the offending value #{offending}, got: #{message}"
+
+      assert String.contains?(message, "closed set") and String.contains?(message, member),
+             "the refusal must name the closed set (including #{member}), got: #{message}"
+
+      refute String.starts_with?(message, "APH_E"),
+             "a strict-parse refusal must not claim a protocol code, got: #{message}"
+    end
+  end
 end

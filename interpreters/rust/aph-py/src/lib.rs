@@ -377,6 +377,65 @@ mod tests {
     });
   }
 
+  #[test]
+  fn a_closed_set_value_this_build_does_not_define_raises_with_the_value_in_the_message() {
+    // WHY: §7.1.5 and §7.1.6 close the channel and content-class vocabularies,
+    // and `aph-core` models them as closed TYPES — so an unrecognized value is
+    // a strict-parse refusal (§8.3 step 1) rather than a string that rides
+    // through. What needs a test is the HOP: the refusal is produced inside
+    // `serde_json` as a custom error, stringified with `format!("{}", e)` and
+    // then wrapped in `AphError`, and nothing but this says whether the
+    // offending value and the closed set survive into `str(e)`. A message
+    // flattened to "invalid value" would still refuse and still be useless to
+    // the producer who has to fix it.
+    //
+    // PINS, per field: the refusal reaches Python as `aph.AphError`; the
+    // offending VALUE survives; the closed SET survives, including the
+    // irregular spellings a producer most plausibly gets wrong; and `str(e)`
+    // claims NO `APH_E` code, because §8.3 step 1 is the layer below the
+    // taxonomy — the same two-shape distinction the module docs promise.
+    pyo3::Python::attach(|py| {
+      for (pointer, offending, member) in [
+        (["credentialSubject", "channel", "kind"], "squillo", "google_chat"),
+        (
+          ["credentialSubject", "communication", "contentClass"],
+          "Digest",
+          "BulkSend",
+        ),
+      ] {
+        let mut document: serde_json::Value =
+          serde_json::from_str(LEGACY_SLACK_REPLY).expect("the legacy envelope parses as JSON");
+        document[pointer[0]][pointer[1]][pointer[2]] =
+          serde_json::Value::String(std::string::String::from(offending));
+        let text = serde_json::to_string(&document).expect("the edited envelope serializes");
+        let err = crate::parse_envelope_json(&text)
+          .expect_err("a value outside the closed set must be refused, never carried");
+        std::assert!(
+          err.is_instance_of::<crate::AphError>(py),
+          "the refusal must reach Python as aph.AphError"
+        );
+        let message = err.value(py).to_string();
+        std::assert!(
+          message.contains(offending),
+          "str(e) must name the offending value `{}`, got: {}",
+          offending,
+          message
+        );
+        std::assert!(
+          message.contains("closed set") && message.contains(member),
+          "str(e) must name the closed set (including `{}`), got: {}",
+          member,
+          message
+        );
+        std::assert!(
+          !message.starts_with("APH_E"),
+          "a strict-parse refusal must not claim a protocol code, got: {}",
+          message
+        );
+      }
+    });
+  }
+
   /// The published corpus directory, resolved at RUNTIME.
   ///
   /// This crate sits at `interpreters/rust/aph-py`, so the examples are three

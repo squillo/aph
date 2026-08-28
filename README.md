@@ -68,7 +68,7 @@ APH builds on the W3C Verifiable Credentials Data Model 2.0, JWS detached signat
 
 ## Quick reference — the wire shape
 
-A full schema lives under `spec/aph-0.1.md`. The example below is a complete v0.1 envelope notarizing a Slack reply. The same envelope shape applies across all supported channels (Email, Slack, Discord, Teams, WhatsApp, Google Chat, iMessage) with only the `credentialSubject.channel` block changing per channel.
+A full schema lives under `spec/aph-0.1.md`. The example below is a complete v0.1 envelope notarizing a Slack reply. The same envelope shape applies across all supported channels (Email, Slack, Discord, Teams, WhatsApp, Google Chat, iMessage, and `service` — a service endpoint an agent delivers a state-changing act to, per RFC 0002) with only the `credentialSubject.channel` block changing per channel.
 
 ```json
 {
@@ -276,9 +276,91 @@ cargo run -p aph-core --example mandates_and_flows   # scope, validity, both sta
 cargo run -p aph-cli -- validate examples/slack_reply_envelope.json
 cargo run -p aph-cli -- inspect  examples/slack_reply_envelope.json
 cargo run -p aph-cli -- golden                       # list conformance fixtures
+cargo run -p aph-cli -- help                         # usage, plus the --json contract
 ```
 
 `validate` is a strict **structural** check — it does not verify signatures, time windows, or body hashes (spec §8.3 steps 2–8). Exit codes: `0` valid, `1` invalid, `2` usage.
+
+#### Reading the verdict from a build
+
+`validate --json` writes **one** JSON object to stdout and nothing to stderr. The exit codes are unchanged, so a gate may read the code, the object, or both — one call produces both and they cannot disagree. Without `--json` every byte the tool writes is what it has always written.
+
+```sh
+$ cargo run -q -p aph-cli -- validate --json examples/slack_reply_envelope.json
+{"ok":true,"id":"urn:uuid:00000000-0000-4000-8000-000000000001","issuer":"did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV"}
+```
+
+An unrecognized value in one of §7.1's **closed vocabularies** — a channel kind, a content class — is the refusal downstream implementations ask about most, so it names itself and hands back the whole set rather than leaving you to find it:
+
+```sh
+$ your-minter emit-envelope | cargo run -q -p aph-cli -- validate --json -
+{"ok":false,"layer":"parse","reason":"closed_set","message":"invalid envelope: `squillo` is not in the closed set {slack, email, …} at line 27 column 23","field":"credentialSubject.channel.kind","value":"squillo","allowed":["slack","email","…"]}
+```
+
+The set is abbreviated **here** on purpose: §7.1's vocabularies widen by design, and a copy of a closed vocabulary sitting in prose teaches the wrong set the moment one does. The object carries the whole current set every time it refuses, and `aph help` prints it — this page deliberately does not.
+
+| field | present when | meaning |
+| --- | --- | --- |
+| `ok` | always | `true` exactly when the envelope strict-parsed. Mirrors the exit code. |
+| `id`, `issuer` | `ok: true` | which envelope was admitted. |
+| `layer` | `ok: false` | which layer refused: `parse` or `io`. |
+| `reason` | `ok: false` | `closed_set`, `malformed`, or `unreadable`. |
+| `message` | `ok: false` | byte-for-byte the line the same run prints to stderr without `--json`. |
+| `field` | `reason: closed_set` | dotted **wire** path of the offending field, ready to paste into a search of your own document. |
+| `value` | `reason: closed_set` | the value that is not in the set. |
+| `allowed` | `reason: closed_set` | the complete set, in spec order — so your error message never hard-codes the vocabulary. |
+
+**There is deliberately no `APH_E` code in this object.** A closed-vocabulary value is refused at strict parse — spec §8.3 step 1, *below* the protocol's closed sixteen-code error taxonomy — so reporting one would invent a code the specification does not define, and a consumer routing on it would be routing on fiction. `layer` names where the refusal came from instead. This is the same reading the second implementation applies, and the reason `ChannelKind::from_str` returns a plain message rather than an `AphError`.
+
+**Exit `2` is a usage error, not a verdict.** A missing input argument prints usage on stderr and emits no JSON, because nothing was read and `{"ok":false}` would tell a gate an envelope had been refused.
+
+**Stability.** The fields above keep their names and their meanings. New fields and new `reason` values may be added, so branch on `ok` first and treat an unrecognized `reason` as a refusal — never as a pass. `aph help` prints this same contract, so a consumer who has the binary does not need this page.
+
+#### Gate your own envelopes in your own CI
+
+`validate` reads stdin as `-`, so nothing about your minter has to be written in Rust. Build the binary once, put it on `PATH`, then pipe one envelope per run and let the exit code fail the build:
+
+```sh
+cargo build --release -p aph-cli     # once; the binary lands at target/release/aph
+your-minter emit-envelope | aph validate -
+```
+
+That one line is the whole gate. To also say **why** it failed — which is what turns an unknown-value refusal into a fix instead of a question — read the `--json` object with `jq`:
+
+```bash
+#!/usr/bin/env bash
+# scripts/aph-gate.sh — fails the build unless the envelope just minted strict-parses.
+set -uo pipefail
+
+verdict=$(your-minter emit-envelope | aph validate --json -)
+status=$?
+verdict=${verdict:-null}          # the minter itself failed; keep jq well-fed
+
+case "$status" in
+  0) echo "admitted: $(jq -r .id <<<"$verdict")"; exit 0 ;;
+  2) echo "aph: usage error — the command line is wrong, not the envelope"; exit 2 ;;
+esac
+
+case "$(jq -r '.reason // "no-verdict"' <<<"$verdict")" in
+  closed_set)
+    printf 'refused: %s = "%s" is not one of %s\n' \
+      "$(jq -r .field    <<<"$verdict")" \
+      "$(jq -r .value    <<<"$verdict")" \
+      "$(jq -c .allowed  <<<"$verdict")" ;;
+  no-verdict) echo "refused: your minter produced no envelope to validate" ;;
+  *)          echo "refused: $(jq -r .message <<<"$verdict")" ;;
+esac
+exit 1
+```
+
+Nothing in it is CI-vendor-specific; it is one step wherever your build runs:
+
+```yaml
+- name: APH envelope gate
+  run: ./scripts/aph-gate.sh
+```
+
+Two notes worth the ten seconds. `pipefail` makes `status` the *minter's* code when the minter is what failed, which is why `verdict` is normalized to `null` before `jq` ever sees it. And a `closed_set` refusal is not a defect in this tool: §7.1's vocabularies are closed by design, a conformant verifier MUST reject a value it does not recognize, and adding a value is a MINOR version event that carries a producer rule with it — see [CONTRIBUTING.md](CONTRIBUTING.md#versioning).
 
 ### JavaScript / TypeScript
 
@@ -407,6 +489,14 @@ your-implementation emit-envelope | cargo run -q -p aph-cli -- validate -
 ```
 
 Exit `0` means your bytes strict-parse; `1` means they do not, with the serde error naming the field. Conversely, `cargo run -q -p aph-cli -- golden <n>` prints fixture *n* raw on stdout for piping into your own verifier. These two are the only targets that need a Rust toolchain.
+
+Add `--json` and that refusal becomes something your build can branch on instead of something a person has to read — `reason` tells a closed-vocabulary refusal apart from generic malformed JSON, and for a closed set the object carries the offending `value` and the whole `allowed` set:
+
+```sh
+your-implementation emit-envelope | cargo run -q -p aph-cli -- validate --json -
+```
+
+**Wire this into your CI the day you start minting, not the day something breaks.** The copy-pasteable gate is [Gate your own envelopes in your own CI](#gate-your-own-envelopes-in-your-own-ci); the field-by-field shape and its stability commitment are in [Reading the verdict from a build](#reading-the-verdict-from-a-build). Three separate downstream implementations have asked what an unrecognized closed-vocabulary value meant; in every case the tool already answered it, and in every case nobody had run it. A guarantee that only a human at a terminal can reach is not reachable from a build.
 
 **A worked recipient, when the vectors are not enough.** The four targets above
 hand you artifacts; the multi-party exchange tests hand you the ALGORITHM.

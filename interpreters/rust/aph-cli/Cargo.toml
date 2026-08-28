@@ -18,3 +18,8 @@ path = "src/main.rs"
 aph-core = { workspace = true }
 aph-conformance = { workspace = true }
 serde_json = { workspace = true }
+# Already in the lockfile via aph-core — naming it adds no new supply chain.
+# Used only to derive `Serialize` for the `validate --json` verdict, so that
+# shape's field order and its omit-when-absent rule are declared once on the
+# struct rather than assembled by hand at every call site.
+serde = { workspace = true }

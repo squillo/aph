@@ -27,19 +27,105 @@ fn repo_root() -> std::path::PathBuf {
 
 /// Loads the committed Snapp bundle's block definitions.
 ///
-/// The bundle name carries a version, so it is discovered by extension
-/// rather than hardcoded — a version bump must not silently skip this test.
+/// One named block's `props`, wherever the bundle declares it.
+///
+/// The exporter nests a child block inside its parent's `blocks` map — the
+/// `VaultMutationKind` enum lives under `VaultMutation`, not beside it — so
+/// a lookup that only reads the top level finds the parents and misses every
+/// child. Resolving one level down as well keeps these pins asking about the
+/// declaration rather than about the serialization's nesting, which has
+/// already changed shape once under a toolchain bump.
+fn block_props<'a>(
+  blocks: &'a serde_json::Map<String, serde_json::Value>,
+  block_name: &str,
+) -> std::option::Option<&'a serde_json::Map<String, serde_json::Value>> {
+  if let std::option::Option::Some(props) = blocks
+    .get(block_name)
+    .and_then(|b| b.get("props"))
+    .and_then(|p| p.as_object())
+  {
+    return std::option::Option::Some(props);
+  }
+  blocks
+    .values()
+    .filter_map(|parent| parent.get("blocks").and_then(|n| n.as_object()))
+    .find_map(|nested| {
+      nested
+        .get(block_name)
+        .and_then(|b| b.get("props"))
+        .and_then(|p| p.as_object())
+    })
+}
+
+/// One named block's `enum` variants, wherever the bundle declares it.
+///
+/// The twin of [`block_props`], and it exists because a block is one of two
+/// things. A RECORD declares `props`; an ENUM declares `enum`, and its
+/// variants may themselves carry `items`. Demanding `props` from an enum
+/// reports "no such block" for a block that is right there — which is a
+/// false negative that reads exactly like a real drift, and is the worst
+/// kind of alarm to have.
+fn block_enum<'a>(
+  blocks: &'a serde_json::Map<String, serde_json::Value>,
+  block_name: &str,
+) -> std::option::Option<&'a serde_json::Map<String, serde_json::Value>> {
+  if let std::option::Option::Some(variants) = blocks
+    .get(block_name)
+    .and_then(|b| b.get("enum"))
+    .and_then(|e| e.as_object())
+  {
+    return std::option::Option::Some(variants);
+  }
+  blocks
+    .values()
+    .filter_map(|parent| parent.get("blocks").and_then(|n| n.as_object()))
+    .find_map(|nested| {
+      nested
+        .get(block_name)
+        .and_then(|b| b.get("enum"))
+        .and_then(|e| e.as_object())
+    })
+}
+
+/// The PROTOCOL bundle's blocks.
+///
+/// The bundle name carries a version, so it is discovered by prefix rather
+/// than hardcoded — a version bump must not silently skip this test. But it
+/// is discovered by the `aph@` prefix rather than by extension alone,
+/// because `snapp/` holds more than one bundle: the guardrail vocabulary
+/// ships beside the protocol as `aph_guardrails@<version>.json`, and it has
+/// a different shape (classifiers, not `mod.*.blocks`).
+///
+/// An earlier form of this took the LAST `*.json` in sorted order. That was
+/// correct while exactly one bundle existed and silently wrong the moment a
+/// second one landed — `_` sorts after `@`, so the sibling won and every pin
+/// in this file began asking the wrong artifact. Selecting by prefix, and
+/// REFUSING on anything other than exactly one match, is what makes a new
+/// sibling a loud failure instead of a quiet re-target.
 fn snapp_blocks() -> serde_json::Map<String, serde_json::Value> {
   let dir = repo_root().join("snapp");
   let mut bundles: std::vec::Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
     .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", dir, e))
     .filter_map(|e| e.ok().map(|e| e.path()))
     .filter(|p| p.extension().and_then(|s| s.to_str()) == std::option::Option::Some("json"))
+    .filter(|p| {
+      p.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with("aph@"))
+        .unwrap_or(false)
+    })
     .collect();
   bundles.sort();
-  let bundle = bundles
-    .last()
-    .unwrap_or_else(|| std::panic!("no compiled Snapp bundle in {:?}", dir));
+  std::assert_eq!(
+    bundles.len(),
+    1,
+    "expected exactly one `aph@*.json` protocol bundle in {:?}, found {:?} — \
+     a second one means two artifacts claim to be the protocol Snapp, and \
+     these pins cannot silently choose between them",
+    dir,
+    bundles
+  );
+  let bundle = &bundles[0];
 
   let raw = std::fs::read_to_string(bundle)
     .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", bundle, e));
@@ -225,15 +311,63 @@ fn check_object(
   missing: &mut std::vec::Vec<String>,
   seen: &mut std::collections::BTreeSet<String>,
 ) {
-  let props = match blocks
-    .get(block_name)
-    .and_then(|b| b.get("props"))
-    .and_then(|p| p.as_object())
-  {
+  // An ENUM block is validated by MEMBERSHIP, not by props: the object's
+  // keys must be declared variants. A variant's own `items` are its shape,
+  // and are deliberately not walked further here — this pin is about the
+  // example corpus naming things the Snapp declares, and a variant name is
+  // the thing being named.
+  if let std::option::Option::Some(variants) = block_enum(&blocks, block_name) {
+    // An enum rides the wire INTERNALLY TAGGED: a `kind` discriminator
+    // naming the variant, plus that variant's own `items` as siblings. So
+    // the tag selects which shape the remaining keys are checked against —
+    // checking them against the variant NAMES instead would reject every
+    // payload field, which is the shape of a false alarm rather than a
+    // finding.
+    let tag = match json.get("kind").and_then(serde_json::Value::as_str) {
+      std::option::Option::Some(t) => t,
+      std::option::Option::None => {
+        missing.push(std::format!(
+          "{}: enum `{}` is written without a `kind` discriminator",
+          path, block_name
+        ));
+        return;
+      }
+    };
+    let variant = match variants.get(tag) {
+      std::option::Option::Some(v) => v,
+      std::option::Option::None => {
+        missing.push(std::format!(
+          "{}.kind: `{}` is not a declared variant of enum `{}`",
+          path, tag, block_name
+        ));
+        return;
+      }
+    };
+    seen.insert(std::format!("{}.{}", block_name, tag));
+    let items = variant
+      .get("items")
+      .and_then(serde_json::Value::as_object)
+      .cloned()
+      .unwrap_or_default();
+    for key in json.keys() {
+      if key == "kind" {
+        continue;
+      }
+      if !items.contains_key(key.as_str()) {
+        missing.push(std::format!(
+          "{}.{}: variant `{}` of enum `{}` declares no item `{}`",
+          path, key, tag, block_name, key
+        ));
+      }
+    }
+    return;
+  }
+
+  let props = match block_props(&blocks, block_name) {
     std::option::Option::Some(p) => p,
     std::option::Option::None => {
       missing.push(std::format!(
-        "{}: Snapp has no block `{}` with props",
+        "{}: Snapp has no block `{}` with props or variants",
         path, block_name
       ));
       return;
@@ -402,10 +536,7 @@ fn every_required_envelope_prop_is_exercised_by_an_example() {
 
   let mut unexercised: std::vec::Vec<String> = std::vec::Vec::new();
   for block_name in reachable {
-    let props = blocks
-      .get(block_name)
-      .and_then(|b| b.get("props"))
-      .and_then(|p| p.as_object())
+    let props = block_props(&blocks, block_name)
       .unwrap_or_else(|| std::panic!("Snapp has no block `{}`", block_name));
     for (prop_name, prop) in props {
       let optional = prop
@@ -493,16 +624,32 @@ fn wire_key_mapping_handles_the_documented_exceptions() {
 /// this returns the union and the callers below select their own members by
 /// name. Returning the union rather than guessing a split is deliberate: a
 /// split that guessed wrong would fail for the wrong reason.
-fn snapp_vocabulary_discriminants() -> std::collections::BTreeMap<String, u64> {
+/// One NAMED enum's members from the Snapp's `Vocabulary` block.
+///
+/// Asks for the enum BY NAME rather than merging every enum in the block.
+/// An earlier bundle shape flattened all five vocabularies into one map, so
+/// `Slack` and `Reply` shared a namespace at discriminant 0 and a ChannelKind
+/// lookup could be satisfied by a ContentClass member that happened to be
+/// spelled the same. Naming the enum makes each pin answer about its own
+/// vocabulary, which is what the tests below have always claimed to check.
+fn snapp_vocabulary_discriminants(enum_name: &str) -> std::collections::BTreeMap<String, u64> {
   let blocks = snapp_blocks();
   let vocabulary = blocks
     .get("Vocabulary")
     .and_then(serde_json::Value::as_object)
     .unwrap_or_else(|| std::panic!("the Snapp has no `Vocabulary` block"));
-  let variants = vocabulary
-    .get("enum")
+  let declared = vocabulary
+    .get("blocks")
     .and_then(serde_json::Value::as_object)
-    .unwrap_or_else(|| std::panic!("`Vocabulary` declares no `enum`"));
+    .unwrap_or_else(|| std::panic!("`Vocabulary` declares no nested `blocks`"));
+  let variants = declared
+    .get(enum_name)
+    .and_then(serde_json::Value::as_object)
+    .and_then(|body| body.get("enum"))
+    .and_then(serde_json::Value::as_object)
+    .unwrap_or_else(|| {
+      std::panic!("`Vocabulary` declares no `{}` enum", enum_name)
+    });
 
   let mut out = std::collections::BTreeMap::new();
   for (name, body) in variants {
@@ -534,7 +681,7 @@ fn the_snapp_and_the_reference_agree_on_the_channel_kind_vocabulary() {
   // Membership is compared, not discriminant VALUES: the Snapp assigns
   // positions across a flattened union, so the values are its business. What
   // must never diverge is WHICH MEMBERS EXIST.
-  let snapp = snapp_vocabulary_discriminants();
+  let snapp = snapp_vocabulary_discriminants("ChannelKind");
   let mut missing_from_snapp = std::vec::Vec::new();
   for kind in aph_core::ChannelKind::ALL {
     // The Snapp spells variants in PascalCase; the wire spelling is the
@@ -571,7 +718,7 @@ fn the_snapp_and_the_reference_agree_on_the_content_class_vocabulary() {
   // `DM` is this set's drift candidate — it is the one member whose wire
   // spelling is not PascalCase, so a naive transform yields `Dm` and the
   // populators part company on a value that still looks right.
-  let snapp = snapp_vocabulary_discriminants();
+  let snapp = snapp_vocabulary_discriminants("ContentClass");
   let mut missing_from_snapp = std::vec::Vec::new();
   for class in aph_core::ContentClass::ALL {
     // The Snapp spells this set exactly as the wire does EXCEPT `DM`, which

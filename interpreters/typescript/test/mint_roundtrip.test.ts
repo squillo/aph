@@ -30,7 +30,7 @@ import { serializeEnvelopeDocument } from '../src/serialize.js';
 import { ed25519DataIntegritySigner } from '../src/signers.js';
 import { verifyEnvelope } from '../src/verify.js';
 import { sha256 } from '../src/webcrypto.js';
-import type { DelegationMandate } from '../src/types.js';
+import type { ChannelKind, DelegationMandate } from '../src/types.js';
 import { RFC8032_TEST_2, RFC8032_TEST_3, ed25519SigningKey } from '../testkit/vectors.js';
 
 const NOW = '2026-06-01T12:00:00Z';
@@ -114,7 +114,7 @@ async function signers(): Promise<{
 
 async function mandateFor(options: {
   readonly principalDid: string;
-  readonly allowedChannels: string[];
+  readonly allowedChannels: ChannelKind[];
   readonly validFrom?: string;
   readonly validUntil?: string;
 }): Promise<DelegationMandate> {

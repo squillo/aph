@@ -84,6 +84,7 @@ mod blocks Vocabulary {
     Whatsapp,
     GoogleChat,
     Imessage,
+    Service,
   }
 ```
 
@@ -101,6 +102,7 @@ apply different policy to an unsolicited `New` message than to a `Reply`.
     Channel,
     BulkSend,
     Broadcast,
+    Mutation,
   }
 ```
 

@@ -266,4 +266,61 @@ mod tests {
       "an unknown mode string must error, never default to a mode"
     );
   }
+
+  #[test]
+  fn a_closed_set_value_this_build_does_not_define_is_refused_through_the_text_boundary() {
+    // WHY: §7.1.5 and §7.1.6 close the channel and content-class
+    // vocabularies, and `aph-core` now models them as closed TYPES — so an
+    // unrecognized value is a strict-parse refusal (§8.3 step 1) rather than
+    // a string that rides through. What this test exists for is the HOP: the
+    // refusal is produced deep inside `serde_json` as a custom error and this
+    // boundary stringifies it with `format!("{}", e)`, so nothing but a test
+    // says whether the offending value and the closed set are still in the
+    // text a JS caller reads. A message flattened to "invalid value" would
+    // still refuse and would still be useless.
+    //
+    // PINS, per field: the refusal happens; the offending VALUE survives the
+    // stringification; the closed SET survives, `google_chat` included, since
+    // that irregular spelling is the one a producer most plausibly got wrong;
+    // and the message claims NO `APH_E` code, because §8.3 step 1 is the layer
+    // below the taxonomy and a parse dressed as a protocol verdict would send
+    // a reader to inspect key material over a typo.
+    for (pointer, offending, member) in [
+      (
+        ["credentialSubject", "channel", "kind"],
+        "squillo",
+        "google_chat",
+      ),
+      (
+        ["credentialSubject", "communication", "contentClass"],
+        "Digest",
+        "BulkSend",
+      ),
+    ] {
+      let mut document: serde_json::Value =
+        serde_json::from_str(LEGACY_SLACK_REPLY).expect("the legacy envelope parses as JSON");
+      document[pointer[0]][pointer[1]][pointer[2]] =
+        serde_json::Value::String(std::string::String::from(offending));
+      let text = serde_json::to_string(&document).expect("the edited envelope serializes");
+      let err = crate::roundtrip_envelope_json(&text)
+        .expect_err("a value outside the closed set must be refused, never carried");
+      std::assert!(
+        err.contains(offending),
+        "the refusal must name the offending value `{}`, got: {}",
+        offending,
+        err
+      );
+      std::assert!(
+        err.contains("closed set") && err.contains(member),
+        "the refusal must name the closed set (including `{}`), got: {}",
+        member,
+        err
+      );
+      std::assert!(
+        !err.starts_with("APH_E"),
+        "a strict-parse refusal must not claim a protocol code, got: {}",
+        err
+      );
+    }
+  }
 }

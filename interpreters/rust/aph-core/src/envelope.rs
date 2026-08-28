@@ -242,12 +242,17 @@ pub enum ChannelKind {
   GoogleChat,
   /// Wire value `imessage`.
   Imessage,
+  /// Wire value `service` — a service endpoint an agent delivers a
+  /// state-changing act to (RFC 0002). The endpoint IS the end-delivery
+  /// medium, which is why this is a channel kind and not a name for the
+  /// agent-to-agent rail that carried it (§1.1.1).
+  Service,
 }
 
 impl ChannelKind {
   /// Every member of the closed set, in §7.1.5 order. The ONE enumerable
   /// other surfaces (docs, tests, bindings) derive from.
-  pub const ALL: [Self; 7] = [
+  pub const ALL: [Self; 8] = [
     Self::Slack,
     Self::Email,
     Self::Discord,
@@ -255,6 +260,7 @@ impl ChannelKind {
     Self::Whatsapp,
     Self::GoogleChat,
     Self::Imessage,
+    Self::Service,
   ];
 
   /// The exact wire spelling. Exhaustive on purpose: adding a channel kind
@@ -268,7 +274,22 @@ impl ChannelKind {
       Self::Whatsapp => "whatsapp",
       Self::GoogleChat => "google_chat",
       Self::Imessage => "imessage",
+      Self::Service => "service",
     }
+  }
+
+  /// The whole closed set, comma-joined, for the strict-parse refusal
+  /// message. DERIVED from [`Self::ALL`] rather than written out beside it:
+  /// a hand-maintained second copy of a closed vocabulary is precisely the
+  /// defect closing the set exists to prevent, and this message is read by
+  /// implementers deciding what to emit — it going stale would teach them
+  /// the wrong set.
+  fn labels_for_error() -> std::string::String {
+    Self::ALL
+      .iter()
+      .map(Self::label)
+      .collect::<std::vec::Vec<&'static str>>()
+      .join(", ")
   }
 }
 
@@ -297,9 +318,11 @@ impl std::str::FromStr for ChannelKind {
       "whatsapp" => std::result::Result::Ok(Self::Whatsapp),
       "google_chat" => std::result::Result::Ok(Self::GoogleChat),
       "imessage" => std::result::Result::Ok(Self::Imessage),
+      "service" => std::result::Result::Ok(Self::Service),
       other => std::result::Result::Err(std::format!(
-        "`{}` is not in the closed set {{slack, email, discord, teams, whatsapp, google_chat, imessage}}",
-        other
+        "`{}` is not in the closed set {{{}}}",
+        other,
+        Self::labels_for_error()
       )),
     }
   }
@@ -351,11 +374,16 @@ pub enum ContentClass {
   BulkSend,
   /// Wire value `Broadcast`.
   Broadcast,
+  /// Wire value `Mutation` — this act CHANGES STATE rather than carrying a
+  /// message (RFC 0002). It is required to match at both the mandate and
+  /// envelope layer (§6.2), so a notarized mutation is recorded as one
+  /// inside the signature.
+  Mutation,
 }
 
 impl ContentClass {
   /// Every member of the closed set, in §7.1.6 order.
-  pub const ALL: [Self; 7] = [
+  pub const ALL: [Self; 8] = [
     Self::Reply,
     Self::New,
     Self::Mention,
@@ -363,6 +391,7 @@ impl ContentClass {
     Self::Channel,
     Self::BulkSend,
     Self::Broadcast,
+    Self::Mutation,
   ];
 
   /// The exact wire spelling. Exhaustive on purpose.
@@ -375,7 +404,22 @@ impl ContentClass {
       Self::Channel => "Channel",
       Self::BulkSend => "BulkSend",
       Self::Broadcast => "Broadcast",
+      Self::Mutation => "Mutation",
     }
+  }
+
+  /// The whole closed set, comma-joined, for the strict-parse refusal
+  /// message. DERIVED from [`Self::ALL`] rather than written out beside it:
+  /// a hand-maintained second copy of a closed vocabulary is precisely the
+  /// defect closing the set exists to prevent, and this message is read by
+  /// implementers deciding what to emit — it going stale would teach them
+  /// the wrong set.
+  fn labels_for_error() -> std::string::String {
+    Self::ALL
+      .iter()
+      .map(Self::label)
+      .collect::<std::vec::Vec<&'static str>>()
+      .join(", ")
   }
 }
 
@@ -399,9 +443,11 @@ impl std::str::FromStr for ContentClass {
       "Channel" => std::result::Result::Ok(Self::Channel),
       "BulkSend" => std::result::Result::Ok(Self::BulkSend),
       "Broadcast" => std::result::Result::Ok(Self::Broadcast),
+      "Mutation" => std::result::Result::Ok(Self::Mutation),
       other => std::result::Result::Err(std::format!(
-        "`{}` is not in the closed set {{Reply, New, Mention, DM, Channel, BulkSend, Broadcast}}",
-        other
+        "`{}` is not in the closed set {{{}}}",
+        other,
+        Self::labels_for_error()
       )),
     }
   }
@@ -1805,7 +1851,7 @@ mod tests {
 mod closed_vocabulary_tests {
   // These tests exist because the closed sets of §7.1.5 and §7.1.6 lived
   // only in prose while the wire fields were bare `String`s: this crate
-  // accepted `kind: "service"` while the independent TypeScript
+  // accepted an out-of-set `kind` while the independent TypeScript
   // implementation refused it — two conformant-claiming verifiers reaching
   // opposite verdicts on the same bytes. Each test pins one half of the
   // repair.
@@ -1842,12 +1888,15 @@ mod closed_vocabulary_tests {
 
   #[test]
   fn an_unrecognized_channel_kind_is_refused_and_names_the_closed_set() {
-    // The divergence pin. `service` is the exact value the first service-act
-    // draft wanted to emit, and it must be REFUSED until the specification
-    // admits it — the TypeScript implementation already refuses it, and this
-    // crate silently accepted it. The message must name the closed set so an
-    // operator reading a log learns what WOULD have been accepted.
-    let err = "service"
+    // The divergence pin. This test was written against `service`, which
+    // was then the exact value a draft wanted to emit and the reference
+    // silently accepted. `service` has since been ADMITTED — the RFC's
+    // stated prerequisite was this closure landing, and it did — so the pin
+    // now uses a value that names no medium and never will. The property
+    // under test never changed: an unrecognized value is refused, and the
+    // message names the closed set so an operator reading a log learns what
+    // WOULD have been accepted.
+    let err = "carrier_pigeon"
       .parse::<super::ChannelKind>()
       .expect_err("a value outside the closed set must be refused");
     std::assert!(err.contains("closed set"), "error must name the closed set: {err}");
@@ -1856,22 +1905,23 @@ mod closed_vocabulary_tests {
 
   #[test]
   fn an_unrecognized_content_class_is_refused() {
-    // Twin of the channel-kind refusal: `Mutation` is the first value a
-    // service-act envelope would want, and it stays refused until the
-    // specification admits it.
-    std::assert!("Mutation".parse::<super::ContentClass>().is_err());
+    // Twin of the channel-kind refusal, and it graduated the same way:
+    // `Mutation` was this test's subject until the specification admitted
+    // it. The replacement is a plausible-looking class that is not a member,
+    // which is the case an operator actually hits.
+    std::assert!("Digest".parse::<super::ContentClass>().is_err());
     std::assert!("reply".parse::<super::ContentClass>().is_err(), "case matters: wire is `Reply`");
   }
 
   #[test]
-  fn the_closed_sets_hold_exactly_seven_members_each() {
+  fn the_closed_sets_hold_exactly_eight_members_each() {
     // A deliberate census tripwire, not bookkeeping: adding a channel kind
     // or content class is a NORMATIVE event with a dozen documentation and
     // fixture surfaces attached. This test failing is the checklist firing.
     // When the service-act revision lands, update this count IN THE SAME
     // CHANGE as the spec tables, the examples inventory, and the bindings.
-    std::assert_eq!(super::ChannelKind::ALL.len(), 7);
-    std::assert_eq!(super::ContentClass::ALL.len(), 7);
+    std::assert_eq!(super::ChannelKind::ALL.len(), 8);
+    std::assert_eq!(super::ContentClass::ALL.len(), 8);
   }
 }
 
@@ -1903,12 +1953,12 @@ mod closed_vocabulary_deserialization_tests {
 
   #[test]
   fn an_envelope_naming_an_unrecognized_channel_is_refused_at_parse() {
-    // `service` is the live case: the service-act revision wants to emit it,
-    // and until the specification admits it a verifier must refuse rather
-    // than silently verify an act it cannot describe. Before this swap the
-    // reference implementation ACCEPTED this document while the independent
-    // TypeScript implementation refused it.
-    let doc = golden().replace("\"kind\": \"slack\"", "\"kind\": \"service\"");
+    // Written when `service` was the live refusal case; it is now an
+    // admitted kind, so the pin moved to a value outside the set. What it
+    // proves is unchanged and is the whole point of closing the field: the
+    // refusal happens AT PARSE, before any verification step runs, so a
+    // verifier cannot silently verify an act it cannot describe.
+    let doc = golden().replace("\"kind\": \"slack\"", "\"kind\": \"carrier_pigeon\"");
     let parsed: std::result::Result<super::NotarizationEnvelope, _> =
       serde_json::from_str(&doc);
     let err = parsed.expect_err("an unrecognized channel kind must be refused at parse");
@@ -1918,7 +1968,7 @@ mod closed_vocabulary_deserialization_tests {
 
   #[test]
   fn an_envelope_naming_an_unrecognized_content_class_is_refused_at_parse() {
-    let doc = golden().replace("\"contentClass\": \"Reply\"", "\"contentClass\": \"Mutation\"");
+    let doc = golden().replace("\"contentClass\": \"Reply\"", "\"contentClass\": \"Digest\"");
     let parsed: std::result::Result<super::NotarizationEnvelope, _> =
       serde_json::from_str(&doc);
     std::assert!(parsed.is_err(), "an unrecognized content class must be refused at parse");

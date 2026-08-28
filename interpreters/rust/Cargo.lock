@@ -32,6 +32,7 @@ version = "0.1.0-alpha.1"
 dependencies = [
  "aph-conformance",
  "aph-core",
+ "serde",
  "serde_json",
 ]
 

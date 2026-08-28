@@ -257,6 +257,76 @@ test('an unknown member NESTED inside credentialSubject is refused too', () => {
   );
 });
 
+test('§7.1.5 — a channel kind outside the closed set is refused, and the refusal names it', () => {
+  // WHY: §7.1.5 closes the channel vocabulary, and a verifier that admitted a
+  // word it has never seen would carry an authorization it cannot evaluate all
+  // the way to a delivery decision. This is also the case that once split the
+  // two implementations: the reference took `kind` as a bare string and passed
+  // what this parser refused, so the same bytes got opposite verdicts.
+  //
+  // PINS: the refusal is a strict-parse failure and carries NO §11 code (§11
+  // has none for a parse); the JSON PATH names the offending member; and the
+  // message carries both the offending VALUE and the closed set, which is what
+  // makes it actionable to the producer who has to fix it.
+  const value = goldenValue();
+  const channel = (value.credentialSubject as JsonObject).channel as JsonObject;
+  channel.kind = 'squillo';
+  assert.throws(
+    () => parseEnvelope(JSON.stringify(value)),
+    (error: unknown) =>
+      error instanceof AphParseError &&
+      error.path === '$.credentialSubject.channel.kind' &&
+      error.message.includes('"squillo"') &&
+      error.message.includes('closed set') &&
+      error.message.includes('google_chat'),
+  );
+});
+
+test('§7.1.6 — a content class outside the closed set is refused, and the refusal names it', () => {
+  // WHY: the other half of the same repair. §7.1.6 closes the content-class
+  // vocabulary, and it lived in prose while both implementations admitted any
+  // string; a class no verifier defines is exactly how a producer routes past a
+  // check keyed on one. PINS the same three facts as the channel case, on the
+  // sibling member, so a fix applied to one field and not the other is caught.
+  const value = goldenValue();
+  const communication = (value.credentialSubject as JsonObject).communication as JsonObject;
+  communication.contentClass = 'Digest';
+  assert.throws(
+    () => parseEnvelope(JSON.stringify(value)),
+    (error: unknown) =>
+      error instanceof AphParseError &&
+      error.path === '$.credentialSubject.communication.contentClass' &&
+      error.message.includes('"Digest"') &&
+      error.message.includes('closed set'),
+  );
+});
+
+test('§6.1 — an allowedChannels entry outside the closed set is refused at the READ', () => {
+  // WHY: this member is the one place the closed channel set could be admitted
+  // through a side door. §6.1's table spells it "array of strings", so this
+  // parser took it as one — and an entry naming a channel nothing defines then
+  // survived the parse and died at §7.1.7.1 step 4's membership test, which
+  // answers `false`. That is the SAME answer a channel legitimately out of
+  // scope produces: one refusal, two causes, and APH_E005 tells the reader to
+  // widen a grant that is in fact corrupt.
+  //
+  // PINS: the refusal happens at the parse, before any verdict is computed; the
+  // path names the offending ENTRY by index, not just the array; and the
+  // message carries the value and the set. Refusing here is what keeps the
+  // corrupt grant and the honest denial two different events.
+  const value = goldenValue();
+  const mandate = policyOfValue(value).delegationMandate as JsonObject;
+  mandate.allowedChannels = ['slack', 'squillo'];
+  assert.throws(
+    () => parseEnvelope(JSON.stringify(value)),
+    (error: unknown) =>
+      error instanceof AphParseError &&
+      error.path === '$.credentialSubject.policy.delegationMandate.allowedChannels[1]' &&
+      error.message.includes('"squillo"') &&
+      error.message.includes('closed set'),
+  );
+});
+
 test('§7.4 recipientAddressing stays OPAQUE — a new channel field is not a protocol break', () => {
   const value = goldenValue();
   const channel = (value.credentialSubject as JsonObject).channel as JsonObject;

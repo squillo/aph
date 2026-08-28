@@ -124,6 +124,37 @@ function closedEnum<T extends string>(
   return value as T;
 }
 
+/**
+ * The array form of `closedEnum`, for a member whose ENTRIES are each drawn
+ * from a closed set.
+ *
+ * Kept separate from `stringArray` because the two assert different things:
+ * one is a shape, this is a VOCABULARY. A closed-set array checked only for
+ * shape survives the parse and fails later, at the membership test that
+ * consumes it — and there a value no implementation defines and a value that is
+ * simply out of scope produce the identical answer, so a corrupt grant is
+ * reported as an ordinary scope denial and whoever reads the refusal is sent to
+ * fix the wrong thing. Refusing at the READ keeps those two events apart, and
+ * the index in the path names which entry did it.
+ */
+function closedEnumArray<T extends string>(
+  record: Record<string, unknown>,
+  path: string,
+  key: string,
+  allowed: readonly T[],
+): T[] {
+  const values = stringArray(record, path, key);
+  values.forEach((value, index) => {
+    if (!(allowed as readonly string[]).includes(value)) {
+      throw new AphParseError(
+        `${path}.${key}[${index}]`,
+        `"${value}" is not in the closed set {${allowed.join(', ')}}`,
+      );
+    }
+  });
+  return values as T[];
+}
+
 const LOWERCASE_SHA256_HEX = /^[0-9a-f]{64}$/;
 
 function parseHumanPrincipal(value: unknown, path: string): void {
@@ -192,7 +223,15 @@ export function parseDelegationMandate(value: unknown, path: string): void {
   str(record, path, 'id');
   str(record, path, 'humanPrincipalDid');
   str(record, path, 'agentDid');
-  const channels = stringArray(record, path, 'allowedChannels');
+  // §6.1's field table spells this "array of strings" and its column describes
+  // the strings as CHANNEL KINDS, which §7.1.5 closes. The set is what governs:
+  // §7.1.7.1 step 4 asks whether `channel.kind` — itself closed — appears here,
+  // so an entry outside the set can never match anything, and admitting one
+  // would leave a grant that reads as authority while conveying none. §6.3.3.5
+  // states the general rule this is an instance of: an unrecognized member of a
+  // closed set is a failure, or a producer disables a check on any verifier by
+  // writing a word that verifier has never seen.
+  const channels = closedEnumArray(record, path, 'allowedChannels', CHANNEL_KINDS);
   if (channels.length === 0) {
     throw new AphParseError(`${path}.allowedChannels`, '§6.1 requires at least one entry');
   }

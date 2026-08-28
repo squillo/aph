@@ -2,12 +2,12 @@ package aph
 
 // The two protocol codes the four operations in this package can produce.
 //
-// The taxonomy is a closed set of fifteen (APH_E001–APH_E015); these two are
+// The taxonomy is a closed set of sixteen (APH_E001–APH_E016); these two are
 // the only ones REACHABLE from a boundary that parses, re-emits, checks proof
-// STRUCTURE and gates the declared mode. The other thirteen arise on signature,
-// timestamp, body-hash, discovery and revocation paths, none of which this
-// binding exposes — so naming them here would advertise refusals no call can
-// return.
+// STRUCTURE and gates the declared mode. The other fourteen arise on signature,
+// timestamp, body-hash, discovery, revocation and mandate-rooting paths, none of
+// which this binding exposes — so naming them here would advertise refusals no
+// call can return.
 //
 // The value is the wire string and the constant is Go sugar over it: what a
 // caller matches is the code the protocol defines, spelled identically in every

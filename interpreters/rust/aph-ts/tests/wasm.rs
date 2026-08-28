@@ -49,3 +49,53 @@ fn the_golden_crosses_the_real_wasm_boundary_intact() {
   aph_ts::require_attestation_mode(&parsed, "PrincipalSigned")
     .expect("the no-downgrade gate must admit the mode the structure proves");
 }
+
+#[wasm_bindgen_test::wasm_bindgen_test]
+fn a_closed_set_refusal_crosses_the_real_wasm_boundary_with_its_message_intact() {
+  // WHY: this suite's whole reason is the half the native tests cannot reach —
+  // the `#[wasm_bindgen]` exports and the `JsValue` ERROR path — and until now
+  // it exercised only the admitting half, so the error path it names was never
+  // once executed. §7.1.5 is the case that makes that gap matter: an
+  // unrecognized channel kind is a strict-parse refusal (§8.3 step 1) whose
+  // message is built deep inside `serde_json`, stringified, and only then
+  // turned into a `JsValue` — three hops, none of them observed from Rust.
+  //
+  // PINS: the exported entry point REFUSES rather than carrying the value
+  // through; the thrown value is a JS STRING a caller can read (not an opaque
+  // handle); the offending value and the closed set both survive all three
+  // hops, `google_chat` included; and the message claims no `APH_E` code,
+  // because §8.3 step 1 is the layer below the taxonomy.
+  //
+  // The refused document is derived from the published golden by a TEXT edit,
+  // in view of the reader, and the exactly-once check keeps that derivation
+  // honest: if the corpus is reformatted the test fails at the edit instead of
+  // silently asserting something about an unmodified envelope.
+  const ANCHOR: &str = "\"kind\": \"slack\",";
+  assert_eq!(
+    PRINCIPAL_SIGNED_GOLDEN.matches(ANCHOR).count(),
+    1,
+    "the derivation must edit exactly one place in the published golden"
+  );
+  let refused = PRINCIPAL_SIGNED_GOLDEN.replace(ANCHOR, "\"kind\": \"squillo\",");
+
+  let err = aph_ts::parse_envelope_json(&refused)
+    .expect_err("a channel kind outside the closed set must be refused, never carried");
+  let message = err
+    .as_string()
+    .expect("the refusal must cross the boundary as a string a JS caller can read");
+  assert!(
+    message.contains("squillo"),
+    "the refusal must name the offending value, got: {}",
+    message
+  );
+  assert!(
+    message.contains("closed set") && message.contains("google_chat"),
+    "the refusal must name the closed set, got: {}",
+    message
+  );
+  assert!(
+    !message.starts_with("APH_E"),
+    "a strict-parse refusal must not claim a protocol code, got: {}",
+    message
+  );
+}

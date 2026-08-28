@@ -378,3 +378,84 @@ func TestAShapeRefusalCarriesNoProtocolCode(t *testing.T) {
 		t.Errorf("a shape refusal must not lead with a protocol code, got: %s", refusal.Message)
 	}
 }
+
+func TestAClosedSetValueThisBuildDoesNotDefineIsRefused(t *testing.T) {
+	// WHY: §7.1.5 and §7.1.6 close the channel and content-class vocabularies,
+	// and aph-core models them as closed TYPES — so an unrecognized value is a
+	// strict-parse refusal (§8.3 step 1) rather than a string that rides through
+	// to a delivery decision no verifier can evaluate. What needs a test HERE is
+	// the ABI hop: the refusal is a serde_json custom error, stringified inside
+	// the module and copied out of linear memory as a status-1 record, and go
+	// test is the only gate that ever runs this ABI — so nothing else can say
+	// whether the offending value and the closed set are still in what a Go
+	// caller reads. A message flattened to "invalid value" would still refuse and
+	// would still be useless to the producer who has to fix it.
+	//
+	// PINS, per field: the refusal reaches a caller as *aph.Error; its Code is
+	// EMPTY, because §8.3 step 1 is the layer below the taxonomy and a parse
+	// dressed as a protocol verdict sends the reader to inspect key material over
+	// a typo; the offending VALUE survives the boundary; and the closed SET
+	// survives, including the irregular spellings a producer most plausibly gets
+	// wrong (google_chat is snake_case among single words, BulkSend is camel
+	// among short names).
+	ctx := context.Background()
+	runtime := newTestRuntime(t)
+
+	closedSets := []struct {
+		name string
+		// anchor is the published line this derivation replaces, exactly once.
+		anchor string
+		// replacement carries the value no build defines.
+		replacement string
+		// offending is that value, as the refusal must name it.
+		offending string
+		// member is one member of the set the refusal must still enumerate.
+		member string
+	}{
+		{
+			name:        "an unrecognized channel kind (§7.1.5)",
+			anchor:      `"kind": "slack",`,
+			replacement: `"kind": "squillo",`,
+			offending:   "squillo",
+			member:      "google_chat",
+		},
+		{
+			name:        "an unrecognized content class (§7.1.6)",
+			anchor:      `"contentClass": "Reply",`,
+			replacement: `"contentClass": "Digest",`,
+			offending:   "Digest",
+			member:      "BulkSend",
+		},
+	}
+
+	for _, closedSet := range closedSets {
+		t.Run(closedSet.name, func(t *testing.T) {
+			document := substituteOnce(t, legacySlackReply(t), closedSet.anchor, closedSet.replacement)
+
+			_, err := runtime.ParseEnvelopeJSON(ctx, document)
+			if err == nil {
+				t.Fatal("a value outside the closed set must be refused, never carried")
+			}
+			var refusal *Error
+			if !errors.As(err, &refusal) {
+				t.Fatalf("the refusal must reach a caller as *aph.Error, got %T: %v", err, err)
+			}
+			if refusal.Code != "" {
+				t.Errorf("a strict-parse refusal must claim no protocol code, got %q", refusal.Code)
+			}
+			if !strings.Contains(refusal.Message, closedSet.offending) {
+				t.Errorf(
+					"the refusal must name the offending value %q, got: %s",
+					closedSet.offending, refusal.Message,
+				)
+			}
+			if !strings.Contains(refusal.Message, "closed set") ||
+				!strings.Contains(refusal.Message, closedSet.member) {
+				t.Errorf(
+					"the refusal must name the closed set (including %q), got: %s",
+					closedSet.member, refusal.Message,
+				)
+			}
+		})
+	}
+}
