@@ -96,6 +96,72 @@ a publisher serves the compiled bundle at an HTTPS origin it controls, and the
 identity that vouches for it is a DID resolvable by the mechanisms §8.4
 already defines.
 
+### 2a. Signed, immutable, and temporal are three different properties
+
+They are routinely conflated, and a design that gets one and believes it has
+all three is the common failure. Naming them separately is most of the work:
+
+| Property | What it answers | What provides it |
+|---|---|---|
+| **Signed** | Who says this is their vocabulary? | A signature over the bundle, by an identity §8.4 resolves |
+| **Immutable** | Am I reading the same bytes the reference meant? | The content digest — the bundle already carries `integrity: sha256-…` |
+| **Temporal** | What did this publisher say, and when, and have they shown everyone the same thing? | An append-only log with inclusion proofs |
+
+**A signature is not immutability.** It proves who authored the bytes in front
+of you. It does nothing to stop the publisher signing a different vocabulary
+tomorrow and serving that at the same URL under the same version. A consumer
+holding only a signature cannot tell the two apart.
+
+**A digest is not a history.** Pinning by digest makes *your* reference stable
+— you either get the bytes you cited or a refusal — but it says nothing about
+what the publisher showed anyone else, or what they showed you last week.
+
+**The property worth the most here is the one with no common name:
+non-equivocation.** A publisher must not be able to show one vocabulary to you
+and a different one to your counterparty under the same name and version. That
+is precisely the guarantee an exchange between two parties needs, because the
+whole point is that both resolve the same third party. A signature does not
+provide it. A digest provides it only if both parties independently obtained
+the same digest — which is the thing an append-only log makes checkable.
+
+### 2b. The three layers, and only the first is required
+
+**Layer 1 — sign the bundle and pin the digest. Required.** Both compiled
+bundles already carry `integrity: sha256-…`. A publisher signs a small
+manifest binding `{name, version, integrity}` with a key §8.4 already
+discovers; consumers cite the digest. The bytes may then be served, mirrored,
+or cached anywhere, because any copy is verifiable. **Buys:** authenticity and
+integrity. **Does not buy:** any history.
+
+**Layer 2 — record the signed digest in an append-only transparency log.
+Recommended, and this is the answer to "immutable temporal".** A public log
+with inclusion proofs gives a timestamped, non-retractable record that a
+vocabulary existed under an identity at a time, and makes equivocation
+detectable rather than merely unlikely. This is a solved problem with running
+public infrastructure; a project should use one rather than build one, and the
+reasoning is the same reasoning that runs through this document. **A log we
+operate is a log we could rewrite, and the entire premise here is a third
+party neither counterparty controls.** Publishing to a log we own would
+reproduce, one layer down, exactly the problem publishing was meant to solve.
+
+**Layer 3 — content-addressed distribution. Optional.** Where the address IS
+the digest, immutability is structural rather than checked. Useful if
+distribution becomes a problem; it adds availability dependencies and no
+integrity the digest does not already give.
+
+**One cheap reuse worth considering.** §8.4.5 already publishes key material
+at an underscored DNS name. A parallel name could publish a vocabulary's
+current digest — small enough for a TXT record, and it inherits DNSSEC where
+the zone is signed. That yields a second, independent path to the same digest,
+which is the shape §8.4.6's multi-mechanism resolution already assumes, and it
+raises the cost of equivocation without any new infrastructure.
+
+**What none of it buys, stated because it is the tempting inference:** none of
+this makes a vocabulary correct, or its accuracy claims measured, or its
+labels well-chosen. It establishes that you are reading the bytes a named
+publisher published at a known time. That is necessary and it is not
+sufficient, and the distinction belongs anywhere this is described.
+
 ### 3. The reference is a logical identifier plus a digest — never a path
 
 An envelope references a vocabulary by **name, version, and content digest**,
