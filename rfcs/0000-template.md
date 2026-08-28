@@ -1,6 +1,8 @@
 # RFC NNNN — Title
 
 - **Status:** Draft | Accepted | Rejected | Superseded by NNNN
+- **Author:** who proposed it — the person, not the org. A design has a
+  someone who thought of it, and the record should say who.
 - **Issue:** link to the RFC issue where this was discussed
 - **Spec sections touched:** the § list, or "none — non-normative"
 

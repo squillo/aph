@@ -3,6 +3,7 @@
 *Meaning as a resolvable third party.*
 
 - **Status:** Draft
+- **Author:** Scott Wyatt
 - **Issue:** [#3](https://github.com/squillo/aph/issues/3) — the first RFC in
   this directory with one, per the lifecycle in `rfcs/README.md`.
 - **Spec sections touched:** none yet — design only. It would touch §7.1
