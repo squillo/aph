@@ -56,12 +56,20 @@ fn snapp_blocks() -> serde_json::Map<String, serde_json::Value> {
 }
 
 /// Returns the sorted list of published example envelopes.
+///
+/// The corpus INVENTORY (`manifest.json`) shares the directory and is skipped
+/// by name: it is the one file in `examples/*.json` that is not an envelope,
+/// so every key-level check below would report its keys as envelope props with
+/// no N Lang home. Enumerating a directory means owning what else lives there.
 fn example_files() -> std::vec::Vec<std::path::PathBuf> {
   let dir = repo_root().join("examples");
   let mut files: std::vec::Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
     .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", dir, e))
     .filter_map(|e| e.ok().map(|e| e.path()))
-    .filter(|p| p.extension().and_then(|s| s.to_str()) == std::option::Option::Some("json"))
+    .filter(|p| {
+      p.extension().and_then(|s| s.to_str()) == std::option::Option::Some("json")
+        && p.file_name().and_then(|s| s.to_str()) != std::option::Option::Some("manifest.json")
+    })
     .collect();
   files.sort();
   files

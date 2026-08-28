@@ -376,4 +376,167 @@ mod tests {
       );
     });
   }
+
+  /// The published corpus directory, resolved at RUNTIME.
+  ///
+  /// This crate sits at `interpreters/rust/aph-py`, so the examples are three
+  /// levels up from the manifest directory — one level shallower than the
+  /// `include_str!` paths above, which resolve relative to this SOURCE FILE
+  /// rather than to the crate root.
+  fn examples_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
+  }
+
+  /// The corpus INVENTORY, which is not itself a vector — see the test below.
+  const MANIFEST_FILE: &str = "manifest.json";
+
+  /// Every top-level `*.json` in the corpus, enumerated from disk and sorted,
+  /// with the inventory itself skipped by name.
+  fn example_json_names() -> std::collections::BTreeSet<std::string::String> {
+    let dir = examples_dir();
+    let entries = std::fs::read_dir(&dir)
+      .unwrap_or_else(|error| std::panic!("could not read {}: {}", dir.display(), error));
+    let mut names: std::collections::BTreeSet<std::string::String> =
+      std::collections::BTreeSet::new();
+    for entry in entries {
+      let entry =
+        entry.unwrap_or_else(|error| std::panic!("could not read a corpus entry: {error}"));
+      let path = entry.path();
+      if path.extension().and_then(std::ffi::OsStr::to_str)
+        != std::option::Option::Some("json")
+      {
+        continue;
+      }
+      let name = path
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or_else(|| std::panic!("a corpus path has no file name: {}", path.display()))
+        .to_string();
+      if name == MANIFEST_FILE {
+        continue;
+      }
+      names.insert(name);
+    }
+    names
+  }
+
+  #[test]
+  fn the_corpus_on_disk_is_exactly_the_corpus_the_manifest_claims() {
+    // WHY: the two fixtures above are embedded at COMPILE TIME, which is right
+    // for a deep test — the bytes under assertion are the bytes the repository
+    // publishes, welded in — and wrong as the crate's only view of the corpus.
+    // `include_str!` names two files and can never see a third, so a
+    // vocabulary change could land in `examples/` and this crate would compile
+    // and pass having never opened it. A count would not have helped either: a
+    // floor of "at least twelve" passes forever, and swapping one file for
+    // another leaves a count unmoved.
+    //
+    // PINS: SET EQUALITY in BOTH directions, read at RUNTIME, between the
+    // conformance list in `examples/manifest.json` and the top-level `*.json`
+    // files on disk. A file on disk with no manifest entry fails and names
+    // itself — the direction that catches a vector nobody classified. A
+    // manifest entry with no file fails too, which catches a deletion or a
+    // rename that a one-directional check reads as "fewer files, still above
+    // the floor". Also pins that the two embedded fixtures are members of that
+    // declared set, so the compile-time names and the runtime inventory cannot
+    // drift apart.
+    let manifest_path = examples_dir().join(MANIFEST_FILE);
+    let raw = std::fs::read_to_string(&manifest_path).unwrap_or_else(|error| {
+      std::panic!(
+        "could not read the corpus manifest {}: {}",
+        manifest_path.display(),
+        error
+      )
+    });
+    let manifest: serde_json::Value = serde_json::from_str(&raw)
+      .unwrap_or_else(|error| std::panic!("the corpus manifest is not valid JSON: {error}"));
+    let claimed: std::collections::BTreeSet<std::string::String> = manifest
+      .get("conformance")
+      .and_then(serde_json::Value::as_array)
+      .unwrap_or_else(|| std::panic!("the corpus manifest has no `conformance` array"))
+      .iter()
+      .map(|entry| {
+        entry
+          .as_str()
+          .unwrap_or_else(|| std::panic!("a `conformance` entry is not a string"))
+          .to_string()
+      })
+      .collect();
+    // An empty inventory would make every comparison below pass by comparing
+    // nothing against nothing, which is the failure mode this test exists to
+    // end rather than reproduce.
+    std::assert!(
+      !claimed.is_empty(),
+      "the corpus manifest claims no conformance files"
+    );
+
+    let on_disk = example_json_names();
+    let undeclared: std::vec::Vec<&std::string::String> =
+      on_disk.difference(&claimed).collect();
+    std::assert!(
+      undeclared.is_empty(),
+      "these files are in {} with no entry in {}: {:?}",
+      examples_dir().display(),
+      MANIFEST_FILE,
+      undeclared
+    );
+    let missing: std::vec::Vec<&std::string::String> = claimed.difference(&on_disk).collect();
+    std::assert!(
+      missing.is_empty(),
+      "{} claims these files that are not on disk: {:?}",
+      MANIFEST_FILE,
+      missing
+    );
+
+    for embedded in [
+      "principal_signed_envelope.json",
+      "slack_reply_envelope.json",
+    ] {
+      std::assert!(
+        claimed.contains(embedded),
+        "{embedded} is embedded by name in this crate and is not in the conformance manifest"
+      );
+    }
+  }
+
+  #[test]
+  fn every_excluded_corpus_file_is_on_disk_and_says_why_it_is_excluded() {
+    // WHY: the excluded list is the half of the inventory that rots quietly. A
+    // conformance claim that silently covered a deliberately non-conformant
+    // document would be false, and an exclusion naming a file nobody can find
+    // any more is an exclusion for something that stopped existing.
+    //
+    // PINS: every excluded path resolves on disk, and every one carries a
+    // non-empty reason — an exclusion with no stated reason is one the next
+    // reader cannot tell from an oversight.
+    let raw = std::fs::read_to_string(examples_dir().join(MANIFEST_FILE))
+      .unwrap_or_else(|error| std::panic!("could not read the corpus manifest: {error}"));
+    let manifest: serde_json::Value = serde_json::from_str(&raw)
+      .unwrap_or_else(|error| std::panic!("the corpus manifest is not valid JSON: {error}"));
+    let excluded = manifest
+      .get("excluded")
+      .and_then(serde_json::Value::as_array)
+      .unwrap_or_else(|| std::panic!("the corpus manifest has no `excluded` array"));
+    for entry in excluded {
+      let path = entry
+        .get("path")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_else(|| std::panic!("an `excluded` entry carries no `path`"));
+      let reason = entry
+        .get("reason")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_else(|| std::panic!("{path} is excluded with no `reason`"));
+      std::assert!(
+        !reason.trim().is_empty(),
+        "{path} is excluded with an empty reason"
+      );
+      let resolved = examples_dir().join(path);
+      std::assert!(
+        resolved.exists(),
+        "{path} is excluded in {} and is not on disk at {}",
+        MANIFEST_FILE,
+        resolved.display()
+      );
+    }
+  }
 }

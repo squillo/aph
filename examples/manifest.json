@@ -1,0 +1,34 @@
+{
+  "conformance": [
+    "detached_jws_envelope.json",
+    "discord_dm_envelope.json",
+    "email_reply_envelope.json",
+    "es256_signed_envelope.json",
+    "google_chat_envelope.json",
+    "imessage_envelope.json",
+    "principal_signed_envelope.json",
+    "slack_new_with_extensions_envelope.json",
+    "slack_reply_envelope.json",
+    "teams_channel_envelope.json",
+    "ts_minted_envelope.json",
+    "whatsapp_envelope.json"
+  ],
+  "excluded": [
+    {
+      "path": "a2a-database-change/a2a-message-send.json",
+      "reason": "An A2A JSON-RPC transport request that CARRIES an envelope in its message metadata; it is not itself an envelope."
+    },
+    {
+      "path": "a2a-database-change/agent-card.json",
+      "reason": "An A2A AgentCard declaring the notarization extension; it is not an envelope and has no proof."
+    },
+    {
+      "path": "a2a-database-change/envelope.json",
+      "reason": "Illustrative draft only: two fields carry PLACEHOLDER_NOT_CONFORMANT_SEE_RFC_0002 and the proof is a placeholder string, not a signature."
+    },
+    {
+      "path": "a2a-database-change/mutation-body.json",
+      "reason": "The message body an envelope commits to by hash, not an envelope."
+    }
+  ]
+}

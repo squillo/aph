@@ -29,11 +29,39 @@ jobs:
             jq empty "$f"
             count=$((count + 1))
           done < <(find examples -name '*.json' -type f | sort)
-          if [ "$count" -lt 7 ]; then
-            echo "Expected at least 7 example JSON files, found $count." >&2
+          echo "Parsed $count JSON files under examples/."
+
+      - name: Every example is classified by the manifest, and every classification exists
+        run: |
+          set -e
+          # WHY THIS REPLACED A FLOOR. The check above used to end with
+          # `[ "$count" -lt 7 ]` — a floor of seven against sixteen real files,
+          # which could not fail for any reachable state of the tree. A floor
+          # cannot see a vector ADDED and never classified, and cannot see one
+          # file swapped for another, because neither moves the count.
+          #
+          # examples/manifest.json is the ONE inventory: `conformance` lists the
+          # vectors every implementation must admit, `excluded` lists files that
+          # live here for other reasons (an A2A transport request, an AgentCard,
+          # a hashed body, a deliberately non-conformant illustration) with the
+          # reason stated per entry. Set equality in BOTH directions is what
+          # makes adding a vector a deliberate two-file change: a file nobody
+          # classified fails, and a classification whose file vanished fails.
+          #
+          # Every binding's own suite performs this same comparison in its own
+          # language; this job is the one that runs on a docs-only commit, when
+          # none of the language workflows are scheduled at all.
+          jq empty examples/manifest.json
+          jq -r '.conformance[], (.excluded[] | .path)' examples/manifest.json | sort > /tmp/claimed.txt
+          find examples -name '*.json' -type f ! -name manifest.json \
+            | sed 's|^examples/||' | sort > /tmp/on_disk.txt
+
+          if ! diff -u /tmp/claimed.txt /tmp/on_disk.txt > /tmp/corpus.diff; then
+            echo "::error::examples/manifest.json and the files on disk disagree — lines starting '-' are claimed but absent, lines starting '+' are present but unclassified"
+            cat /tmp/corpus.diff >&2
             exit 1
           fi
-          echo "Validated $count JSON example files."
+          echo "Manifest and corpus agree exactly ($(wc -l < /tmp/on_disk.txt) files)."
 
   sanitization-check:
     name: Sanitization

@@ -61,9 +61,17 @@ export function readExample(fileName: string): string {
 }
 
 /** Every `*.json` in `examples/`, enumerated from disk rather than remembered. */
+/**
+ * The corpus INVENTORY, which lives in the corpus directory and is not itself
+ * a vector. Every enumerator skips it by name: it is the one file in
+ * `examples/*.json` that would fail envelope parsing for the honest reason
+ * that it was never an envelope.
+ */
+export const MANIFEST_FILE = 'manifest.json';
+
 export function listExampleFiles(): string[] {
   return readdirSync(EXAMPLES_DIR)
-    .filter((name) => name.endsWith('.json'))
+    .filter((name) => name.endsWith('.json') && name !== MANIFEST_FILE)
     .sort();
 }
 

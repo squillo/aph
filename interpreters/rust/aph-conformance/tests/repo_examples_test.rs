@@ -34,34 +34,87 @@ fn example_json_files() -> std::vec::Vec<std::path::PathBuf> {
     })
     .filter(|path| {
       path.extension().and_then(std::ffi::OsStr::to_str) == std::option::Option::Some("json")
+        && path.file_name().and_then(std::ffi::OsStr::to_str)
+          != std::option::Option::Some(MANIFEST_FILE)
     })
     .collect();
   files.sort();
   files
 }
 
+/// The corpus INVENTORY, which lives in the corpus directory and is not itself
+/// a vector. Skipped by every enumerator: it is the one file in
+/// `examples/*.json` that would fail envelope parsing for the honest reason
+/// that it was never an envelope.
+const MANIFEST_FILE: &str = "manifest.json";
+
+/// The conformance file names the inventory claims, sorted.
+fn manifest_conformance_files() -> std::vec::Vec<std::string::String> {
+  let path = examples_dir().join(MANIFEST_FILE);
+  let raw = std::fs::read_to_string(&path)
+    .unwrap_or_else(|e| std::panic!("could not read the corpus manifest {:?}: {}", path, e));
+  let parsed: serde_json::Value = serde_json::from_str(&raw)
+    .unwrap_or_else(|e| std::panic!("the corpus manifest {:?} is not valid JSON: {}", path, e));
+  let mut names: std::vec::Vec<std::string::String> = parsed
+    .get("conformance")
+    .and_then(serde_json::Value::as_array)
+    .unwrap_or_else(|| std::panic!("the corpus manifest has no `conformance` array"))
+    .iter()
+    .map(|entry| {
+      entry
+        .as_str()
+        .unwrap_or_else(|| std::panic!("a `conformance` entry is not a string"))
+        .to_string()
+    })
+    .collect();
+  names.sort();
+  names
+}
+
 #[test]
-fn examples_directory_carries_every_published_envelope() {
+fn examples_directory_is_exactly_the_corpus_the_manifest_claims() {
   // Guards against a silently vacuous suite: if the path resolution broke or
   // the directory emptied, the per-file tests below would iterate zero files
   // and pass while proving nothing.
   //
-  // The floor is the ENUMERATED corpus, not a remembered number. Twelve
-  // files: seven channel kinds (slack_reply, email_reply, discord_dm,
-  // teams_channel, whatsapp, google_chat, imessage), one §7.5 extensions
-  // example (slack_new_with_extensions), three signed vectors — one per
-  // §8.1/§8.2 path this implementation supports: `principal_signed`
-  // (eddsa-jcs-2022), `es256_signed` (ecdsa-jcs-2019) and `detached_jws`
-  // (JsonWebSignature2020) — and `ts_minted`, the same eddsa-jcs-2022 shape
-  // minted by the TypeScript implementation rather than by this one. A
-  // thirteenth file is fine and passes; a lost one is not.
-  let files = example_json_files();
+  // WHY THIS IS SET EQUALITY AND NOT A FLOOR. It was `>= 12`, and the comment
+  // beside it conceded "a thirteenth file is fine and passes" — which is
+  // exactly the hole. A floor cannot see a vector ADDED and never classified,
+  // and it cannot see one file swapped for another, because neither moves the
+  // count. Both directions are checked here: a file on disk with no manifest
+  // entry fails and names itself, and a manifest entry with no file fails too,
+  // which catches a rename that a one-directional check reads as "still above
+  // the floor". The inventory is the one place the corpus is enumerated, so
+  // adding a vector is a deliberate two-file change rather than a silent one.
+  let on_disk: std::vec::Vec<std::string::String> = example_json_files()
+    .iter()
+    .map(|path| {
+      path
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or_else(|| std::panic!("a corpus path has no file name: {:?}", path))
+        .to_string()
+    })
+    .collect();
+  let claimed = manifest_conformance_files();
+
+  let undeclared: std::vec::Vec<&std::string::String> =
+    on_disk.iter().filter(|name| !claimed.contains(name)).collect();
   std::assert!(
-    files.len() >= 12,
-    "expected at least the 12 enumerated example envelope JSON files in {:?}, found {}: {:?}",
+    undeclared.is_empty(),
+    "these files are in {:?} with no entry in {}: {:?}",
     examples_dir(),
-    files.len(),
-    files
+    MANIFEST_FILE,
+    undeclared
+  );
+
+  let missing: std::vec::Vec<&std::string::String> =
+    claimed.iter().filter(|name| !on_disk.contains(name)).collect();
+  std::assert!(
+    missing.is_empty(),
+    "{} claims these files that are not on disk: {:?}",
+    MANIFEST_FILE,
+    missing
   );
 }
 

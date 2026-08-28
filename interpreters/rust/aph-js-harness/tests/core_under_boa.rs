@@ -40,10 +40,43 @@ fn example_json_files() -> std::vec::Vec<std::path::PathBuf> {
     })
     .filter(|path| {
       path.extension().and_then(std::ffi::OsStr::to_str) == std::option::Option::Some("json")
+        && path.file_name().and_then(std::ffi::OsStr::to_str)
+          != std::option::Option::Some(MANIFEST_FILE)
     })
     .collect();
   files.sort();
   files
+}
+
+/// The corpus INVENTORY, which lives in the corpus directory and is not itself
+/// a vector. Skipped by every enumerator: it is the one file in
+/// `examples/*.json` that would fail envelope parsing for the honest reason
+/// that it was never an envelope.
+const MANIFEST_FILE: &str = "manifest.json";
+
+/// The conformance file names the inventory claims, sorted.
+fn manifest_conformance_files() -> std::vec::Vec<std::string::String> {
+  let path = examples_dir().join(MANIFEST_FILE);
+  let raw = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+    std::panic!("could not read the corpus manifest {}: {}", path.display(), error)
+  });
+  let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap_or_else(|error| {
+    std::panic!("the corpus manifest {} is not valid JSON: {}", path.display(), error)
+  });
+  let mut names: std::vec::Vec<std::string::String> = parsed
+    .get("conformance")
+    .and_then(serde_json::Value::as_array)
+    .unwrap_or_else(|| std::panic!("the corpus manifest has no `conformance` array"))
+    .iter()
+    .map(|entry| {
+      entry
+        .as_str()
+        .unwrap_or_else(|| std::panic!("a `conformance` entry is not a string"))
+        .to_string()
+    })
+    .collect();
+  names.sort();
+  names
 }
 
 /// Reads a corpus file's TEXT, because strict parse is defined over bytes.
@@ -88,19 +121,46 @@ fn proof_at(document: &mut serde_json::Value, index: usize) -> &mut serde_json::
 }
 
 #[test]
-fn the_corpus_is_not_empty() {
+fn the_corpus_is_exactly_what_the_manifest_claims() {
   // Guards against a vacuous run: if path resolution broke or the directory
   // emptied, the per-file assertions below would iterate nothing and pass.
   //
-  // The floor is the ENUMERATED corpus rather than a remembered number: seven
-  // channel-shape fixtures, one registered-extensions fixture, and four signed
-  // vectors — the eddsa-jcs-2022 chain, the ecdsa-jcs-2019 chain, the
-  // JsonWebSignature2020 carriage, and the chain minted by the second
-  // implementation itself. A thirteenth file is fine and passes here; a lost
-  // one is not.
+  // WHY SET EQUALITY RATHER THAN THE FLOOR THIS REPLACES. The assertion here
+  // was `>= 12` and conceded in its own comment that "a thirteenth file is
+  // fine and passes" — so a vector could be added and never run under this
+  // second engine, which is the ONE thing this harness exists to do. A floor
+  // is also blind to a swap, because substituting one file for another leaves
+  // the count unmoved. Both directions are checked against the inventory: an
+  // unclassified file fails and names itself; a claimed file that vanished
+  // fails too.
+  let on_disk: std::vec::Vec<std::string::String> = example_json_files()
+    .iter()
+    .map(|path| {
+      path
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or_else(|| std::panic!("a corpus path has no file name: {}", path.display()))
+        .to_string()
+    })
+    .collect();
+  let claimed = manifest_conformance_files();
+
+  let undeclared: std::vec::Vec<&std::string::String> =
+    on_disk.iter().filter(|name| !claimed.contains(name)).collect();
   std::assert!(
-    example_json_files().len() >= 12,
-    "the published corpus is smaller than the vectors this repository ships"
+    undeclared.is_empty(),
+    "these files are in the corpus with no entry in {}: {:?}",
+    MANIFEST_FILE,
+    undeclared
+  );
+
+  let missing: std::vec::Vec<&std::string::String> =
+    claimed.iter().filter(|name| !on_disk.contains(name)).collect();
+  std::assert!(
+    missing.is_empty(),
+    "{} claims these files that are not on disk: {:?}",
+    MANIFEST_FILE,
+    missing
   );
 }
 
