@@ -41,3 +41,4 @@ issue stage already has every section drafted.
 |---|---|---|
 | [0001](0001-rotation-attestation.md) | Signed rotation attestation (v0.2 candidate) | Draft |
 | [0002](0002-service-act-channel.md) | A service-act channel binding | Draft |
+| [0003](0003-audience-and-single-use.md) | Audience binding and single-use envelopes | Draft |
