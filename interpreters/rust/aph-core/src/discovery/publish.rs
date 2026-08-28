@@ -318,6 +318,42 @@ fn check_key_len(
 /// [`super::dns_txt::parse_txt_record`], so the value that comes back is
 /// not the one that went in; and a `;` or control character ends the tag
 /// early, letting one value inject or truncate later tags.
+/// Renders a §8.5.1 DNS TXT tag-list publishing one vocabulary digest.
+///
+/// The value goes at `_aph._vocab.<domain>`. Tags are emitted in the §8.5.1
+/// order — `v`, `n`, `ver`, `h` — separated by `"; "`. All three inputs come
+/// from the compiled bundle's own `@snapp` block, VERBATIM: this function is
+/// the §8.5.1 wire form's ONE renderer, beside its §8.4.5 sibling above, and
+/// it validates its inputs with the same guard — a bundle name carrying `;`
+/// would otherwise terminate the entry and inject tags into a published
+/// record.
+///
+/// The §8.5.1 size rule is enforced HERE rather than at the nameserver: a
+/// record over one 255-byte character-string would need splitting, and a
+/// digest split across strings needs a concatenation rule nobody implements
+/// identically. Refusing in the renderer is the difference between an error
+/// an operator reads and a publication that silently truncates.
+pub fn render_vocab_record(
+  name: &str,
+  version: &str,
+  integrity: &str,
+) -> std::result::Result<String, crate::errors::AphError> {
+  check_txt_tag_value("n", name)?;
+  check_txt_tag_value("ver", version)?;
+  check_txt_tag_value("h", integrity)?;
+
+  let record = std::format!("v={}; n={}; ver={}; h={}", APH_TXT_VERSION, name, version, integrity);
+  if record.len() > 255 {
+    return std::result::Result::Err(crate::errors::AphError::unsupported_algorithm(
+      std::format!(
+        "the rendered record is {} bytes and a TXT character-string holds 255",
+        record.len()
+      ),
+    ));
+  }
+  std::result::Result::Ok(record)
+}
+
 fn check_txt_tag_value(
   tag: &str,
   value: &str,
@@ -786,6 +822,35 @@ mod tests {
     std::assert_eq!(
       super::render_txt_record(&key, "", "").unwrap_err().code(),
       "APH_E010"
+    );
+  }
+
+  #[test]
+  fn a_vocabulary_name_containing_a_semicolon_cannot_inject_tags() {
+    // WHY: §8.5.1's twin of the kid-injection case above. The name and
+    // version come from a compiled bundle's own metadata — which a THIRD
+    // PARTY authors, under RFC 0006's publish-your-own-vocabulary model — so
+    // they are untrusted text being concatenated into a tag-list. A bundle
+    // named `x; h=sha256-attacker` would append a second digest tag, and a
+    // resolver honouring the last occurrence would verify attacker-chosen
+    // bytes against an honest-looking record.
+    let refused = super::render_vocab_record("x; h=sha256-attacker", "1.0", "sha256-abc");
+    std::assert!(refused.is_err(), "a name carrying `;` must be refused, never rendered");
+  }
+
+  #[test]
+  fn a_vocabulary_record_renders_in_spec_order_and_fits_one_string() {
+    // PINS: the §8.5.1 tag order (`v`, `n`, `ver`, `h`), the digest carried
+    // VERBATIM, and the 255-byte single-character-string ceiling — refused in
+    // the renderer, where an operator reads the error, not at the nameserver,
+    // where it silently truncates.
+    let record =
+      super::render_vocab_record("aph_guardrails", "0.1.0-alpha.1", "sha256-abc").unwrap();
+    std::assert_eq!(record, "v=APHv1; n=aph_guardrails; ver=0.1.0-alpha.1; h=sha256-abc");
+    let oversized = "x".repeat(300);
+    std::assert!(
+      super::render_vocab_record("n", "1", &oversized).is_err(),
+      "a record over one character-string must be refused in the renderer"
     );
   }
 

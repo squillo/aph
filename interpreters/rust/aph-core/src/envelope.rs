@@ -857,6 +857,13 @@ pub struct ActClassification {
   /// digest: a classifier that ran against a base and a tightening overlay
   /// was produced by TWO artifacts, and naming only one would put a false
   /// statement inside a signature.
+  ///
+  /// NON-EMPTY, refused at parse: labels resolve against the vocabularies
+  /// that define them, so a claim citing nothing is labels nobody can look
+  /// up — meaningless rather than merely sparse. The independent TypeScript
+  /// implementation refused this from its first draft; this constraint is
+  /// what keeps the reference from silently accepting bytes it refuses.
+  #[serde(deserialize_with = "non_empty_vocabularies")]
   pub vocabularies: std::vec::Vec<VocabularyRef>,
   /// The family-qualified labels this act carries.
   ///
@@ -865,6 +872,23 @@ pub struct ActClassification {
   /// routing it implies. Carrying one would discard the verdicts a
   /// recipient's policy most wants.
   pub labels: std::vec::Vec<ActLabel>,
+}
+
+/// Refuses an empty `vocabularies` array at parse (§7.1.12: the member is
+/// required AND non-empty). Absent-vs-empty is the §8.4.6 distinction one
+/// field down: an envelope with no claim omits the whole object, and an
+/// object present but citing nothing is malformed, not minimal.
+fn non_empty_vocabularies<'de, D: serde::Deserializer<'de>>(
+  deserializer: D,
+) -> std::result::Result<std::vec::Vec<VocabularyRef>, D::Error> {
+  let refs = <std::vec::Vec<VocabularyRef> as serde::Deserialize>::deserialize(deserializer)?;
+  if refs.is_empty() {
+    return std::result::Result::Err(serde::de::Error::custom(
+      "`vocabularies` is empty; a classification must name every vocabulary \
+       the verdict depended on, and one that names none claims nothing",
+    ));
+  }
+  std::result::Result::Ok(refs)
 }
 
 /// One family-qualified label: `FAMILY/LABEL`.
@@ -2113,6 +2137,25 @@ mod act_classification_tests {
     let back: super::ActClassification =
       serde_json::from_str(&json).expect("it round-trips");
     std::assert_eq!(claim, back);
+  }
+
+  #[test]
+  fn a_claim_citing_no_vocabulary_is_refused_at_parse() {
+    // THE DIVERGENCE PIN, found by audit rather than by design: the
+    // independent TypeScript implementation refused an empty `vocabularies`
+    // from its first draft while this crate's derived Deserialize accepted
+    // it — two conformant-claiming implementations reaching opposite
+    // verdicts on the same bytes, the exact defect class QQ-era work closed
+    // for `allowedChannels`, reintroduced in a field one day old. Per the
+    // standing guardrail, the ACCEPTING surface was the wrong one.
+    let refused = serde_json::from_str::<super::ActClassification>(
+      r#"{"vocabularies":[],"labels":["A/B"]}"#,
+    );
+    std::assert!(refused.is_err(), "a claim citing no vocabulary must be refused");
+    std::assert!(
+      refused.unwrap_err().to_string().contains("claims nothing"),
+      "the refusal must say why an empty citation is meaningless"
+    );
   }
 
   #[test]

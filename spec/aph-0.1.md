@@ -15,6 +15,31 @@ This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, publ
 ---
 
 
+> ### Revision 2026-08-28 — meaning: two channel kinds, a content class, and the vocabulary surfaces
+>
+> Three accepted RFCs land in place under the pre-production exception, all
+> answering one day's implementer reports. **RFC 0002** adds `service` to
+> §7.1.5 and `Mutation` to §7.1.6 — a service endpoint an agent delivers a
+> state-changing act to IS the end-delivery medium, so naming it honours
+> §1.1.1 rather than bending it. **RFC 0007** adds `squillo`, an
+> in-application messaging surface where a human reads in that application's
+> client — a peer of `slack` and `discord`, requested for cross-organization
+> interop and NOT the membership-scope value of the same spelling that
+> RFC 0004 permanently refused. **RFC 0006** adds §7.1.12
+> `actClassification` — what a sender says an act MEANS, against vocabularies
+> both parties resolve independently — and §8.5, which publishes a
+> vocabulary's digest at `_aph._vocab.<domain>` in the same tag-list shape
+> §8.4.5 uses for keys.
+>
+> One rule binds all three, and it is load-bearing rather than courtesy:
+> §7.1's parse is strict, so a verifier built before a value or field existed
+> does not ignore it — it fails at strict parse, below the protocol's own
+> error vocabulary. A producer MUST NOT emit any of these until it has reason
+> to believe the recipient understands them (§10.1). The versioning rule they
+> ride on was also corrected: a new closed-vocabulary value is MINOR at every
+> series, never PATCH, because an addition that turns a working verifier into
+> a refusing one is not a patch.
+
 > ### Revision 2026-08-15 — the revocation transport
 >
 > This draft made revocation normative (§6.3.1) and then left a recipient no
@@ -992,7 +1017,7 @@ What the sender says this act MEANS, in terms of one or more vocabularies both p
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `vocabularies` | array of object | yes | Every vocabulary the verdict depended on, in fold order. See below. |
+| `vocabularies` | array of object | yes | Every vocabulary the verdict depended on, in fold order — non-empty, because labels resolve against the vocabularies that define them. An empty array is a strict-parse rejection: an envelope making no claim omits `actClassification` entirely, and an object present but citing nothing is malformed rather than minimal. See below. |
 | `labels` | array of string | yes | The family-qualified labels this act carries, each written `FAMILY/LABEL`. |
 
 Each entry of `vocabularies`:

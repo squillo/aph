@@ -1,6 +1,7 @@
 package aph
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -145,19 +146,19 @@ func TestEveryConformanceFileTheManifestClaimsIsReadable(t *testing.T) {
 	// named in both places and still be a zero-byte stub or unreadable, at which
 	// point the inventory is honest and the corpus is not.
 	//
-	// WHAT IT PINS: every conformance entry opens, parses as JSON, and is a JSON
-	// OBJECT — the floor every envelope shape sits on. Deeper verification is
-	// this binding's other tests' job; this one only refuses to let a hollow
-	// file pass as a corpus member.
+	// WHAT IT PINS: every conformance entry STRICT-PARSES through the wasm ABI —
+	// not merely "is JSON", which an audit found was the old floor here: a new
+	// golden carrying a new optional field would have passed this test without
+	// the module ever seeing the field, so the one gate that runs the ABI was
+	// vouching for bytes it never parsed. Routing each file through
+	// ParseEnvelopeJSON makes every FUTURE golden exercise the module the day
+	// it lands, with no one remembering to add a test.
+	ctx := context.Background()
+	runtime := newTestRuntime(t)
 	for _, name := range readManifest(t).Conformance {
 		text := readExample(t, name)
-		var document map[string]any
-		if err := json.Unmarshal([]byte(text), &document); err != nil {
-			t.Errorf("%s is named in %s and is not a JSON object: %v", name, manifestFile, err)
-			continue
-		}
-		if len(document) == 0 {
-			t.Errorf("%s is named in %s and carries no members", name, manifestFile)
+		if _, err := runtime.ParseEnvelopeJSON(ctx, text); err != nil {
+			t.Errorf("%s is named in %s and does not strict-parse: %v", name, manifestFile, err)
 		}
 	}
 }

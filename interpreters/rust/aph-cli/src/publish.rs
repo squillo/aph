@@ -207,11 +207,16 @@ pub fn cmd_render_vocab(args: &[std::string::String]) -> i32 {
   0
 }
 
-/// The §8.5.1 tag list for a compiled bundle: `v`, `n`, `ver`, `h`.
+/// The §8.5.1 record for a compiled bundle, by way of `aph-core`'s renderer.
 ///
-/// Every value is READ from the bundle's own `@snapp` block. Nothing here
-/// invents, normalizes, or re-encodes — a publication tool that edits what it
-/// publishes is a second author of the artifact.
+/// This function only LOCATES the three inputs in the bundle's `@snapp`
+/// block; the wire form itself is rendered by
+/// [`aph_core::discovery::publish::render_vocab_record`], beside its §8.4.5
+/// sibling — the ONE renderer rule this module's preamble states. That is
+/// also where the tag-injection guard lives: a bundle name carrying `;`
+/// would otherwise terminate the entry and inject tags into a published
+/// record, and the guard belongs with the renderer rather than with every
+/// caller who remembers.
 fn vocabulary_record(bundle: &serde_json::Value) -> std::result::Result<String, std::string::String> {
   let meta = bundle
     .get("@snapp")
@@ -223,26 +228,8 @@ fn vocabulary_record(bundle: &serde_json::Value) -> std::result::Result<String, 
       .and_then(serde_json::Value::as_str)
       .ok_or_else(|| std::format!("the bundle's `@snapp` declares no `{}`", key))
   };
-  let name = read("name")?;
-  let version = read("version")?;
-  let integrity = read("integrity")?;
-
-  let record = std::format!(
-    "v=APHv1; n={}; ver={}; h={}",
-    name, version, integrity
-  );
-  // §8.5.1 requires one 255-byte character-string. Refusing here rather than
-  // at the nameserver is the difference between an error an operator reads
-  // and a publication that silently truncates.
-  if record.len() > 255 {
-    return std::result::Result::Err(std::format!(
-      "the record is {} bytes and a TXT character-string holds 255; \
-       splitting a digest across strings needs a concatenation rule that two \
-       implementations will read differently",
-      record.len()
-    ));
-  }
-  std::result::Result::Ok(record)
+  aph_core::discovery::publish::render_vocab_record(read("name")?, read("version")?, read("integrity")?)
+    .map_err(|e| std::format!("{}", e))
 }
 
 /// Decodes a `did:key` into the public key the renderers publish.
