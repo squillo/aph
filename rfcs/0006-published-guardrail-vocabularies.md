@@ -149,12 +149,51 @@ the digest, immutability is structural rather than checked. Useful if
 distribution becomes a problem; it adds availability dependencies and no
 integrity the digest does not already give.
 
-**One cheap reuse worth considering.** §8.4.5 already publishes key material
-at an underscored DNS name. A parallel name could publish a vocabulary's
-current digest — small enough for a TXT record, and it inherits DNSSEC where
-the zone is signed. That yields a second, independent path to the same digest,
-which is the shape §8.4.6's multi-mechanism resolution already assumes, and it
-raises the cost of equivocation without any new infrastructure.
+### 2c. The DNS record, concretely
+
+§8.4.5 already publishes key material at `_aph._notary.<domain>` as a
+DKIM-style tag list. A vocabulary digest is the same shape of fact — small,
+public, and useful to someone with no prior relationship — so it takes the
+same shape rather than a new one:
+
+```
+_aph._vocab.example.com.  IN  TXT  "v=APHv1; n=aph_guardrails; ver=0.1.0-alpha.1; h=sha256-y6E/EGldCz2ogpVB7wlnS5orbnAjcCpoUBaDietJmXA="
+```
+
+Required tags: `v` (version, `APHv1`, as §8.4.5), `n` (vocabulary name), `ver`
+(vocabulary version), `h` (the bundle's `integrity` value, verbatim — the same
+SRI-shaped string the compiled Snapp already carries, not a re-encoding of
+it). A publisher serving several vocabularies publishes several TXT records at
+the one name; a resolver selects on `n` and `ver` and MUST refuse rather than
+guess when two records claim the same pair with different digests.
+
+It fits comfortably: the example above is well inside a single 255-byte
+character-string, which matters because a digest split across strings is a
+concatenation rule nobody will implement identically.
+
+`_aph._vocab` would need adding to the underscored names §13 reserves
+alongside `_aph` and `_aph._notary` — one line in the same registration,
+not a second registration.
+
+**What this buys.** A second, independent path to the digest, which is the
+shape §8.4.6's multi-mechanism resolution already assumes; DNSSEC where the
+zone is signed; and no new infrastructure, since a publisher operating a
+`did:web` identity already controls the zone.
+
+**What it does not buy, and the distinction matters more than the mechanism.**
+DNS is not append-only. A publisher can change the record, and a resolver
+sees only what it is served — so this is a *discovery* path for the current
+digest, **not** the temporal layer and **not** non-equivocation. Layer 2
+remains necessary for those, and a design that ships this record and calls the
+temporal question answered has confused a cheap win for the expensive one.
+
+**The failure mode is benign, which is why it is worth having anyway.** A
+spoofed or stale record yields a digest that does not match the bytes, and the
+bytes are then refused. The worst outcome is denial, never substitution — an
+attacker who controls DNS can stop you resolving a vocabulary and cannot make
+you accept a different one. That asymmetry is what makes an unauthenticated
+lookup acceptable here, and it holds only because the digest is doing the
+integrity work.
 
 **What none of it buys, stated because it is the tempting inference:** none of
 this makes a vocabulary correct, or its accuracy claims measured, or its
