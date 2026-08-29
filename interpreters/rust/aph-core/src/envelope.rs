@@ -1215,6 +1215,22 @@ pub fn sealed_payload_is_declared(
   std::result::Result::Ok(())
 }
 
+/// THE strict-parse entry every text boundary shares: serde's
+/// member-strict parse plus the wire-version rules that are strict-parse
+/// CLASS but cross-member — today, [`sealed_payload_is_declared`]. Hoisted
+/// here because four bindings each carried an identical local copy of the
+/// serde half, and a rule added to one copy is a rule the other three
+/// silently lack; the hoist is what makes "strict parse" mean ONE thing
+/// at every boundary.
+pub fn parse_envelope_json(
+  json: &str,
+) -> std::result::Result<NotarizationEnvelope, String> {
+  let envelope: NotarizationEnvelope =
+    serde_json::from_str(json).map_err(|e| std::format!("{}", e))?;
+  sealed_payload_is_declared(&envelope)?;
+  std::result::Result::Ok(envelope)
+}
+
 /// Refuses an empty `vocabularies` array at parse (§7.1.12: the member is
 /// required AND non-empty). Absent-vs-empty is the §8.4.6 distinction one
 /// field down: an envelope with no claim omits the whole object, and an

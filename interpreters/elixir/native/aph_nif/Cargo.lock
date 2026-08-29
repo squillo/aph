@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "aph-core"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "base64",
  "bs58",

@@ -1,0 +1,83 @@
+{
+  "aphVersion": "0.2",
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/aph/v1"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "AgentSendAuthorizationCredential"
+  ],
+  "id": "urn:uuid:00000000-0000-4000-8000-00000000000e",
+  "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+  "validFrom": "2026-05-21T00:00:00Z",
+  "validUntil": "2026-05-21T00:10:00Z",
+  "credentialSubject": {
+    "humanPrincipal": {
+      "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
+      "displayName": "Scott Wyatt"
+    },
+    "agent": {
+      "id": "did:web:agent.squillo.com",
+      "agentCardUri": "https://agent.squillo.com/.well-known/agent-card.json",
+      "displayName": "Squillo Concierge",
+      "version": "1.0"
+    },
+    "channel": {
+      "kind": "slack",
+      "recipientAddressing": {
+        "channelId": "C01234567",
+        "parentTs": "1716249600.000100",
+        "teamId": "T01234567"
+      }
+    },
+    "communication": {
+      "contentClass": "Reply",
+      "bodySha256": "a9b371c35e4aa75684785c479a5433c2fc95c9590fef31f70dfd1c495f6c29a6",
+      "bodySize": 1842,
+      "previewLines": 3,
+      "preview": "Hey team — quick update on the deploy:\n• prod rollout finished at 14:02 UTC\n• no error spikes in the first hour"
+    },
+    "policy": {
+      "decision": "AskEveryTime",
+      "matchedScope": "per-channel",
+      "delegationMandateId": null,
+      "actChain": []
+    },
+    "notarization": {
+      "notaryService": {
+        "id": "did:web:notary.squillo.com",
+        "name": "Squillo Notary Service",
+        "version": "0.1.0"
+      },
+      "decisionTimestamp": "2026-05-21T00:00:01Z",
+      "decisionLatencyMs": 1834
+    },
+    "audience": {
+      "id": "did:web:ssot.example.com",
+      "channelBinding": {
+        "kind": "slack",
+        "channelId": "C01234567",
+        "teamId": "T01234567"
+      }
+    },
+    "sealedPayload": {
+      "suite": "APH-SEAL-1",
+      "reader": {
+        "id": "did:web:receiver.example.com",
+        "kid": "enc-1"
+      },
+      "enc": "tarVPutDGeHZEOwEQPhJ0Z4KOqn-O8uRNCvYDkiDV1U",
+      "ciphertext": "XKqYDgBHq0E3Mxj18f1pcG1bzLmS2AfDIhUln_hI-t_FVFf2D-3ZxVbo1vyi5G6Uhnp02ni844TQIXbNjOCFxmc89w"
+    }
+  },
+  "linkedMandate": null,
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "verificationMethod": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+    "created": "2026-05-21T00:00:01Z",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3WgvA9JHkbV3qLZHcM4FxBp4xHfQVnVnPKKDdyazQwQGdGzxsRdmZWBxXwQvN6P2sLZbLP4HnRy9LcZdpFLLM6h"
+  }
+}

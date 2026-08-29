@@ -5,6 +5,14 @@ JS runtime — with zero runtime dependencies.** The platform's WebCrypto,
 strings in, verdicts out; if it parses, it is exactly what the spec says it
 is, and if it does not, you get the §11 code that says why.
 
+It also implements the v0.2-draft delta's NON-READER role for
+`sealedPayload` (RFC 0008): strict parse of the member, the wire-version
+rule, and verification around the seal as opaque bytes. It deliberately
+never OPENS a seal — WebCrypto has no ChaCha20-Poly1305, and faking the
+capability with a userland cipher would cost the zero-dependency claim
+that makes everything else here trustworthy. Opening is the reference's
+job (`aph-sealed`); a conformant verifier never needs it.
+
 A complete APH v0.1 implementation — **mint and verify** — written from
 `spec/aph-0.1.md` and the published `examples/`. It shares no code with the
 Rust reference: its own RFC 8785 canonicalizer, its own strict parser, its own

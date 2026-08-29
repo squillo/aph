@@ -61,6 +61,13 @@ export const PROOF_PURPOSES = ['assertionMethod', 'authentication'] as const;
 export type ProofPurpose = (typeof PROOF_PURPOSES)[number];
 
 export const APH_VERSION = '0.1';
+/**
+ * The v0.2-draft delta (`spec/aph-0.2-draft.md`): additive over v0.1.0.
+ * This implementation ADMITS the version and enforces which members it
+ * declares; it does not otherwise change behavior, because the delta is a
+ * delta.
+ */
+export const APH_VERSION_DRAFT = '0.2';
 export const CONTEXT_VC_V2 = 'https://www.w3.org/ns/credentials/v2';
 export const CONTEXT_APH_V1 = 'https://w3id.org/aph/v1';
 export const TYPE_VERIFIABLE_CREDENTIAL = 'VerifiableCredential';
@@ -175,6 +182,35 @@ export interface CredentialSubject {
   appleAurAcceptance?: AppleAurAcceptance;
   audience?: Audience;
   actClassification?: ActClassification;
+  /**
+   * v0.2-draft (RFC 0008): a payload only `reader` can open. Declared from
+   * aphVersion "0.2" — the parser refuses it on an earlier wire. This
+   * implementation verifies AROUND it (the non-reader role the delta's
+   * verification step defines: opaque bytes under every existing check);
+   * OPENING a seal is outside its platform-crypto envelope, because
+   * WebCrypto has no ChaCha20-Poly1305 and this package's central claim is
+   * the platform's own crypto and nothing else.
+   */
+  sealedPayload?: SealedPayload;
+}
+
+/** v0.2-draft (RFC 0008): who may open a sealed payload. */
+export interface SealedReader {
+  id: string;
+  kid: string;
+}
+
+/** v0.2-draft (RFC 0008): the sealed payload wire member. */
+export interface SealedPayload {
+  /** The pinned suite identifier (`APH-SEAL-1`). Structure is validated at
+   * parse; suite MEMBERSHIP is an opener's question, and this
+   * implementation never opens. */
+  suite: string;
+  reader: SealedReader;
+  /** Unpadded base64url: the HPKE encapsulated key. */
+  enc: string;
+  /** Unpadded base64url: AEAD ciphertext, tag included. */
+  ciphertext: string;
 }
 
 /**

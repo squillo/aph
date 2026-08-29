@@ -46,7 +46,10 @@
 fn parse_envelope(
   json: &str,
 ) -> std::result::Result<aph_core::NotarizationEnvelope, std::string::String> {
-  serde_json::from_str(json).map_err(|e| std::format!("{}", e))
+  // Delegates to the core's shared strict-parse entry, so the wire-version
+  // rules (sealedPayload's declaration check today) hold at THIS boundary
+  // by construction rather than by re-implementation.
+  aph_core::parse_envelope_json(json)
 }
 
 /// Strict-parses `json` and re-emits it as canonical compact JSON text —
@@ -467,5 +470,22 @@ mod tests {
         err
       );
     }
+  }
+
+  #[test]
+  fn the_draft_vector_parses_and_its_downgrade_refuses_at_this_boundary() {
+    // The shared strict-parse entry (hoisted to the core) means the
+    // v0.2-draft wire-version rule holds at THIS boundary by construction;
+    // this test is the proof at the boundary, not a re-implementation.
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+      .join("../../../examples/v0.2-draft/sealed_envelope.json");
+    let vector = std::fs::read_to_string(&path)
+      .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
+    super::parse_envelope(&vector).expect("the 0.2-draft vector strict-parses here");
+
+    let downgraded = vector.replace("\"aphVersion\": \"0.2\"", "\"aphVersion\": \"0.1\"");
+    let err = super::parse_envelope(&downgraded)
+      .expect_err("the same member on a 0.1 wire is malformed for the version it claims");
+    std::assert!(err.contains("not declared"), "the refusal names the rule: {err}");
   }
 }

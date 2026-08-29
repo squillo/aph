@@ -620,4 +620,85 @@ mod tests {
     );
     std::assert_eq!(recomputed, envelope.credential_subject.communication.body_sha256);
   }
+
+  // ── The committed 0.2-draft vector ──────────────────────────────────
+
+  fn draft_vector_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+      .join("../../../examples/v0.2-draft/sealed_envelope.json")
+  }
+
+  /// The vector's exact bytes, regenerated: fully deterministic because the
+  /// keys derive from fixed IKM, the RNG is seeded, and the base is a
+  /// committed golden — so the committed file can be byte-compared against
+  /// a fresh mint exactly as the signed v0.1 vectors are.
+  fn regenerate_draft_vector() -> String {
+    let (_, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
+    let mut envelope = envelope_v02();
+    envelope.id = std::string::String::from("urn:uuid:00000000-0000-4000-8000-00000000000e");
+    super::seal_into_envelope(
+      &mut rng(),
+      &mut envelope,
+      reader("did:web:receiver.example.com"),
+      &receiver_pk,
+      b"the body no hop reads: the v0.2-draft sealed vector",
+    )
+    .expect("sealing the vector succeeds");
+    use sha2::Digest as _;
+    let sealed = envelope.credential_subject.sealed_payload.as_ref().expect("sealed");
+    let raw = super::unb64(&sealed.ciphertext, "ciphertext").expect("decodes");
+    envelope.credential_subject.communication.body_sha256 =
+      std::format!("{:x}", sha2::Sha256::digest(&raw));
+    std::format!(
+      "{}\n",
+      serde_json::to_string_pretty(&envelope).expect("the vector serializes")
+    )
+  }
+
+  #[test]
+  fn the_committed_draft_vector_is_byte_identical_to_a_fresh_mint() {
+    // The same drift discipline the signed v0.1 vectors live under: the
+    // committed file IS what this code mints, or this test prints the
+    // replacement between cut lines and fails.
+    let regenerated = regenerate_draft_vector();
+    let path = draft_vector_path();
+    // A missing file is TOTAL drift, not a separate failure: the first mint
+    // and a deleted vector both resolve the same way — write the printed
+    // replacement.
+    let published = std::fs::read_to_string(&path).unwrap_or_default();
+    if published != regenerated {
+      std::panic!(
+        "examples/v0.2-draft/sealed_envelope.json has drifted from the bytes \
+         this suite mints.\nTo fix in ONE step, overwrite that file with EXACTLY \
+         the content between the cut lines (the final newline is part of the \
+         content):\n----8<----\n{}----8<----",
+        regenerated
+      );
+    }
+  }
+
+  #[test]
+  fn the_committed_draft_vector_opens_for_its_reader_and_verifies_blind() {
+    // The vector proves both halves at once: a blind hop's bodySha256
+    // check succeeds over the raw ciphertext octets, and the named
+    // reader's derived test key opens the committed bytes — pinning the
+    // wire format's long-term stability, not only this build's.
+    use sha2::Digest as _;
+    let raw_json = std::fs::read_to_string(draft_vector_path()).expect("the vector is on disk");
+    let envelope: aph_core::NotarizationEnvelope =
+      aph_core::parse_envelope_json(&raw_json).expect("the vector strict-parses as 0.2");
+
+    let sealed = envelope.credential_subject.sealed_payload.as_ref().expect("sealed");
+    let raw = super::unb64(&sealed.ciphertext, "ciphertext").expect("decodes");
+    std::assert_eq!(
+      std::format!("{:x}", sha2::Sha256::digest(&raw)),
+      envelope.credential_subject.communication.body_sha256,
+      "the blind hop's body binding holds over the committed bytes"
+    );
+
+    let (receiver_sk, _) = derive_keypair_for_tests(RECEIVER_IKM);
+    let opened = super::unseal_from_envelope(&envelope, &receiver_sk)
+      .expect("the named reader opens the committed vector");
+    std::assert_eq!(opened, b"the body no hop reads: the v0.2-draft sealed vector");
+  }
 }

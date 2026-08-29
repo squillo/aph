@@ -10,7 +10,10 @@ illustrate the wire shape of v0.1 envelopes and are suitable for round-trip
 parsing by any APH implementation; the four signed ones are additionally
 suitable for verification.
 
-One subdirectory sits deliberately outside that count:
+Two subdirectories sit deliberately outside that count.
+[`v0.2-draft/`](v0.2-draft/README.md) holds vectors for members the
+v0.2-draft delta declares — every v0.1 gate refuses them at strict parse by
+design, and the `aph-sealed` suite byte-welds them instead. And:
 [`a2a-database-change/`](a2a-database-change/README.md) is an illustrative
 draft of an agent authorizing a database change over A2A. Its envelope is
 **not conformant** — two fields carry explicit placeholders because v0.1 has

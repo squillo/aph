@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -539,3 +541,27 @@ func TestTheGoldensMandateBindingVerifiesAndARetargetedMandateRefuses(t *testing
 	}
 }
 
+// TestDraftVectorWireVersionRule pins that this boundary inherited the
+// v0.2-draft wire-version rule from the reference's shared strict-parse
+// entry (via the committed wasm): the draft vector parses, and the same
+// member relabeled onto an aphVersion 0.1 wire refuses with the rule's
+// message rather than being waved through.
+func TestDraftVectorWireVersionRule(t *testing.T) {
+	ctx := context.Background()
+	rt := newTestRuntime(t)
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "examples", "v0.2-draft", "sealed_envelope.json"))
+	if err != nil {
+		t.Fatalf("reading the draft vector: %v", err)
+	}
+	if _, err := rt.ParseEnvelopeJSON(ctx, string(raw)); err != nil {
+		t.Fatalf("the 0.2-draft vector must strict-parse here: %v", err)
+	}
+
+	downgraded := strings.Replace(string(raw), `"aphVersion": "0.2"`, `"aphVersion": "0.1"`, 1)
+	if _, err := rt.ParseEnvelopeJSON(ctx, downgraded); err == nil {
+		t.Fatal("the member on a 0.1 wire must refuse: malformed for the version it claims")
+	} else if !strings.Contains(err.Error(), "not declared") {
+		t.Fatalf("the refusal must name the rule, got: %v", err)
+	}
+}

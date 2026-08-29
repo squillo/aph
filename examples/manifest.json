@@ -31,6 +31,10 @@
     {
       "path": "a2a-database-change/mutation-body.json",
       "reason": "The message body an envelope commits to by hash, not an envelope."
+    },
+    {
+      "path": "v0.2-draft/sealed_envelope.json",
+      "reason": "An aphVersion 0.2-draft vector (RFC 0008 sealedPayload): every v0.1 conformance gate refuses it at strict parse BY DESIGN, and the aph-sealed suite byte-welds and opens it instead."
     }
   ]
 }

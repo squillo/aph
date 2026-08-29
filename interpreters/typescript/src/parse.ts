@@ -18,6 +18,7 @@
 import { AphParseError } from './errors.js';
 import {
   APH_VERSION,
+  APH_VERSION_DRAFT,
   ATTESTATION_MODES,
   CHANNEL_KINDS,
   RECIPIENT_CLASSES,
@@ -321,7 +322,7 @@ function parseCredentialSubject(value: unknown, path: string): void {
     value,
     path,
     ['humanPrincipal', 'agent', 'channel', 'communication', 'policy', 'notarization'],
-    ['appleAurAcceptance', 'audience', 'actClassification'],
+    ['appleAurAcceptance', 'audience', 'actClassification', 'sealedPayload'],
   );
   parseHumanPrincipal(record.humanPrincipal, `${path}.humanPrincipal`);
   parseAgent(record.agent, `${path}.agent`);
@@ -338,6 +339,27 @@ function parseCredentialSubject(value: unknown, path: string): void {
   if ('actClassification' in record) {
     parseActClassification(record.actClassification, `${path}.actClassification`);
   }
+  if ('sealedPayload' in record) {
+    parseSealedPayload(record.sealedPayload, `${path}.sealedPayload`);
+  }
+}
+
+/**
+ * v0.2-draft (RFC 0008). Structure only: every member strict, all four
+ * required, the reader fully named. Suite MEMBERSHIP is deliberately not
+ * closed here — refusing an unknown suite is the OPENER's obligation at
+ * open time, and this implementation never opens; a verifier that carried
+ * a suite allowlist it never consults would be a claim without a check.
+ */
+function parseSealedPayload(value: unknown, path: string): void {
+  const record = members(value, path, ['suite', 'reader', 'enc', 'ciphertext'], []);
+  str(record, path, 'suite');
+  str(record, path, 'enc');
+  str(record, path, 'ciphertext');
+  const readerPath = `${path}.reader`;
+  const reader = members(record.reader, readerPath, ['id', 'kid'], []);
+  str(reader, readerPath, 'id');
+  str(reader, readerPath, 'kid');
 }
 
 /**
@@ -513,11 +535,30 @@ export function parseEnvelope(input: string | unknown): NotarizationEnvelope {
   );
 
   const version = str(record, path, 'aphVersion');
-  if (version !== APH_VERSION) {
+  if (version !== APH_VERSION && version !== APH_VERSION_DRAFT) {
     throw new AphParseError(
       '$.aphVersion',
-      `MUST be "${APH_VERSION}" for this draft, got "${version}"`,
+      `MUST be "${APH_VERSION}" (final) or "${APH_VERSION_DRAFT}" (the additive draft delta), got "${version}"`,
     );
+  }
+  // The delta's wire-version rule: `sealedPayload` is declared from
+  // aphVersion "0.2" and nothing earlier. Checked HERE because it is a
+  // cross-member rule — the member's own parser cannot see the version —
+  // and it is strict-parse class: the wire is malformed for the version it
+  // claims, which no protocol code describes.
+  if (version === APH_VERSION) {
+    const subject = record.credentialSubject;
+    if (
+      typeof subject === 'object' &&
+      subject !== null &&
+      'sealedPayload' in (subject as Record<string, unknown>)
+    ) {
+      throw new AphParseError(
+        '$.credentialSubject.sealedPayload',
+        '`sealedPayload` is declared from aphVersion "0.2" (spec/aph-0.2-draft.md); ' +
+          'an aphVersion "0.1" envelope carrying it is malformed for the version it claims',
+      );
+    }
   }
 
   const context = stringArray(record, path, '@context');

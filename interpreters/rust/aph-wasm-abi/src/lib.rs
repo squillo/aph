@@ -210,7 +210,10 @@ getrandom::register_custom_getrandom!(entropy::refuse);
 fn parse_envelope(
   json: &str,
 ) -> std::result::Result<aph_core::NotarizationEnvelope, std::string::String> {
-  serde_json::from_str(json).map_err(|e| std::format!("{}", e))
+  // Delegates to the core's shared strict-parse entry, so the wire-version
+  // rules (sealedPayload's declaration check today) hold at THIS boundary
+  // by construction rather than by re-implementation.
+  aph_core::parse_envelope_json(json)
 }
 
 /// Strict-parses `json` and re-emits it as canonical compact JSON text —

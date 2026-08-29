@@ -232,3 +232,28 @@ the 0.2 delta stabilizes — a draft wire taught to five surfaces at once
 is five surfaces to re-teach on every draft revision), and any corpus
 golden (a 0.2 vector would refuse in every 0.1 gate, correctly; vectors
 arrive with the v0.2 cut).
+
+**Deferrals discharged (2026-08-29, later the same day).** The three
+deferred surfaces landed once the shape stopped moving:
+
+- **One strict-parse entry, everywhere.** The four bindings each carried an
+  identical local serde parse; the hoist (`aph_core::parse_envelope_json`)
+  folds the wire-version rule into the ONE parse path every text boundary
+  delegates to, so the rule holds at every binding by construction. Each
+  boundary carries the proof: the committed vector parses, its downgrade
+  refuses naming the rule.
+- **The committed vector.** `examples/v0.2-draft/sealed_envelope.json` —
+  deterministic (derived test keys, seeded RNG, a committed golden as
+  base), byte-welded by the same drift-print discipline as the signed
+  v0.1 vectors, and opened by the derived reader key in a second test that
+  pins the FORMAT's stability, not just the build's. Excluded from the
+  v0.1 conformance corpus with its reason in the manifest, per the
+  established subdirectory precedent.
+- **The independent TypeScript implementation, in the NON-READER role.**
+  It admits aphVersion `0.2`, strict-parses the member, enforces the
+  wire-version rule, and verifies around the seal as opaque bytes — the
+  exact role §2's verification step defines for every verifier that is
+  not the reader. It deliberately does not OPEN seals: WebCrypto has no
+  ChaCha20-Poly1305, and a userland cipher would cost the
+  platform-crypto-only claim. That boundary is stated in its README
+  rather than discovered.
