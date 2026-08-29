@@ -37,6 +37,20 @@ pub struct DelegationMandate {
   /// operator shown the wrong one. Typed, the unknown value is refused where
   /// it is READ, and the two events stay separate.
   pub allowed_channels: Vec<crate::envelope::ChannelKind>,
+  /// Recipient classes permitted under this mandate (§6.1, RFC 0005) —
+  /// the constraint a human could not previously write down: "my agent may
+  /// send email to PEOPLE" versus unattended machine-to-machine traffic
+  /// that is byte-for-byte the same medium.
+  ///
+  /// OPTIONAL and absent-when-unconstrained, for two reasons with different
+  /// weights. The compatibility one: this struct is SIGNED, and an absent
+  /// member keeps every previously signed mandate's canonical bytes — and
+  /// therefore its signatures — intact. The semantic one: `None` is a grant
+  /// that says nothing about consumers, which every pre-RFC-0005 grant is;
+  /// an EMPTY list would be a grant allowing no consumer at all, which is a
+  /// coherent thing to sign and is not the same statement.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub allowed_recipient_classes: std::option::Option<Vec<crate::envelope::RecipientClass>>,
   /// Per-channel max-send rate (per hour). `None` = unlimited.
   #[serde(default)]
   pub rate_limit_per_hour: std::option::Option<u32>,
@@ -93,6 +107,7 @@ mod tests {
       human_principal_did: String::from("did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy"),
       agent_did: String::from("did:web:agent.squillo.com"),
       allowed_channels: std::vec![crate::envelope::ChannelKind::Slack, crate::envelope::ChannelKind::Email],
+      allowed_recipient_classes: std::option::Option::None,
       rate_limit_per_hour: std::option::Option::Some(60),
       valid_from: String::from("2026-05-21T00:00:00Z"),
       valid_until: String::from("2026-05-22T00:00:00Z"),

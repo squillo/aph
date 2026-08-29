@@ -181,7 +181,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
     // the issuing authority in substance, the notary a witness.
     issuer: principal.clone(),
     valid_from: std::string::String::from("2026-05-21T00:00:00Z"),
-    valid_until: std::string::String::from("2026-05-22T00:00:00Z"),
+    valid_until: std::string::String::from("2026-05-21T00:10:00Z"),
     credential_subject: aph_core::CredentialSubject {
       human_principal: aph_core::HumanPrincipalRef {
         id: principal,
@@ -204,6 +204,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
           "parentTs": "1716249600.000100",
           "teamId": "T01234567"
         }),
+        recipient_class: std::option::Option::None,
       },
       communication: aph_core::CommunicationDescriptor {
         content_class: aph_core::ContentClass::Reply,
@@ -239,6 +240,7 @@ fn build_signed_envelope() -> aph_core::NotarizationEnvelope {
         decision_latency_ms: 12,
       },
       apple_aur_acceptance: std::option::Option::None,
+      audience: std::option::Option::None,
       act_classification: std::option::Option::None,
     },
     linked_mandate: std::option::Option::None,

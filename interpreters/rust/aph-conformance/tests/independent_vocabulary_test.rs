@@ -182,3 +182,15 @@ fn the_independent_implementation_agrees_on_the_policy_decision_vocabulary() {
     .collect();
   assert_same_membership(&declared("POLICY_DECISIONS"), &reference, "policy decisions");
 }
+
+#[test]
+fn the_independent_implementation_declares_the_same_recipient_classes() {
+  // The fourth closed vocabulary, welded from birth: RFC 0005's set is two
+  // members today and the test exists for the day someone widens one
+  // populator and not the other.
+  let reference: std::vec::Vec<&'static str> = aph_core::RecipientClass::ALL
+    .iter()
+    .map(aph_core::RecipientClass::label)
+    .collect();
+  assert_same_membership(&declared("RECIPIENT_CLASSES"), &reference, "recipient classes");
+}

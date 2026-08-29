@@ -1,6 +1,6 @@
 # RFC 0005 — Recipient class: who is on the other end of the medium
 
-- **Status:** Draft
+- **Status:** Accepted
 - **Issue:** raised by an implementer building an agent-to-agent transport
   over ordinary mail, as a request for an eighth channel kind. The kind is
   refused here; the problem behind it is not, and this document proposes the
@@ -161,3 +161,41 @@ set, and the question of whether the set should be closed at all is open and
 non-obvious given the reasoning in RFC 0004. It does not settle the rollout
 rule. And it does not claim to solve consent generally: it addresses one
 distinction a human plainly intends and currently cannot write down.
+
+## Decision
+
+**Accepted 2026-08-29**, by the sole maintainer, WITH the concrete form this
+document deliberately declined to fix — so the open questions it names are
+answered here, on the record, rather than superseded silently. The
+solo-ratification limitation of RFC 0006/0007's Decision blocks applies
+verbatim; additionally, the reporting implementer whose request produced
+this document did not review the concrete form before it landed, and their
+fallback (gate locally, ship nothing) was a position this decision
+deliberately overrode in favor of a constraint recipients can see.
+
+The concrete form:
+
+- The value lives on BOTH surfaces: `channel.recipientClass` (§7.1.5,
+  OPTIONAL, omitted-when-absent) declares; `allowedRecipientClasses` (§6.1,
+  OPTIONAL on the Delegation Mandate) constrains, bound by the human's own
+  signature.
+- The set is CLOSED at `human`, `agent` — two members, grown by amendment
+  like every closed set, not fixed at two by a boolean's shape.
+- Absence semantics, both surfaces: an absent `recipientClass` is "no
+  claim"; an absent `allowedRecipientClasses` is "unconstrained" (which
+  every pre-existing signed grant is, keeping those signatures intact). An
+  EMPTY `allowedRecipientClasses` is a coherent grant allowing no consumer
+  at all — a different statement, admitted at parse.
+- Under a constrained grant, an envelope declaring a class outside it OR
+  declaring none refuses with `APH_E020` — a constraint escapable by
+  omission is not a constraint, and the party disciplined is exactly the
+  honest-but-over-broad agent this document names as the threat.
+- The rollout rule this document said any concrete form owes: the same
+  version-gated emission rule as `audience` and `actClassification` —
+  producers MUST NOT emit either new member until they have reason to
+  believe the recipient understands it (§10.1).
+
+This ratification also closes the question RFC 0004's disposition left open:
+`a2a_email` is disposed of not by the `email` mapping alone but by this
+axis — the recipient-class refinement it encoded is now expressible where it
+belongs.

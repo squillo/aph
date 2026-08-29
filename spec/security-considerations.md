@@ -44,13 +44,31 @@ Threat: an attacker captures a valid APH envelope and replays it later,
 potentially in a different conversation, hoping the recipient will accept
 the message as freshly authorized.
 
-Mitigation: every envelope carries a `validFrom` / `validUntil` time
+Mitigation (upgraded by RFC 0003 from bounded to mitigated-with-
+conditions): every envelope carries a `validFrom` / `validUntil` time
 window and a unique `id` (UUID v4 in the canonical encoding). Recipients
-MUST reject envelopes presented outside the time window. Recipients
-SHOULD additionally maintain a short-lived dedup cache keyed on the
-envelope `id` so a single envelope cannot be presented twice within its
-validity window. Time windows are bound at notarization time and SHOULD
-be on the order of minutes, not hours.
+MUST reject envelopes presented outside the time window (`APH_E019`,
+§8.3 step 6). Recipients MUST record `id` at acceptance and reject any
+later presentation of the same `id` (`APH_E018`, §8.3 step 8b) — the
+former SHOULD-grade dedup cache is now the protocol's own obligation,
+retained at least until `validUntil`. A producer MAY additionally name
+the one recipient entitled to accept (`audience`, §7.1.13); a verifier
+that is not that recipient refuses (`APH_E017`, §8.3 step 5a). Time
+windows are bound at notarization time and SHOULD be on the order of
+minutes, not hours.
+
+The conditions, stated honestly (RFC 0003's own limits):
+
+1. Single-use is PER-VERIFIER. Two independent verifiers each accept
+   once, because strangers share no state — the same property that makes
+   APH verifiable by strangers at all. Audience binding is what narrows
+   acceptance to one intended verifier; the two mechanisms are
+   load-bearing together and neither is sufficient alone.
+2. An envelope with no `audience` remains a bearer credential. RFC 0003
+   makes that the producer's explicit choice rather than the protocol's
+   silent default; it does not eliminate the shape. The embedded
+   Delegation Mandate's own bearer problem is separate, larger, and
+   deliberately NOT addressed by that RFC.
 
 ### 2.2 Tampering with the message body
 

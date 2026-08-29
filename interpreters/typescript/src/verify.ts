@@ -64,6 +64,30 @@ export interface VerifyOptions {
   readonly bodyBytes?: Uint8Array;
   readonly maxEnvelopeBytes?: number;
   /**
+   * §8.3 step 5a (RFC 0003): this verifier's own identity, compared against
+   * `credentialSubject.audience.id` when the envelope names one. Omitting it
+   * does NOT skip the check — an envelope WITH an audience meets a verifier
+   * that cannot determine its own identity, and §8.3 says reject, not skip.
+   * An envelope with no audience never consults this.
+   */
+  readonly verifierId?: string;
+  /**
+   * §8.3 step 5a: the delivery coordinates of the act this verifier is being
+   * asked to perform, compared member-by-member against
+   * `audience.channelBinding` when present. Same reject-not-skip rule: a
+   * binding nobody can check is refused.
+   */
+  readonly actCoordinates?: Readonly<Record<string, unknown>>;
+  /**
+   * §8.3 step 8b (RFC 0003): the verifier's single-use ledger. When supplied,
+   * an `id` already in the set refuses with APH_E018, and a successful verify
+   * ADDS the id — returning from this function is this library's acceptance
+   * moment. When omitted the obligation still exists; it is simply being kept
+   * by the caller somewhere this function cannot see, and the caller should
+   * be able to say where.
+   */
+  readonly consumedIds?: Set<string>;
+  /**
    * §8.2 detached-JWS signing input. RFC 7797 with `b64:false` makes the input
    * `BASE64URL(header) || "." || <raw payload bytes>`; some deployed signers
    * base64url-encode the payload anyway. `auto` accepts either and is the
@@ -405,6 +429,19 @@ export async function verifyEmbeddedMandate(
     throw aphError('APH_E006', "the embedded mandate's notarySignature did not verify under the notary's key");
   }
 
+  if (mandate.allowedRecipientClasses !== undefined) {
+    // RFC 0005: a constrained grant refuses a class outside it AND a missing
+    // declaration — a constraint escapable by omission would teach every
+    // over-broad agent the same trick.
+    const declared = subject.channel.recipientClass;
+    if (declared === undefined || !mandate.allowedRecipientClasses.includes(declared)) {
+      throw aphError(
+        'APH_E020',
+        `the envelope declares recipient class ${declared ?? 'nothing'}; the mandate allows ` +
+          `[${mandate.allowedRecipientClasses.join(', ')}]`,
+      );
+    }
+  }
   if (!mandate.allowedChannels.includes(subject.channel.kind)) {
     throw aphError(
       'APH_E005',
@@ -551,6 +588,56 @@ export async function verifyEnvelope(
     throw aphError('APH_E001', 'the notary proof did not verify over its §7.2.1 base');
   }
 
+  // Step 5a — the audience check (RFC 0003). Placed with the other
+  // signature-adjacent checks: after the proofs, before the window and the
+  // body hash. Absence of the field is the producer's bearer-credential
+  // decision and admits; absence of the verifier's OWN identity while the
+  // field is present refuses, because a check a verifier may skip when
+  // inconvenient is not a check.
+  const audience = envelope.credentialSubject.audience;
+  if (audience !== undefined) {
+    if (options.verifierId === undefined) {
+      throw aphError(
+        'APH_E017',
+        `the envelope names audience ${audience.id} and this verifier was given no identity ` +
+          'to compare against — §8.3 step 5a rejects rather than skips',
+      );
+    }
+    if (audience.id !== options.verifierId) {
+      throw aphError(
+        'APH_E017',
+        `the envelope names audience ${audience.id}; this verifier is ${options.verifierId}`,
+      );
+    }
+    const binding = audience.channelBinding;
+    if (binding !== undefined) {
+      const act = options.actCoordinates;
+      if (act === undefined) {
+        throw aphError(
+          'APH_E017',
+          'the audience carries a channelBinding and this verifier was given no act ' +
+            'coordinates to compare against — §8.3 step 5a rejects rather than skips',
+        );
+      }
+      for (const [member, bound] of Object.entries(binding)) {
+        const actual = act[member];
+        if (actual === undefined) {
+          throw aphError(
+            'APH_E017',
+            `audience.channelBinding.${member} is bound and the act has no such coordinate`,
+          );
+        }
+        if (JSON.stringify(actual) !== JSON.stringify(bound)) {
+          throw aphError(
+            'APH_E017',
+            `audience.channelBinding.${member} is ${JSON.stringify(bound)}; the act's is ` +
+              JSON.stringify(actual),
+          );
+        }
+      }
+    }
+  }
+
   // Step 1d — the embedded mandate, once the notary key it countersigns under
   // is the one already resolved for the proof. Resolving it twice would be two
   // chances to disagree about who the notary is.
@@ -568,8 +655,11 @@ export async function verifyEnvelope(
   const until = instant(envelope.validUntil, '$.validUntil');
   if (now + skewMs < from || now - skewMs > until) {
     throw aphError(
-      'APH_E003',
-      `evaluated at ${options.now}, outside the envelope window ${envelope.validFrom} .. ${envelope.validUntil}`,
+      'APH_E019',
+      `evaluated at ${options.now}, outside the envelope window ${envelope.validFrom} .. ` +
+        `${envelope.validUntil} — the envelope's OWN window (APH_E003 is a mandate consulted ` +
+        'past its expiry, and this implementation shipped that miscite until RFC 0003 gave ' +
+        'the envelope window its own code)',
     );
   }
 
@@ -582,6 +672,17 @@ export async function verifyEnvelope(
 
   // Step 8a — revocation status.
   checkCredentialStatus(envelope);
+
+  // Step 8b — single-use (RFC 0003). LAST, at the acceptance moment: a
+  // verifier that refuses for any other reason has not consumed the id, and
+  // recording here means a crash between check and act cannot spend the
+  // envelope twice.
+  if (options.consumedIds !== undefined) {
+    if (options.consumedIds.has(envelope.id)) {
+      throw aphError('APH_E018', `envelope ${envelope.id} was already accepted once`);
+    }
+    options.consumedIds.add(envelope.id);
+  }
 
   return { envelope, attestationMode, bodyHashChecked, embeddedMandateChecked };
 }

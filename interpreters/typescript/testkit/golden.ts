@@ -27,7 +27,7 @@ export const GOLDEN_NOTARY_VERIFICATION_METHOD = 'did:web:notary.squillo.com#key
  * (2026-05-21T00:00:00Z .. 2026-05-22T00:00:00Z). A constant, because a
  * verifier that read the wall clock would pass today and fail in 2027.
  */
-export const GOLDEN_EVALUATION_INSTANT = '2026-05-21T12:00:00Z';
+export const GOLDEN_EVALUATION_INSTANT = '2026-05-21T00:05:00Z';
 
 /**
  * The keys a verifier must be handed to check the golden end to end. The

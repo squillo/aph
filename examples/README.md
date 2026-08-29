@@ -1,8 +1,9 @@
 # APH Envelope Examples
 
-This directory contains 13 example APH `NotarizationEnvelope` JSON files:
+This directory contains 14 example APH `NotarizationEnvelope` JSON files:
 one per supported channel kind (7), one exercising the §7.5 registered
-optional extensions, **three signed vectors — one for each of the signing
+optional extensions, one carrying the §7.1.12 `actClassification` claim, one
+carrying the §7.1.13 `audience` binding (RFC 0003), **three signed vectors — one for each of the signing
 paths §8.1/§8.2 make MUST-support** — and `ts_minted_envelope.json`, which
 the TypeScript implementation mints and the Rust reference verifies. They
 illustrate the wire shape of v0.1 envelopes and are suitable for round-trip
@@ -21,6 +22,9 @@ no wire value for a service act (see RFC 0002) — so it is excluded from every
 - `slack_reply_envelope.json` — Slack thread reply
 - `act_classification_envelope.json` — the §7.1.12 `actClassification` claim,
   citing the shipped guardrail bundle by its own digest
+- `audience_bound_envelope.json` — the §7.1.13 `audience` binding (RFC 0003):
+  named recipient plus `channelBinding` coordinates, and a minutes-order
+  window per §6.3
 - `email_reply_envelope.json` — Email reply (with `In-Reply-To`)
 - `discord_dm_envelope.json` — Discord direct message
 - `teams_channel_envelope.json` — Microsoft Teams channel post

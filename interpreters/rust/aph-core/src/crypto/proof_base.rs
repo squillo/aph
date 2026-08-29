@@ -456,6 +456,7 @@ mod tests {
       human_principal_did: std::string::String::from("did:key:zHuman"),
       agent_did: std::string::String::from("did:web:agent.squillo.com"),
       allowed_channels: std::vec![crate::envelope::ChannelKind::Slack],
+      allowed_recipient_classes: std::option::Option::None,
       rate_limit_per_hour: std::option::Option::Some(30),
       valid_from: std::string::String::from("2026-05-21T00:00:00Z"),
       valid_until: std::string::String::from("2026-06-21T00:00:00Z"),

@@ -183,7 +183,19 @@
                 }
               }
             },
-            "PolicyDecision": {
+            "RecipientClass": {
+              "enum": {
+                "Human": {
+                  "atom": "u8",
+                  "const": 0
+                },
+                "Agent": {
+                  "atom": "u8",
+                  "const": 1
+                }
+              }
+            },
+        "PolicyDecision": {
               "enum": {
                 "AlwaysAllow": {
                   "atom": "u8",
@@ -416,6 +428,14 @@
             "allowed_channels": {
               "type": "<$::*::Directional>"
             },
+            "allowed_recipient_classes": {
+              "type": "<$::*::Directional>",
+              "@attrs": {
+                "#[optional(true = true)]": {
+                  "true": true
+                }
+              }
+            },
             "rate_limit_per_hour": {
               "atom": "u32",
               "@attrs": {
@@ -553,8 +573,31 @@
                 }
               }
             },
+            "audience": {
+              "type": "<$::*::Audience>",
+              "@attrs": {
+                "#[optional(true = true)]": {
+                  "true": true
+                }
+              }
+            },
             "act_classification": {
               "type": "<$::*::ActClassification>",
+              "@attrs": {
+                "#[optional(true = true)]": {
+                  "true": true
+                }
+              }
+            }
+          }
+        },
+        "Audience": {
+          "props": {
+            "id": {
+              "atom": "str"
+            },
+            "channel_binding": {
+              "type": "<$::*::Positional>",
               "@attrs": {
                 "#[optional(true = true)]": {
                   "true": true
@@ -624,6 +667,14 @@
             },
             "recipient_addressing": {
               "type": "<$::*::Positional>"
+            },
+            "recipient_class": {
+              "type": "<$::*::RecipientClass>",
+              "@attrs": {
+                "#[optional(true = true)]": {
+                  "true": true
+                }
+              }
             }
           }
         },

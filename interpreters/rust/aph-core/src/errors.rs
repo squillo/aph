@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E017. Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E020. Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -188,6 +188,55 @@ pub enum AphError {
     /// The verifier's own identity, as it knows itself.
     verifier_id: String,
   },
+
+  /// `APH_E018` — this envelope was already accepted once. RFC 0003's
+  /// single-use step: a verifier records `id` at the moment it commits to
+  /// the act (acceptance in the RFC 5321 §6.1 sense) and refuses every
+  /// later presentation of the same `id`. The record is the RECIPIENT'S
+  /// ledger obligation — two independent verifiers each accept once, which
+  /// is why audience binding (`APH_E017`) and single-use are load-bearing
+  /// together and neither is sufficient alone.
+  #[error("APH_E018: envelope already spent: `{envelope_id}` was accepted before")]
+  EnvelopeAlreadySpent {
+    /// The `id` that was presented again after acceptance.
+    envelope_id: String,
+  },
+
+  /// `APH_E019` — the envelope's OWN validity window fails against the
+  /// verifier's clock: `validFrom` is in the future or `validUntil` is in
+  /// the past. Deliberately distinct from `APH_E003`, which is a *mandate*
+  /// consulted past its expiry; before this code existed an implementer
+  /// refusing an expired envelope had to invent a refusal or miscite
+  /// `APH_E003`, and this crate's own tests nearly did.
+  #[error("APH_E019: envelope window invalid: [{valid_from} .. {valid_until}] judged at {observed_at}")]
+  EnvelopeWindowInvalid {
+    /// The envelope's `validFrom`, verbatim.
+    valid_from: String,
+    /// The envelope's `validUntil`, verbatim.
+    valid_until: String,
+    /// The instant the verifier judged the window at, RFC 3339.
+    observed_at: String,
+  },
+
+  /// `APH_E020` — the mandate constrains WHO may consume (RFC 0005's
+  /// `allowedRecipientClasses`) and this envelope either declares a class
+  /// outside the grant or declares none at all. The second half is
+  /// deliberate: a constraint the envelope lets nobody check would be
+  /// escapable by omission, and the threat here is one's own
+  /// honest-but-over-broad agent — exactly the party the refusal teaches.
+  /// Deliberately distinct from `APH_E005`, which is the MEDIUM being out
+  /// of scope; this is the CONSUMER being out of scope on an allowed
+  /// medium.
+  #[error("APH_E020: recipient class not allowed: envelope declares `{declared}`, mandate `{mandate_id}` allows {{{allowed}}}")]
+  RecipientClassNotAllowed {
+    /// What the envelope's channel declared — or the literal word
+    /// `nothing`, when it declared no class at all.
+    declared: String,
+    /// The constraining mandate's `id`.
+    mandate_id: String,
+    /// The granted classes, comma-joined, so the refusal teaches the fix.
+    allowed: String,
+  },
 }
 
 impl AphError {
@@ -213,6 +262,9 @@ impl AphError {
       Self::MandateRevoked { .. } => "APH_E015",
       Self::MandateRequired { .. } => "APH_E016",
       Self::AudienceMismatch { .. } => "APH_E017",
+      Self::EnvelopeAlreadySpent { .. } => "APH_E018",
+      Self::EnvelopeWindowInvalid { .. } => "APH_E019",
+      Self::RecipientClassNotAllowed { .. } => "APH_E020",
     }
   }
 
@@ -236,6 +288,9 @@ impl AphError {
       Self::MandateRevoked { .. } => "Obtain a fresh delegation mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2)",
       Self::MandateRequired { .. } => "Issue a delegation mandate covering this channel and scope, or route the act through the human-present flow (§9.1)",
       Self::AudienceMismatch { .. } => "Deliver the envelope to the endpoint it names, or re-issue naming the intended recipient",
+      Self::EnvelopeAlreadySpent { .. } => "Mint a fresh envelope for a new act; acceptance consumes an envelope and a replayed one is refused by design",
+      Self::EnvelopeWindowInvalid { .. } => "Mint a fresh envelope with a current window; single-act windows should be minutes, not hours",
+      Self::RecipientClassNotAllowed { .. } => "Declare the recipient class the act actually has, or ask the principal for a grant that covers it",
     }
   }
 
@@ -352,6 +407,40 @@ impl AphError {
       verifier_id: verifier_id.into(),
     }
   }
+
+  /// Builds an `APH_E018` naming the id whose second presentation was
+  /// refused, so an operator can find the first acceptance in their ledger.
+  pub fn envelope_already_spent(envelope_id: impl std::convert::Into<String>) -> Self {
+    Self::EnvelopeAlreadySpent { envelope_id: envelope_id.into() }
+  }
+
+  /// Builds an `APH_E019` carrying the window verbatim and the instant it
+  /// was judged at; without all three, "expired" is unactionable.
+  pub fn envelope_window_invalid(
+    valid_from: impl std::convert::Into<String>,
+    valid_until: impl std::convert::Into<String>,
+    observed_at: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::EnvelopeWindowInvalid {
+      valid_from: valid_from.into(),
+      valid_until: valid_until.into(),
+      observed_at: observed_at.into(),
+    }
+  }
+
+  /// Builds an `APH_E020` naming what was declared (or `nothing`), which
+  /// mandate constrained it, and what that mandate allows.
+  pub fn recipient_class_not_allowed(
+    declared: impl std::convert::Into<String>,
+    mandate_id: impl std::convert::Into<String>,
+    allowed: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::RecipientClassNotAllowed {
+      declared: declared.into(),
+      mandate_id: mandate_id.into(),
+      allowed: allowed.into(),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -375,12 +464,23 @@ mod tests {
       super::AphError::mandate_revoked("urn:uuid:00000000-0000-4000-8000-000000000002"),
       super::AphError::mandate_required("did:key:zTestAgent", "slack"),
       super::AphError::audience_mismatch("did:web:other.example.com", "did:web:this.example.com"),
+      super::AphError::envelope_already_spent("urn:uuid:00000000-0000-4000-8000-000000000003"),
+      super::AphError::envelope_window_invalid(
+        "2026-05-21T12:00:00Z",
+        "2026-05-21T12:10:00Z",
+        "2026-05-21T13:00:00Z",
+      ),
+      super::AphError::recipient_class_not_allowed(
+        "agent",
+        "urn:uuid:00000000-0000-4000-8000-000000000004",
+        "human",
+      ),
     ]
   }
 
   #[test]
   fn every_code_in_the_closed_set_is_unique() {
-    // The spec (§11) fixes a CLOSED set of exactly seventeen codes, and
+    // The spec (§11) fixes a CLOSED set of exactly twenty codes, and
     // other implementations branch on them. A duplicate would make two
     // distinct failures indistinguishable to a remote verifier. The count
     // is pinned so that adding a code without amending §11 fails here.
@@ -398,7 +498,7 @@ mod tests {
     // and rotted); the pinned count below is the tripwire, kept in exactly
     // one place.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 17);
+    std::assert_eq!(errors.len(), 20);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();

@@ -23,6 +23,15 @@ export const CHANNEL_KINDS = [
 ] as const;
 export type ChannelKind = (typeof CHANNEL_KINDS)[number];
 
+/**
+ * §7.1.5 (RFC 0005): who CONSUMES what lands on the channel. The second
+ * dimension the a2a_email request was really asking for — a refinement that
+ * must apply to every kind is not a kind. Closed at two deliberately; grown
+ * by amendment like every closed set here.
+ */
+export const RECIPIENT_CLASSES = ['human', 'agent'] as const;
+export type RecipientClass = (typeof RECIPIENT_CLASSES)[number];
+
 export const CONTENT_CLASSES = [
   'Reply',
   'New',
@@ -80,6 +89,12 @@ export interface AgentRef {
 
 export interface ChannelDescriptor {
   kind: ChannelKind;
+  /**
+   * §7.1.5 (RFC 0005): optional, omitted when absent — absence is "no
+   * claim", and a sender's value is a CLAIM either way: it constrains an
+   * honest-but-over-broad agent, not a hostile one.
+   */
+  recipientClass?: RecipientClass;
   /** §7.4: channel-shaped and OPAQUE — its sub-fields are never strict-parsed. */
   recipientAddressing: JsonObject;
 }
@@ -104,6 +119,13 @@ export interface DelegationMandate {
    * refuses to read. The parser closes the same set on the way in.
    */
   allowedChannels: ChannelKind[];
+  /**
+   * §6.1 (RFC 0005): recipient classes the human granted. ABSENT means
+   * unconstrained — which every pre-RFC-0005 signed grant is, and an absent
+   * member keeps those grants' signed bytes intact. An EMPTY array is a
+   * coherent grant allowing no consumer at all: not the same statement.
+   */
+  allowedRecipientClasses?: RecipientClass[];
   rateLimitPerHour?: number | null;
   validFrom: string;
   validUntil: string;
@@ -151,7 +173,31 @@ export interface CredentialSubject {
   policy: PolicyDescriptor;
   notarization: NotarizationMetadata;
   appleAurAcceptance?: AppleAurAcceptance;
+  audience?: Audience;
   actClassification?: ActClassification;
+}
+
+/**
+ * §7.1.13 (RFC 0003): who may accept this envelope. Absence is the
+ * producer's DECISION to issue a bearer credential — an envelope without
+ * this member is byte-identical to one minted before the field existed.
+ */
+export interface Audience {
+  /** DID of the endpoint entitled to accept (§8.3 step 5a, APH_E017). */
+  id: string;
+  /**
+   * Restates the delivery coordinates the envelope authorizes so an
+   * envelope for one channel cannot be spent on another. Open members by
+   * design: everything beside `kind` IS coordinate data, compared
+   * member-by-member against the act's coordinates.
+   */
+  channelBinding?: AudienceChannelBinding;
+}
+
+/** §7.1.13: `kind` from the closed set; every other member is a coordinate. */
+export interface AudienceChannelBinding {
+  kind: ChannelKind;
+  [coordinate: string]: unknown;
 }
 
 /**

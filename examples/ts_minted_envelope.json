@@ -10,8 +10,8 @@
   ],
   "id": "urn:uuid:00000000-0000-4000-8000-0000000000c3",
   "issuer": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
-  "validFrom": "2026-06-01T00:00:00Z",
-  "validUntil": "2026-06-02T00:00:00Z",
+  "validFrom": "2026-06-01T11:55:00Z",
+  "validUntil": "2026-06-01T12:05:00Z",
   "credentialSubject": {
     "humanPrincipal": {
       "id": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
@@ -76,7 +76,7 @@
       "verificationMethod": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT#z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
       "created": "2026-06-01T00:00:01Z",
       "proofPurpose": "assertionMethod",
-      "proofValue": "z4nLrbtEjbtrbpwv5knrfsnacFN84HXzjaHiQHgLCwuR8p4T6y2BkYZkjHrqvatf6srgEyc1QxG6cQFxtBux2NPnC",
+      "proofValue": "z5d3Prv2Dv46omXYa8xt1Q1g1U4TjexmiDGjXJBRF9y8YAVhfHNJUrE3M5xSi677mSTVUZWu9THyVQE1sHhW2Cd1G",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000c1"
     },
     {
@@ -85,7 +85,7 @@
       "verificationMethod": "did:key:z6MkwSD8dBdqcXQzKJZQFPy2hh2izzxskndKCjdmC2dBpfME#z6MkwSD8dBdqcXQzKJZQFPy2hh2izzxskndKCjdmC2dBpfME",
       "created": "2026-06-01T00:00:02Z",
       "proofPurpose": "authentication",
-      "proofValue": "zCfUVc7cqHEhT5nQT1j9Vc2EqN7UTBeGFHxhPH8Pd4WdNi9e9QcRJT2MtZZ5n1su2yfWZptmAjdhv16kbgvAWXSo",
+      "proofValue": "zM5oEeVt9X9LbJ7ftx8PmMNrAV2Po1D6MpVw793AizJXNYoCxKYduE8S8k45Mo6LbpAkjGZLxxcJDS91fymY2ixv",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000c2",
       "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000c1"
     }

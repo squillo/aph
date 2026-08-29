@@ -149,6 +149,18 @@ export const CORPUS: readonly CorpusRow[] = [
       'proves the two artifacts agree on what that bundle is called',
   },
   {
+    file: 'audience_bound_envelope.json',
+    required: true,
+    verdict: { kind: 'refuse', code: 'APH_E001' },
+    proves:
+      '§7.1.13 `audience` parses in the INDEPENDENT implementation — the named ' +
+      'recipient and the open-membered `channelBinding` with its closed `kind` — and ' +
+      'that carrying it does not change the verdict, which stays the shape-only ' +
+      'signature refusal reached BEFORE step 5a. The step 5a gate itself is pinned on ' +
+      'minted envelopes in the roundtrip suite, where a real signature lets the ' +
+      'pipeline reach it',
+  },
+  {
     file: 'slack_new_with_extensions_envelope.json',
     required: true,
     verdict: { kind: 'refuse', code: 'APH_E001' },

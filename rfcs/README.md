@@ -64,8 +64,8 @@ specification guarantee that lives only in prose.
 |---|---|---|
 | [0001](0001-rotation-attestation.md) | Signed rotation attestation (v0.2 candidate) | Draft |
 | [0002](0002-service-act-channel.md) | A service-act channel binding | **Accepted** |
-| [0003](0003-audience-and-single-use.md) | Audience binding and single-use envelopes | Draft |
+| [0003](0003-audience-and-single-use.md) | Audience binding and single-use envelopes | **Accepted** |
 | [0004](0004-vendor-extension-channel-kind.md) | A vendor-extension arm for `ChannelKind` | Rejected |
-| [0005](0005-recipient-class.md) | Recipient class: who is on the other end of the medium | Draft |
+| [0005](0005-recipient-class.md) | Recipient class: who is on the other end of the medium | **Accepted** |
 | [0006](0006-published-guardrail-vocabularies.md) | Published guardrail vocabularies: meaning as a resolvable third party | **Accepted** |
 | [0007](0007-in-app-channel-kind.md) | A channel kind for an in-application messaging surface | **Accepted** |

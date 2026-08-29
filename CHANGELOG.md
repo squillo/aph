@@ -5,6 +5,18 @@ All notable changes to APH (Agent per Human Notarization Protocol) will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-08-29
+
+### Added
+
+- **RFC 0003 (Accepted): audience binding + single-use envelopes.** `credentialSubject.audience` (§7.1.13, optional, omitted-when-absent) with `channelBinding` coordinates; §8.3 step 5a (audience, `APH_E017`, reject-rather-than-skip) and step 8b (single-use: `id` is spent by acceptance, `APH_E018`, retention until `validUntil`); `APH_E019` gives the envelope's own window its code and ends the `APH_E003` miscite; §6.3 minutes-order window guidance; §1's replay bullet rewritten to be true with its per-verifier limit stated. Reference: `Audience` types, `verify_audience`, `verify_envelope_window`, `ConsumedEnvelopeLedger` port + in-memory impl. Independent TypeScript implements steps 5a/8b (`verifierId`/`actCoordinates`/`consumedIds` options) and fixes its shipped E003-for-envelope-window miscite. Corpus: all fourteen goldens now carry minutes windows; the three Rust-minted vectors and the TS-minted vector re-minted through their committed seams; new `audience_bound_envelope.json` golden.
+- **RFC 0005 (Accepted, with concrete form recorded in its Decision block): the recipient-class axis.** `channel.recipientClass` (§7.1.5) and `DelegationMandate.allowedRecipientClasses` (§6.1), closed set `human`/`agent` as the fourth closed vocabulary — full closed-type treatment in the reference (`RecipientClass`), the independent TypeScript, the Snapp bundle and its N Lang sources, welded four ways from birth (spec sites, independent implementation, Snapp discriminants, prose). `APH_E020` refuses a class outside a constrained grant AND a missing declaration under one. Disposes of `a2a_email`.
+- §11 grows seventeen → twenty codes (E018 `EnvelopeAlreadySpent`, E019 `EnvelopeWindowInvalid`, E020 `RecipientClassNotAllowed`); security-considerations §2.1 upgraded from SHOULD-dedup to the protocol's own MUSTs, with RFC 0003's two honest limits stated.
+
+### Changed
+
+- Every published example's envelope window: 24 hours → 10 minutes (§6.3). Golden-derived evaluation instants recalibrated. Emission of `audience` and `recipientClass` is version-gated per §10.1, same as `actClassification`.
+
 ## [0.1.0-draft] — 2026-05-21
 
 ### Added

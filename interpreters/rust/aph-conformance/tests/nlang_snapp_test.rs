@@ -768,3 +768,42 @@ fn the_snapp_and_the_reference_agree_on_the_policy_decision_vocabulary() {
     "the Snapp declares policy decisions the reference does not"
   );
 }
+
+#[test]
+fn the_snapp_and_the_reference_agree_on_the_recipient_class_vocabulary() {
+  // The FOURTH closed vocabulary, welded on the day it was born rather than
+  // found drifting by an audit like its predecessor — which is the entire
+  // lesson of that audit applied forward. Wire spellings are lowercase
+  // (`human`, `agent`); the Snapp spells variants in PascalCase, so the
+  // mapping is derived exactly as the channel-kind weld derives it.
+  let snapp = snapp_vocabulary_discriminants("RecipientClass");
+  let mut missing_from_snapp = std::vec::Vec::new();
+  for class in aph_core::RecipientClass::ALL {
+    let pascal: String = class
+      .label()
+      .split('_')
+      .map(|part| {
+        let mut chars = part.chars();
+        match chars.next() {
+          std::option::Option::Some(first) => {
+            first.to_ascii_uppercase().to_string() + chars.as_str()
+          }
+          std::option::Option::None => String::new(),
+        }
+      })
+      .collect();
+    if !snapp.contains_key(pascal.as_str()) {
+      missing_from_snapp.push(class.label());
+    }
+  }
+  std::assert!(
+    missing_from_snapp.is_empty(),
+    "the reference declares recipient classes the Snapp does not: {:?}",
+    missing_from_snapp
+  );
+  std::assert_eq!(
+    snapp.len(),
+    aph_core::RecipientClass::ALL.len(),
+    "the Snapp declares recipient classes the reference does not"
+  );
+}

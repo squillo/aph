@@ -33,9 +33,11 @@ import { TS_MINTED_EVALUATION_INSTANT, TS_MINTED_FILE } from '../testkit/ts_mint
 
 /**
  * The instant each file is evaluated at. Every published envelope carries its
- * own 24-hour window, so one shared constant would put half the corpus outside
- * it — and a verifier that read the wall clock would pass today and fail next
- * year, which is the whole reason `now` is a parameter.
+ * own MINUTES-order window (§6.3, RFC 0003 — the 24-hour windows the corpus
+ * used to ship were the spec losing an argument to its own threat model), so
+ * one shared constant would put the differently-dated mint outside it — and a
+ * verifier that read the wall clock would pass today and fail next year,
+ * which is the whole reason `now` is a parameter.
  */
 function evaluationInstant(file: string): string {
   return file === TS_MINTED_FILE ? TS_MINTED_EVALUATION_INSTANT : GOLDEN_EVALUATION_INSTANT;

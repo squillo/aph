@@ -30,7 +30,7 @@ import { serializeEnvelopeDocument } from '../src/serialize.js';
 import { ed25519DataIntegritySigner } from '../src/signers.js';
 import { verifyEnvelope } from '../src/verify.js';
 import { sha256 } from '../src/webcrypto.js';
-import type { ChannelKind, DelegationMandate } from '../src/types.js';
+import type { ChannelKind, DelegationMandate, RecipientClass } from '../src/types.js';
 import { RFC8032_TEST_2, RFC8032_TEST_3, ed25519SigningKey } from '../testkit/vectors.js';
 
 const NOW = '2026-06-01T12:00:00Z';
@@ -115,6 +115,7 @@ async function signers(): Promise<{
 async function mandateFor(options: {
   readonly principalDid: string;
   readonly allowedChannels: ChannelKind[];
+  readonly allowedRecipientClasses?: RecipientClass[];
   readonly validFrom?: string;
   readonly validUntil?: string;
 }): Promise<DelegationMandate> {
@@ -125,6 +126,9 @@ async function mandateFor(options: {
       humanPrincipalDid: options.principalDid,
       agentDid: 'did:web:agent.squillo.com',
       allowedChannels: options.allowedChannels,
+      ...(options.allowedRecipientClasses !== undefined
+        ? { allowedRecipientClasses: options.allowedRecipientClasses }
+        : {}),
       validFrom: options.validFrom ?? '2026-05-31T00:00:00Z',
       validUntil: options.validUntil ?? '2026-06-02T00:00:00Z',
     },
@@ -255,3 +259,210 @@ test('serialization is byte-stable: parse of the emitted document re-emits the s
   assert.equal(serializeEnvelopeDocument(parseEnvelope(document)), document);
   assert.ok(document.endsWith('\n'));
 });
+
+// ── RFC 0003: audience, single-use, and the envelope window's own code ──
+//
+// These run on MINTED envelopes, not the shape-only corpus, because §8.3
+// puts the audience gate AFTER signature verification: on an illustrative
+// fixture the E001 refusal fires first and step 5a is unreachable. A gate
+// only testable behind a real signature must be tested behind one.
+
+async function auditedEnvelope(): Promise<string> {
+  const { principalDid, notaryDid, notary } = await signers();
+  const prepared = await prepare({ principalDid, notaryDid, issuer: notaryDid });
+  delete (prepared.credentialSubject.policy as { attestationMode?: unknown }).attestationMode;
+  (prepared.credentialSubject as { audience?: unknown }).audience = {
+    id: 'did:web:ssot.example.com',
+    channelBinding: { kind: 'slack', teamId: 'T01234567' },
+  };
+  const envelope = await mintNotaryAttestedEnvelope({
+    prepared,
+    notary,
+    created: '2026-06-01T00:00:02Z',
+  });
+  return serializeEnvelopeDocument(envelope);
+}
+
+test('step 5a: the named verifier with matching coordinates is admitted', async () => {
+  // The positive path, pinned so the gate cannot rot into refusing everyone
+  // while its refusal tests stay green.
+  const verified = await verifyEnvelope(await auditedEnvelope(), {
+    now: NOW,
+    verifierId: 'did:web:ssot.example.com',
+    actCoordinates: { kind: 'slack', teamId: 'T01234567', threadTs: 'incidental' },
+  });
+  assert.equal(verified.attestationMode, 'NotaryAttested');
+});
+
+test('step 5a: a verifier with no identity REJECTS an audience-bearing envelope, not skips', async () => {
+  // RFC 0003's sharpest sentence. Skipping here would make the binding
+  // decoration precisely where an attacker relays the envelope.
+  await assert.rejects(
+    async () => verifyEnvelope(await auditedEnvelope(), { now: NOW }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E017',
+  );
+});
+
+test('step 5a: the wrong verifier is refused with APH_E017', async () => {
+  await assert.rejects(
+    async () =>
+      verifyEnvelope(await auditedEnvelope(), {
+        now: NOW,
+        verifierId: 'did:web:other.example.com',
+        actCoordinates: { kind: 'slack', teamId: 'T01234567' },
+      }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E017',
+  );
+});
+
+test('step 5a: a bound coordinate the act lacks, or contradicts, refuses', async () => {
+  // The member-by-member rule: a constraint that cannot be checked is
+  // refused, and one that checks false is refused — both E017.
+  await assert.rejects(
+    async () =>
+      verifyEnvelope(await auditedEnvelope(), {
+        now: NOW,
+        verifierId: 'did:web:ssot.example.com',
+      }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E017',
+  );
+  await assert.rejects(
+    async () =>
+      verifyEnvelope(await auditedEnvelope(), {
+        now: NOW,
+        verifierId: 'did:web:ssot.example.com',
+        actCoordinates: { kind: 'slack', teamId: 'T_ELSEWHERE' },
+      }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E017',
+  );
+});
+
+test('step 8b: acceptance spends the id, and a refusal consumes nothing', async () => {
+  // RFC 0003 measured the defect as 100 presentations, 100 admissions. With
+  // a ledger supplied, presentation two is APH_E018 — and a presentation
+  // refused for ANOTHER reason must not spend the envelope, which is why
+  // recording happens at the acceptance moment and not before.
+  const { principalDid, notaryDid, notary } = await signers();
+  const prepared = await prepare({ principalDid, notaryDid, issuer: notaryDid });
+  delete (prepared.credentialSubject.policy as { attestationMode?: unknown }).attestationMode;
+  const envelope = serializeEnvelopeDocument(
+    await mintNotaryAttestedEnvelope({ prepared, notary, created: '2026-06-01T00:00:02Z' }),
+  );
+  const consumedIds = new Set<string>();
+
+  // A refusal first: outside the window. The ledger must stay empty.
+  await assert.rejects(
+    () => verifyEnvelope(envelope, { now: '2027-01-01T00:00:00Z', consumedIds }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E019',
+  );
+  assert.equal(consumedIds.size, 0);
+
+  await verifyEnvelope(envelope, { now: NOW, consumedIds });
+  assert.equal(consumedIds.size, 1);
+  await assert.rejects(
+    () => verifyEnvelope(envelope, { now: NOW, consumedIds }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E018',
+  );
+});
+
+test("APH_E019 — the envelope's OWN window has its own code now", async () => {
+  // This implementation SHIPPED the E003 miscite for the envelope window;
+  // RFC 0003 added the code that makes the two refusals distinguishable.
+  // The mandate-window test above still pins E003 for the mandate side, so
+  // the pair of tests is the weld holding the distinction.
+  const { principalDid, notaryDid, notary } = await signers();
+  const prepared = await prepare({ principalDid, notaryDid, issuer: notaryDid });
+  delete (prepared.credentialSubject.policy as { attestationMode?: unknown }).attestationMode;
+  const envelope = await mintNotaryAttestedEnvelope({
+    prepared,
+    notary,
+    created: '2026-06-01T00:00:02Z',
+  });
+  await assert.rejects(
+    () => verifyEnvelope(serializeEnvelopeDocument(envelope), { now: '2027-01-01T00:00:00Z' }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E019',
+  );
+});
+
+// ── RFC 0005: the recipient-class constraint on minted envelopes ──
+
+test('APH_E020 — a constrained grant refuses a declared class outside it', async () => {
+  // The motivating case verbatim: the human granted "slack to PEOPLE"; the
+  // act is unattended agent-to-agent traffic on the same medium. Before
+  // RFC 0005 nothing on the wire could refuse this.
+  const { principalDid, notaryDid, principal, notary } = await signers();
+  const mandate = await mandateFor({
+    principalDid,
+    allowedChannels: ['slack'],
+    allowedRecipientClasses: ['human'],
+  });
+  const prepared = await prepare({ principalDid, notaryDid, mandate });
+  (prepared.credentialSubject.channel as { recipientClass?: unknown }).recipientClass = 'agent';
+  const envelope = await mintPrincipalSignedEnvelope({
+    prepared,
+    principal,
+    principalProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a3', created: '2026-06-01T00:00:01Z' },
+    notary,
+    notaryProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a4', created: '2026-06-01T00:00:02Z' },
+  });
+  await assert.rejects(
+    () => verifyEnvelope(serializeEnvelopeDocument(envelope), { now: NOW }),
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E020',
+  );
+});
+
+test('APH_E020 — declaring NOTHING under a constrained grant refuses too', async () => {
+  // A constraint escapable by omission is not a constraint. The refusal
+  // names `nothing` so the operator sees which failure this was.
+  const { principalDid, notaryDid, principal, notary } = await signers();
+  const mandate = await mandateFor({
+    principalDid,
+    allowedChannels: ['slack'],
+    allowedRecipientClasses: ['human'],
+  });
+  const envelope = await mintPrincipalSignedEnvelope({
+    prepared: await prepare({ principalDid, notaryDid, mandate }),
+    principal,
+    principalProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a3', created: '2026-06-01T00:00:01Z' },
+    notary,
+    notaryProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a4', created: '2026-06-01T00:00:02Z' },
+  });
+  await assert.rejects(
+    () => verifyEnvelope(serializeEnvelopeDocument(envelope), { now: NOW }),
+    (error: unknown) =>
+      error instanceof AphError && error.code === 'APH_E020' && error.message.includes('nothing'),
+  );
+});
+
+test('a declared class inside the grant is admitted, and an unconstrained grant checks nothing', async () => {
+  // Positive controls for both arms, so the refusal tests above cannot rot
+  // into a check that refuses everyone.
+  const { principalDid, notaryDid, principal, notary } = await signers();
+  const constrained = await mandateFor({
+    principalDid,
+    allowedChannels: ['slack'],
+    allowedRecipientClasses: ['human'],
+  });
+  const prepared = await prepare({ principalDid, notaryDid, mandate: constrained });
+  (prepared.credentialSubject.channel as { recipientClass?: unknown }).recipientClass = 'human';
+  const envelope = await mintPrincipalSignedEnvelope({
+    prepared,
+    principal,
+    principalProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a3', created: '2026-06-01T00:00:01Z' },
+    notary,
+    notaryProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a4', created: '2026-06-01T00:00:02Z' },
+  });
+  const verified = await verifyEnvelope(serializeEnvelopeDocument(envelope), { now: NOW });
+  assert.equal(verified.embeddedMandateChecked, true);
+
+  const unconstrained = await mandateFor({ principalDid, allowedChannels: ['slack'] });
+  const bare = await mintPrincipalSignedEnvelope({
+    prepared: await prepare({ principalDid, notaryDid, mandate: unconstrained }),
+    principal,
+    principalProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a3', created: '2026-06-01T00:00:01Z' },
+    notary,
+    notaryProof: { id: 'urn:uuid:00000000-0000-4000-8000-0000000000a4', created: '2026-06-01T00:00:02Z' },
+  });
+  await verifyEnvelope(serializeEnvelopeDocument(bare), { now: NOW });
+});
+

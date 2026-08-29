@@ -1,7 +1,7 @@
 # RFC 0003 — Audience binding and single-use envelopes
 
-- **Status:** Draft
-- **Issue:** _to be opened — this document is the proposal, not a ruling_
+- **Status:** Accepted
+- **Issue:** ruled directly (see Decision)
 - **Spec sections touched:** §7.1 (envelope shape — new `audience`), §8.3
   (verification steps — new audience and single-use checks), §11 (error
   taxonomy — two new codes), §6.3 (validity windows — guidance),
@@ -262,3 +262,30 @@ deserves its own RFC rather than a subsection here.
   revocation wiring.
 - Does not add cryptography. Both new checks are comparisons; every
   implementation already has the values they compare.
+
+## Decision
+
+**Accepted 2026-08-29**, by the sole maintainer, and implemented the same
+day. The solo-ratification limitation recorded in RFC 0006 and 0007's
+Decision blocks applies verbatim: the second-maintainer requirement is open
+and unfilled, and this was decided anyway, deliberately and on the record —
+the demonstrated bearer-replay attack was judged worse than the process gap,
+and the ecosystem was already half-implemented (`APH_E017` registered ahead
+of this document under the additive-codes rule, §8.3 step 8's conditional
+MUST, a consumed-envelope ledger live in one verifier).
+
+What landed with ratification, so a reader need not diff the spec:
+`audience` is §7.1.13; the audience check is §8.3 step 5a; single-use is
+§8.3 step 8b; the window code split is `APH_E019` (this document's proposal
+named the pair E017/E018 for audience and single-use and E019 for the
+window, and that is how they landed); §6.3 carries the minutes-order window
+guidance and the ENTIRE published corpus was regenerated to match — the
+twelve 24-hour windows this document indicts are gone, the signed vectors
+re-minted through their committed seams. The §1 "Replay-resistant" bullet
+was rewritten to be TRUE, with the per-verifier limit stated in it.
+
+One deferral, recorded rather than hidden: the language bindings expose no
+dedicated audience-check operation yet. The check is a comparison a consumer
+can write in any host language; a binding operation is minted when the first
+consumer asks, and the parity contract's census will count it when it
+arrives.

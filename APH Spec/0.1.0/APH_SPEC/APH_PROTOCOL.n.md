@@ -137,6 +137,21 @@ written down rather than inferred from an absence.
   }
 ```
 
+### Recipient classes
+
+Who CONSUMES what lands on the channel (§7.1.5, RFC 0005) — the second
+dimension the a2a_email request was really asking for. A refinement that
+must apply to every channel kind is not a kind; it is this axis. Closed at
+two deliberately, grown by amendment like every closed set here. Wire
+spellings are lowercase (`human`, `agent`), as §7.1.5 defines them.
+
+```nlang
+  enum RecipientClass {
+    Human,
+    Agent,
+  }
+```
+
 ### Cryptosuites
 
 The proof suites for the Data Integrity proof form (§8.2). `eddsa-jcs-2022`

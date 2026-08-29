@@ -184,6 +184,24 @@ const POLICY_DECISION_SITES: [Restatement; 2] = [
   },
 ];
 
+/// Both places the spec enumerates the recipient classes (RFC 0005): §7.1.5
+/// defines the axis on the channel block; §6.1 restates it as the mandate
+/// constraint. Welded from the day the vocabulary was born.
+const RECIPIENT_CLASS_SITES: [Restatement; 2] = [
+  Restatement {
+    heading: "#### 7.1.5 ",
+    field: "recipientClass",
+    marker: "the closed set ",
+    cite: "§7.1.5 `ChannelDescriptor.recipientClass`",
+  },
+  Restatement {
+    heading: "### 6.1 ",
+    field: "allowedRecipientClasses",
+    marker: "the closed set ",
+    cite: "§6.1 `DelegationMandate.allowedRecipientClasses`",
+  },
+];
+
 /// Compares one restatement's members against the reference type's, in both
 /// directions, and reports each direction as the distinct defect it is.
 fn assert_membership_matches(site: &Restatement, spec: &str, reference: &[&'static str]) {
@@ -311,6 +329,20 @@ fn the_spec_and_the_reference_agree_on_the_policy_decision_vocabulary() {
     .map(aph_core::PolicyDecision::label)
     .collect();
   for site in &POLICY_DECISION_SITES {
+    assert_membership_matches(site, &spec, &reference);
+  }
+}
+
+#[test]
+fn the_spec_and_the_reference_agree_on_the_recipient_classes() {
+  // Same two-site membership weld as every closed vocabulary above; this
+  // one was born welded (RFC 0005) instead of joining late after an audit.
+  let spec = spec_markdown();
+  let reference: std::vec::Vec<&'static str> = aph_core::RecipientClass::ALL
+    .iter()
+    .map(aph_core::RecipientClass::label)
+    .collect();
+  for site in &RECIPIENT_CLASS_SITES {
     assert_membership_matches(site, &spec, &reference);
   }
 }

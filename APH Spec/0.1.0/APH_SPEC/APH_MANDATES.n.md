@@ -56,6 +56,13 @@ mod blocks DelegationMandate {
     agent_did: str,
     // Channel kinds this mandate permits. Non-empty.
     allowed_channels: Directional<str>,
+    // Recipient classes the human granted (§6.2, RFC 0005). Optional and
+    // absent-when-unconstrained: this struct is SIGNED, and absence keeps
+    // every previously signed grant's canonical bytes intact. An EMPTY
+    // list is a coherent grant allowing no consumer at all — a different
+    // statement, and one a principal may sign on purpose.
+    #[optional(true)]
+    allowed_recipient_classes: Directional<str>,
     // Sends per hour; absent means unlimited.
     #[optional(true)]
     rate_limit_per_hour: u32,

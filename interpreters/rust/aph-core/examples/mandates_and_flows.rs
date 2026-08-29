@@ -15,6 +15,7 @@ fn main() {
     human_principal_did: String::from("did:key:zAlice"),
     agent_did: String::from("did:web:agent.example"),
     allowed_channels: vec![aph_core::ChannelKind::Slack, aph_core::ChannelKind::Email],
+    allowed_recipient_classes: std::option::Option::None,
     rate_limit_per_hour: Some(12),
     valid_from: String::from("2026-05-21T00:00:00Z"),
     valid_until: String::from("2026-05-22T00:00:00Z"),

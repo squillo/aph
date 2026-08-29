@@ -11,7 +11,7 @@
   "id": "urn:uuid:00000000-0000-4000-8000-0000000000f3",
   "issuer": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
   "validFrom": "2026-05-21T00:00:00Z",
-  "validUntil": "2026-05-22T00:00:00Z",
+  "validUntil": "2026-05-21T00:10:00Z",
   "credentialSubject": {
     "humanPrincipal": {
       "id": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
@@ -76,7 +76,7 @@
       "verificationMethod": "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT#z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT",
       "created": "2026-05-21T00:00:01Z",
       "proofPurpose": "assertionMethod",
-      "proofValue": "zmTawgu3JsywRoYEDuKTtWfYakg6KEymF4MNeFikZpWnvoc8Qpc5dTKNB8gTe7PXwqp2b1yHrGyagAKiCC8HQHxN",
+      "proofValue": "z5sN7vCeYRKDBUmKGJxnzZjLvj1iFHARAhc9qiTVZ2x2K5V8poBEmKGT2YERycNUwRjc1P9ej4s9XMSUJYK6TmCys",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f1"
     },
     {
@@ -85,7 +85,7 @@
       "verificationMethod": "did:web:notary.squillo.com#key-1",
       "created": "2026-05-21T00:00:02Z",
       "proofPurpose": "authentication",
-      "proofValue": "z4TvqsaiwuoeX6c4qKxhioofJgSXvKy73Q48hr2hgAvUFdpjgQbvugy7gvPdtk5iFDzdG7hFNUchoVjYiYmT8dtY3",
+      "proofValue": "zD5wSvJKHYEAduBEWESzGyHpVVWJARPjy1ns5aHRSNZevHS4WfHd7ZmW1Vk3zW6EHz7ydQrKN9BvZHrwMmB3u17f",
       "id": "urn:uuid:00000000-0000-4000-8000-0000000000f2",
       "previousProof": "urn:uuid:00000000-0000-4000-8000-0000000000f1"
     }

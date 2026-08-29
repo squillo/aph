@@ -78,11 +78,35 @@ mod blocks CredentialSubject {
     // Registered optional extension (§7.5.1).
     #[optional(true)]
     apple_aur_acceptance: AppleAurAcceptanceClaim,
+    // Who may accept this envelope (§7.1.13, RFC 0003). Omitted when
+    // absent — absence is the producer's DECISION to issue a bearer
+    // credential, not an oversight the verifier forgives.
+    #[optional(true)]
+    audience: Audience,
     // What the sender says this act MEANS (§7.1.12). Omitted when absent, so
     // an envelope making no claim is byte-identical to one written before the
     // field existed.
     #[optional(true)]
     act_classification: ActClassification,
+  }
+}
+```
+
+### Audience
+
+Who may accept this envelope, and — optionally — on which delivery
+coordinates (§7.1.13). `channel_binding` is deliberately `Positional`, the
+same opacity `recipient_addressing` carries and for the same reason: its
+members ARE the coordinates, channel-shaped and compared member-by-member by
+§8.3 step 5a, and legislating their names here would make every channel
+vendor's coordinate a protocol break.
+
+```nlang
+mod blocks Audience {
+  props {
+    id: str,
+    #[optional(true)]
+    channel_binding: Positional,
   }
 }
 ```
@@ -168,6 +192,11 @@ mod blocks ChannelDescriptor {
   props {
     kind: str,
     recipient_addressing: Positional,
+    // Who consumes what lands there (§7.1.5, RFC 0005). Optional: absence
+    // is "no claim", and every envelope minted before the field existed
+    // stays byte-identical.
+    #[optional(true)]
+    recipient_class: RecipientClass,
   }
 }
 ```

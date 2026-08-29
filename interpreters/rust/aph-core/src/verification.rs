@@ -374,6 +374,36 @@ pub fn verify_embedded_mandate_binding(
     ));
   }
 
+  // RFC 0005: when the grant constrains WHO consumes, the envelope must
+  // declare a class inside it. An envelope declaring NOTHING under a
+  // constrained grant refuses too — a constraint escapable by omission
+  // would teach every over-broad agent the same trick, and the party this
+  // check disciplines is the principal's own honest agent.
+  if let std::option::Option::Some(allowed) = &mandate.allowed_recipient_classes {
+    let allowed_labels = allowed
+      .iter()
+      .map(crate::envelope::RecipientClass::label)
+      .collect::<std::vec::Vec<&'static str>>()
+      .join(", ");
+    match envelope.credential_subject.channel.recipient_class {
+      std::option::Option::Some(declared) if allowed.contains(&declared) => {}
+      std::option::Option::Some(declared) => {
+        return std::result::Result::Err(crate::errors::AphError::recipient_class_not_allowed(
+          declared.label(),
+          &mandate.id,
+          allowed_labels,
+        ));
+      }
+      std::option::Option::None => {
+        return std::result::Result::Err(crate::errors::AphError::recipient_class_not_allowed(
+          "nothing",
+          &mandate.id,
+          allowed_labels,
+        ));
+      }
+    }
+  }
+
   // `is_valid_at` is the crate's existing RFC 3339 window comparison: it
   // parses with `chrono` and returns false on anything unparseable, so a
   // garbage timestamp denies rather than defaulting to valid. Both endpoints
@@ -453,6 +483,163 @@ pub fn verify_timestamp_order(
   }
 
   std::result::Result::Ok(())
+}
+
+/// §8.3's audience step (RFC 0003 §1): when the envelope names who may
+/// accept it, this verifier had better be that party.
+///
+/// The semantics, in refusal order:
+/// - `audience` ABSENT: admitted. Absence is the producer's decision to
+///   issue a bearer credential, never an oversight the verifier forgives.
+/// - `audience.id` differs from `verifier_id`: refused, `APH_E017`.
+/// - `audience.channelBinding` present: every member it names — `kind`
+///   included — must equal the same-named member of `act_coordinates`, the
+///   delivery coordinates of the act this verifier is being asked to
+///   perform. A member the act's coordinates lack is a MISMATCH, and
+///   `act_coordinates` being `None` entirely is a mismatch too: a verifier
+///   that cannot determine the act's coordinates MUST reject rather than
+///   skip, exactly as one that cannot determine its own identity must —
+///   which is why `verifier_id` is a required parameter rather than an
+///   `Option` this function politely tolerates.
+///
+/// A comparison, not cryptography: nothing here checks a signature, and
+/// the caller runs this AFTER signature verification (§8.3 ordering).
+pub fn verify_audience(
+  envelope: &crate::envelope::NotarizationEnvelope,
+  verifier_id: &str,
+  act_coordinates: std::option::Option<&crate::envelope::AudienceChannelBinding>,
+) -> std::result::Result<(), crate::errors::AphError> {
+  let audience = match &envelope.credential_subject.audience {
+    std::option::Option::None => return std::result::Result::Ok(()),
+    std::option::Option::Some(audience) => audience,
+  };
+  if audience.id != verifier_id {
+    return std::result::Result::Err(crate::errors::AphError::audience_mismatch(
+      &audience.id,
+      verifier_id,
+    ));
+  }
+  let binding = match &audience.channel_binding {
+    std::option::Option::None => return std::result::Result::Ok(()),
+    std::option::Option::Some(binding) => binding,
+  };
+  let act = match act_coordinates {
+    std::option::Option::Some(act) => act,
+    std::option::Option::None => {
+      // Reject-rather-than-skip: a binding nobody can check is refused,
+      // not waved through, because a check a verifier may skip when
+      // inconvenient is not a check.
+      return std::result::Result::Err(crate::errors::AphError::audience_mismatch(
+        std::format!("{} (channelBinding present)", audience.id),
+        std::format!("{} (act delivery coordinates unknown to this verifier)", verifier_id),
+      ));
+    }
+  };
+  if binding.kind != act.kind {
+    return std::result::Result::Err(crate::errors::AphError::audience_mismatch(
+      std::format!("{} (channelBinding kind: `{}`)", audience.id, binding.kind.label()),
+      std::format!("{} (act kind: `{}`)", verifier_id, act.kind.label()),
+    ));
+  }
+  for (member, bound) in &binding.coordinates {
+    match act.coordinates.get(member) {
+      std::option::Option::Some(actual) if actual == bound => {}
+      std::option::Option::Some(actual) => {
+        return std::result::Result::Err(crate::errors::AphError::audience_mismatch(
+          std::format!("{} (channelBinding {}: `{}`)", audience.id, member, bound),
+          std::format!("{} (act {}: `{}`)", verifier_id, member, actual),
+        ));
+      }
+      std::option::Option::None => {
+        return std::result::Result::Err(crate::errors::AphError::audience_mismatch(
+          std::format!("{} (channelBinding {}: `{}`)", audience.id, member, bound),
+          std::format!("{} (act has no `{}` coordinate)", verifier_id, member),
+        ));
+      }
+    }
+  }
+  std::result::Result::Ok(())
+}
+
+/// The envelope's OWN validity window, judged against a clock the CALLER
+/// supplies (RFC 0003's `APH_E019`; §8.3 step 2's check finally has its
+/// code). Distinct from anything mandate-shaped: `APH_E003` is a mandate
+/// consulted past its expiry, and routing an expired ENVELOPE there was
+/// the miscite this crate's own tests nearly shipped.
+///
+/// `observed_at` is a parameter, not a syscall: verification stays a pure
+/// function of its inputs, testable at any instant, and the caller states
+/// which clock it trusts. Every timestamp unparseable → refused with the
+/// same code, fail-closed — an unreadable window never admits.
+pub fn verify_envelope_window(
+  envelope: &crate::envelope::NotarizationEnvelope,
+  observed_at: &str,
+) -> std::result::Result<(), crate::errors::AphError> {
+  let window_invalid = || {
+    crate::errors::AphError::envelope_window_invalid(
+      &envelope.valid_from,
+      &envelope.valid_until,
+      observed_at,
+    )
+  };
+  let from = chrono::DateTime::parse_from_rfc3339(&envelope.valid_from)
+    .map_err(|_| window_invalid())?;
+  let until = chrono::DateTime::parse_from_rfc3339(&envelope.valid_until)
+    .map_err(|_| window_invalid())?;
+  let at = chrono::DateTime::parse_from_rfc3339(observed_at).map_err(|_| window_invalid())?;
+  if at < from || at > until {
+    return std::result::Result::Err(window_invalid());
+  }
+  std::result::Result::Ok(())
+}
+
+/// The single-use record §8.3's final step obliges a recipient to keep
+/// (RFC 0003 §2): `id` is spent at ACCEPTANCE, and a second presentation
+/// of the same `id` is refused with `APH_E018`.
+///
+/// The protocol states the obligation, not the storage — a single process
+/// may use a set, a cluster needs shared state, a notary MAY offer a burn
+/// endpoint — so this is a port. The retention contract an implementor
+/// signs up for: an id MUST be retained at least until its envelope's
+/// `validUntil` has passed, and MAY be discarded thereafter, because
+/// [`verify_envelope_window`] already refuses the envelope from then on.
+pub trait ConsumedEnvelopeLedger {
+  /// Records `envelope_id` as spent iff it was not already; returns whether
+  /// this call was the one that spent it. One atomic question, because
+  /// separate "seen?" and "record!" calls are a check-then-act race — two
+  /// concurrent presentations would both pass the check.
+  fn spend(&mut self, envelope_id: &str) -> bool;
+}
+
+/// The single-process ledger: a set. Exists so the obligation is testable
+/// here and so a caller with one process needs no ceremony; anything
+/// distributed brings its own implementation of the trait.
+#[derive(std::fmt::Debug, std::default::Default)]
+pub struct InMemoryConsumedEnvelopeLedger {
+  spent: std::collections::BTreeSet<String>,
+}
+
+impl ConsumedEnvelopeLedger for InMemoryConsumedEnvelopeLedger {
+  fn spend(&mut self, envelope_id: &str) -> bool {
+    self.spent.insert(envelope_id.to_string())
+  }
+}
+
+/// §8.3's single-use step: call this AT THE MOMENT the verifier commits to
+/// the act — acceptance, in the RFC 5321 §6.1 sense — after every other
+/// check has passed. Calling it earlier consumes the envelope on a
+/// presentation that some LATER check may still refuse, and RFC 0003 is
+/// explicit that a verifier which rejects for any other reason has not
+/// consumed the id.
+pub fn enforce_single_use(
+  ledger: &mut dyn ConsumedEnvelopeLedger,
+  envelope: &crate::envelope::NotarizationEnvelope,
+) -> std::result::Result<(), crate::errors::AphError> {
+  if ledger.spend(&envelope.id) {
+    std::result::Result::Ok(())
+  } else {
+    std::result::Result::Err(crate::errors::AphError::envelope_already_spent(&envelope.id))
+  }
 }
 
 /// Parses an RFC 3339 timestamp, reporting `APH_E013` and naming the field
@@ -535,6 +722,7 @@ mod tests {
       human_principal_did: std::string::String::from(HUMAN_DID),
       agent_did: std::string::String::from(AGENT_DID),
       allowed_channels: std::vec![crate::envelope::ChannelKind::Slack, crate::envelope::ChannelKind::Email],
+      allowed_recipient_classes: std::option::Option::None,
       rate_limit_per_hour: std::option::Option::Some(12),
       valid_from: std::string::String::from("2026-05-01T00:00:00Z"),
       valid_until: std::string::String::from("2026-06-01T00:00:00Z"),
@@ -574,6 +762,7 @@ mod tests {
         channel: crate::envelope::ChannelDescriptor {
           kind: crate::envelope::ChannelKind::Slack,
           recipient_addressing: serde_json::json!({"teamId": "T01234567"}),
+          recipient_class: std::option::Option::None,
         },
         communication: crate::envelope::CommunicationDescriptor {
           content_class: crate::envelope::ContentClass::Reply,
@@ -604,6 +793,7 @@ mod tests {
           decision_latency_ms: 1834,
         },
         apple_aur_acceptance: std::option::Option::None,
+        audience: std::option::Option::None,
         act_classification: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,
@@ -1284,5 +1474,279 @@ mod tests {
       .expect_err("a one-element chain has no checkable order");
     std::assert_eq!(err.code(), "APH_E013");
   }
-}
+  // ── RFC 0003: audience, window, single-use ──────────────────────
 
+  fn audience(id: &str) -> crate::envelope::Audience {
+    crate::envelope::Audience {
+      id: id.to_string(),
+      channel_binding: std::option::Option::None,
+    }
+  }
+
+  fn binding(
+    kind: crate::envelope::ChannelKind,
+    coordinates: &[(&str, &str)],
+  ) -> crate::envelope::AudienceChannelBinding {
+    crate::envelope::AudienceChannelBinding {
+      kind,
+      coordinates: coordinates
+        .iter()
+        .map(|(k, v)| (k.to_string(), serde_json::json!(v)))
+        .collect(),
+    }
+  }
+
+  #[test]
+  fn an_envelope_with_no_audience_is_a_bearer_credential_by_choice() {
+    // RFC 0003 makes bearer semantics the producer's EXPLICIT decision:
+    // absence admits, and turning absence into a refusal would break every
+    // envelope minted before the field existed.
+    let envelope = single_proof_envelope();
+    super::verify_audience(&envelope, "did:web:anyone.example.com", std::option::Option::None)
+      .expect("absence is not a constraint");
+  }
+
+  #[test]
+  fn an_audience_naming_another_verifier_is_refused() {
+    // The core of the replay fix: a captured envelope stops being valid in
+    // anyone's hands. The refusal must be E017 and must name both parties,
+    // or the operator reading the log cannot tell WHICH side is misrouted.
+    let mut envelope = single_proof_envelope();
+    envelope.credential_subject.audience =
+      std::option::Option::Some(audience("did:web:intended.example.com"));
+    let err =
+      super::verify_audience(&envelope, "did:web:other.example.com", std::option::Option::None)
+        .expect_err("a mismatched audience must refuse");
+    std::assert_eq!(err.code(), "APH_E017");
+    let text = std::format!("{}", err);
+    std::assert!(text.contains("did:web:intended.example.com"));
+    std::assert!(text.contains("did:web:other.example.com"));
+  }
+
+  #[test]
+  fn the_named_verifier_is_admitted() {
+    // The positive half of the same coin, pinned so the check cannot rot
+    // into refusing everyone and passing its negative tests forever.
+    let mut envelope = single_proof_envelope();
+    envelope.credential_subject.audience =
+      std::option::Option::Some(audience("did:web:intended.example.com"));
+    super::verify_audience(&envelope, "did:web:intended.example.com", std::option::Option::None)
+      .expect("the named audience is exactly who may accept");
+  }
+
+  #[test]
+  fn a_channel_binding_with_no_act_coordinates_is_refused_not_skipped() {
+    // RFC 0003's sharpest sentence: a verifier that cannot determine the
+    // coordinates MUST reject rather than skip. Skipping here would turn
+    // the binding into decoration precisely when an attacker relays the
+    // envelope somewhere its coordinates are unknown.
+    let mut envelope = single_proof_envelope();
+    let mut aud = audience("did:web:intended.example.com");
+    aud.channel_binding = std::option::Option::Some(binding(
+      crate::envelope::ChannelKind::Slack,
+      &[("teamId", "T01234567")],
+    ));
+    envelope.credential_subject.audience = std::option::Option::Some(aud);
+    let err = super::verify_audience(
+      &envelope,
+      "did:web:intended.example.com",
+      std::option::Option::None,
+    )
+    .expect_err("unknown act coordinates must refuse, not skip");
+    std::assert_eq!(err.code(), "APH_E017");
+  }
+
+  #[test]
+  fn a_channel_binding_member_mismatch_is_refused_naming_the_member() {
+    // The member-by-member comparison is what stops an envelope for one
+    // channel being spent on another; the refusal names the member so the
+    // mismatch is diagnosable without diffing JSON by eye.
+    let mut envelope = single_proof_envelope();
+    let mut aud = audience("did:web:intended.example.com");
+    aud.channel_binding = std::option::Option::Some(binding(
+      crate::envelope::ChannelKind::Slack,
+      &[("teamId", "T01234567"), ("channelId", "C01234567")],
+    ));
+    envelope.credential_subject.audience = std::option::Option::Some(aud);
+    let act = binding(
+      crate::envelope::ChannelKind::Slack,
+      &[("teamId", "T01234567"), ("channelId", "C_ELSEWHERE")],
+    );
+    let err = super::verify_audience(
+      &envelope,
+      "did:web:intended.example.com",
+      std::option::Option::Some(&act),
+    )
+    .expect_err("a differing coordinate must refuse");
+    std::assert_eq!(err.code(), "APH_E017");
+    std::assert!(std::format!("{}", err).contains("channelId"));
+  }
+
+  #[test]
+  fn a_matching_channel_binding_is_admitted_and_extra_act_members_are_fine() {
+    // The binding constrains what it NAMES: coordinates the act carries
+    // beyond the bound ones are the channel's business, not a mismatch —
+    // otherwise no binding could be written without enumerating every
+    // incidental member a transport adds.
+    let mut envelope = single_proof_envelope();
+    let mut aud = audience("did:web:intended.example.com");
+    aud.channel_binding = std::option::Option::Some(binding(
+      crate::envelope::ChannelKind::Slack,
+      &[("teamId", "T01234567")],
+    ));
+    envelope.credential_subject.audience = std::option::Option::Some(aud);
+    let act = binding(
+      crate::envelope::ChannelKind::Slack,
+      &[("teamId", "T01234567"), ("threadTs", "1727000000.000100")],
+    );
+    super::verify_audience(
+      &envelope,
+      "did:web:intended.example.com",
+      std::option::Option::Some(&act),
+    )
+    .expect("every bound member matches");
+  }
+
+  #[test]
+  fn a_kind_mismatch_in_the_binding_is_refused() {
+    // Cross-channel spend is the attack the binding exists for: an envelope
+    // bound to slack coordinates presented as an email act must refuse even
+    // when no other member overlaps.
+    let mut envelope = single_proof_envelope();
+    let mut aud = audience("did:web:intended.example.com");
+    aud.channel_binding =
+      std::option::Option::Some(binding(crate::envelope::ChannelKind::Slack, &[]));
+    envelope.credential_subject.audience = std::option::Option::Some(aud);
+    let act = binding(crate::envelope::ChannelKind::Email, &[]);
+    let err = super::verify_audience(
+      &envelope,
+      "did:web:intended.example.com",
+      std::option::Option::Some(&act),
+    )
+    .expect_err("kind is a bound member like any other");
+    std::assert_eq!(err.code(), "APH_E017");
+  }
+
+  #[test]
+  fn the_envelope_window_admits_inside_and_refuses_both_sides_with_e019() {
+    // APH_E019 exists because refusing an expired ENVELOPE used to have no
+    // code of its own and E003 (a mandate consulted past expiry) was the
+    // standing miscite. The fixture window is 2026-05-21T00:00:00Z ..
+    // 2026-05-22T00:00:00Z; both refusals must carry E019 and the verbatim
+    // window so the operator sees WHAT was judged, not only that it failed.
+    let envelope = single_proof_envelope();
+    super::verify_envelope_window(&envelope, "2026-05-21T12:00:00Z").expect("inside the window");
+    let early = super::verify_envelope_window(&envelope, "2026-05-20T23:59:59Z")
+      .expect_err("not yet valid");
+    std::assert_eq!(early.code(), "APH_E019");
+    let late = super::verify_envelope_window(&envelope, "2026-05-22T00:00:01Z")
+      .expect_err("expired");
+    std::assert_eq!(late.code(), "APH_E019");
+    std::assert!(std::format!("{}", late).contains("2026-05-22T00:00:00Z"));
+  }
+
+  #[test]
+  fn an_unparseable_window_fails_closed_to_e019() {
+    // An unreadable window never admits — same fail-closed rule as proof
+    // timestamps, but routed to the envelope-window code, because "your
+    // window is garbage" and "your proof chain is garbage" are different
+    // repairs.
+    let mut envelope = single_proof_envelope();
+    envelope.valid_until = std::string::String::from("not-a-timestamp");
+    let err = super::verify_envelope_window(&envelope, "2026-05-21T12:00:00Z")
+      .expect_err("garbage must refuse");
+    std::assert_eq!(err.code(), "APH_E019");
+  }
+
+  #[test]
+  fn an_envelope_is_spent_by_acceptance_and_a_second_presentation_refuses() {
+    // RFC 0003 §2 measured the defect: 100 presentations of one golden
+    // envelope, 100 admissions. The ledger turns presentation two into
+    // APH_E018 naming the id, and refusing is not accepting — the refusal
+    // consumes nothing further.
+    let mut ledger = super::InMemoryConsumedEnvelopeLedger::default();
+    let envelope = single_proof_envelope();
+    super::enforce_single_use(&mut ledger, &envelope).expect("first acceptance spends");
+    let err = super::enforce_single_use(&mut ledger, &envelope)
+      .expect_err("second presentation is a replay");
+    std::assert_eq!(err.code(), "APH_E018");
+    std::assert!(std::format!("{}", err).contains(&envelope.id));
+    let again =
+      super::enforce_single_use(&mut ledger, &envelope).expect_err("and it stays spent");
+    std::assert_eq!(again.code(), "APH_E018");
+  }
+
+  #[test]
+  fn distinct_envelope_ids_spend_independently() {
+    // The ledger is keyed on `id` alone — two different envelopes never
+    // contend, which is what makes the retention bound implementable: the
+    // store grows with ids inside live windows, not with traffic.
+    let mut ledger = super::InMemoryConsumedEnvelopeLedger::default();
+    let first = single_proof_envelope();
+    let mut second = single_proof_envelope();
+    second.id = std::string::String::from("urn:uuid:00000000-0000-4000-8000-000000000002");
+    super::enforce_single_use(&mut ledger, &first).expect("first id is fresh");
+    super::enforce_single_use(&mut ledger, &second).expect("second id is fresh too");
+  }
+  // ── RFC 0005: the recipient-class constraint ─────────────────────
+
+  #[test]
+  fn an_unconstrained_mandate_ignores_recipient_class_entirely() {
+    // None means the grant says nothing about consumers — which every
+    // mandate signed before RFC 0005 is, so this arm is also the
+    // signature-compatibility arm.
+    let mut envelope = single_proof_envelope();
+    envelope.credential_subject.policy.delegation_mandate = std::option::Option::Some(mandate());
+    super::verify_embedded_mandate_binding(&envelope)
+      .expect("no constraint, nothing to check");
+  }
+
+  #[test]
+  fn a_declared_class_inside_the_grant_is_admitted() {
+    let mut envelope = single_proof_envelope();
+    envelope.credential_subject.channel.recipient_class =
+      std::option::Option::Some(crate::envelope::RecipientClass::Human);
+    let mut constrained = mandate();
+    constrained.allowed_recipient_classes =
+      std::option::Option::Some(std::vec![crate::envelope::RecipientClass::Human]);
+    envelope.credential_subject.policy.delegation_mandate =
+      std::option::Option::Some(constrained);
+    super::verify_embedded_mandate_binding(&envelope)
+      .expect("human is exactly what the grant covers");
+  }
+
+  #[test]
+  fn a_declared_class_outside_the_grant_is_refused_with_e020() {
+    // The motivating case verbatim: the grant says "email to PEOPLE", the
+    // act is unattended machine-to-machine traffic on the same medium.
+    let mut envelope = single_proof_envelope();
+    envelope.credential_subject.channel.recipient_class =
+      std::option::Option::Some(crate::envelope::RecipientClass::Agent);
+    let mut constrained = mandate();
+    constrained.allowed_recipient_classes =
+      std::option::Option::Some(std::vec![crate::envelope::RecipientClass::Human]);
+    envelope.credential_subject.policy.delegation_mandate =
+      std::option::Option::Some(constrained);
+    let err = super::verify_embedded_mandate_binding(&envelope)
+      .expect_err("agent traffic under a human-only grant must refuse");
+    std::assert_eq!(err.code(), "APH_E020");
+    std::assert!(std::format!("{}", err).contains("agent"));
+  }
+
+  #[test]
+  fn declaring_nothing_under_a_constrained_grant_is_refused_not_waved() {
+    // The omission arm: were absence admitted, the constraint would be
+    // escapable by simply not declaring — and the refusal message says
+    // `nothing` so the operator sees WHICH failure this was.
+    let mut envelope = single_proof_envelope();
+    let mut constrained = mandate();
+    constrained.allowed_recipient_classes =
+      std::option::Option::Some(std::vec![crate::envelope::RecipientClass::Human]);
+    envelope.credential_subject.policy.delegation_mandate =
+      std::option::Option::Some(constrained);
+    let err = super::verify_embedded_mandate_binding(&envelope)
+      .expect_err("an unverifiable constraint refuses");
+    std::assert_eq!(err.code(), "APH_E020");
+    std::assert!(std::format!("{}", err).contains("nothing"));
+  }
+}

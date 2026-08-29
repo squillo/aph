@@ -15,6 +15,24 @@ This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, publ
 ---
 
 
+> ### Revision 2026-08-29 — replay closed, the second axis, and a corpus that practices what §6.3 preaches
+>
+> Two more accepted RFCs land in place under the pre-production exception.
+> **RFC 0003** ends the bearer-replay era: `audience` (§7.1.13) names who may
+> accept, §8.3 gains the audience step (5a, `APH_E017`) and the single-use
+> step (8b, `APH_E018` — an envelope is SPENT by acceptance, per-verifier),
+> the envelope's own window finally has its code (`APH_E019`, ending the
+> `APH_E003` miscite this project's own implementations were shipping), and
+> §1's "Replay-resistant" bullet is now TRUE rather than aspirational. The
+> published corpus was regenerated to minutes-order windows — every one of
+> the 24-hour windows the RFC indicted is gone, signed vectors re-minted.
+> **RFC 0005** adds the second axis the `a2a_email` request was really asking
+> for: `recipientClass` on the channel block and `allowedRecipientClasses` on
+> the Delegation Mandate (closed set `human`, `agent`; `APH_E020`), so "my
+> agent may send email to PEOPLE" is finally a constraint a recipient can
+> check rather than a hope. §11 grows to twenty codes. Emission of every new
+> member stays version-gated (§10.1).
+
 > ### Revision 2026-08-28 — meaning: two channel kinds, a content class, and the vocabulary surfaces
 >
 > Three accepted RFCs land in place under the pre-production exception, all
@@ -167,7 +185,7 @@ APH v0.1 is designed to meet the following goals:
 - **Local-first decision.** The `AlwaysAllow` / `AskEveryTime` / `NeverAllow` policy is evaluated on the human's device or under the human's direct control. Notarization does not require an authorization server.
 - **Recipient-verifiable across vendors.** A recipient running entirely different software from the sender MUST be able to verify the credential using only public standards (W3C VC 2.0, RFC 8785, RFC 7515, RFC 8032).
 - **Transport-agnostic.** APH envelopes ride on the channel's native metadata surface (email header, chat block metadata, message attachment). APH does not define a new transport.
-- **Replay-resistant.** Each envelope binds to a specific outbound payload via a body hash, a time window, and a unique envelope identifier.
+- **Replay-resistant.** Each envelope binds to a specific outbound payload via a body hash and a time window, MAY name the one recipient entitled to accept it (`audience`, §7.1.13), and is spent by acceptance: a verifier records the envelope `id` when it commits to the act and refuses any later presentation of the same `id` (§8.3 step 8b, `APH_E018`). Single-use is per-verifier — recipients share no state — which is why audience binding and the single-use record are load-bearing together (RFC 0003).
 - **Composable.** APH composes cleanly with A2A (advertised as an agent extension), AP2 (cross-linked mandates), MCP (exposed as a tool), W3C VC 2.0 (envelope shape), and SD-JWT-VC (selective-disclosure compact form).
 - **No vendor lock-in.** All required cryptographic primitives are IETF or W3C standards. Implementations MAY be written against any conformant library.
 
@@ -267,6 +285,7 @@ Fields:
 | `humanPrincipalDid` | string | yes | DID of the human principal granting authority. |
 | `agentDid` | string | yes | DID of the agent receiving authority. |
 | `allowedChannels` | array of strings | yes | Channel kinds permitted (e.g., `["slack", "email"]`). |
+| `allowedRecipientClasses` | array of strings | no | Recipient classes permitted, from the closed set `human`, `agent` (RFC 0005) — the constraint a human could not previously write down: mail to PEOPLE versus unattended machine-to-machine traffic on the same medium. ABSENT means unconstrained (which every pre-RFC-0005 grant is, and keeps its signed bytes intact); an EMPTY array is a coherent grant allowing no consumer at all, and is not the same statement. |
 | `rateLimitPerHour` | unsigned integer | no | Optional per-hour send rate cap. Omitted or `null` means unlimited. |
 | `validFrom` | RFC 3339 string | yes | "Valid from" timestamp. |
 | `validUntil` | RFC 3339 string | yes | "Valid until" timestamp. |
@@ -294,6 +313,7 @@ Validation rules:
 - `id` MUST be a globally unique `urn:uuid:` value.
 - `validFrom` MUST be lexicographically less than `validUntil`.
 - `allowedChannels` MUST contain at least one entry.
+- When `allowedRecipientClasses` is present, a verifier checking an envelope against this mandate MUST refuse (`APH_E020`) an envelope whose `channel.recipientClass` is outside the granted set — or ABSENT, because a constraint escapable by omission is not a constraint (§7.1.7.1).
 - `principalSignature` MUST verify against the verification method resolved from `humanPrincipalDid`. This check comes FIRST: a countersignature over an unverifiable grant proves nothing.
 - `notarySignature` MUST verify against the issuing Notary Service's published verification method.
 - Implementations MUST reject mandates with unknown fields (strict deserialization).
@@ -364,7 +384,7 @@ The conceptual revocation model is:
 1. **Issuer-side state.** The Notary Service tracks, for every Delegation Mandate it has signed, a `revoked: bool` state and a `revokedAt: RFC 3339 string` timestamp (set when revoked, absent otherwise). The Notary Service exposes a revocation operation to the Human Principal; calling it sets `revoked = true` and stamps `revokedAt = now`.
 2. **Effect on downstream Communication Mandates.** A Notary Service MUST NOT issue a new Communication Mandate referencing a revoked Delegation Mandate. A Communication Mandate signed before its parent Delegation Mandate was revoked remains cryptographically valid; the revocation cuts off issuance of NEW mandates rather than invalidating existing signatures.
 3. **Effect on issued envelopes.** Envelopes already in flight when the parent mandate is revoked remain verifiable as signed credentials — the signatures are genuine and stay genuine. What ended is the authority behind them. **A Recipient Endpoint that receives an envelope carrying a `credentialStatus` reference (§7.1.1) MUST resolve that reference and MUST reject the envelope when the parent Delegation Mandate is revoked** (`APH_E015`, §6.3.3, §8.3 step 8a). This is a MUST rather than the recipient policy earlier drafts left it as: a transport nobody is obliged to consult protects nobody, and expiry in the next subsection (§6.3.2) already binds verifiers with a MUST — an authority that ran out on schedule and an authority the human deliberately pulled cannot carry opposite normative force. When an envelope carries NO status reference the recipient has been offered no claim to check, and §6.3.3.4 case 1 governs.
-4. **Revocation transport.** Defined normatively in §6.3.3: the notary publishes a status list credential at an endpoint derived from its own `did:web`, and each envelope issued under a mandate carries that mandate's position in the list. Short validity windows (RECOMMENDED: hours to days, not weeks to months) remain RECOMMENDED as defense in depth — they bound the exposure of a recipient that cannot reach the status surface at all, and of one whose deployment predates this revision.
+4. **Revocation transport.** Defined normatively in §6.3.3: the notary publishes a status list credential at an endpoint derived from its own `did:web`, and each envelope issued under a mandate carries that mandate's position in the list. Short validity windows (RECOMMENDED: hours to days, not weeks to months, for MANDATES — an ENVELOPE authorizing a single act SHOULD carry a window on the order of minutes, per RFC 0003: a window bounds replay without preventing it, and the single-use record of §8.3 step 8b shrinks with the windows a verifier accepts) remain RECOMMENDED as defense in depth — they bound the exposure of a recipient that cannot reach the status surface at all, and of one whose deployment predates this revision.
 
 A Communication Mandate is single-use and conceptually "consumed" by issuing the corresponding envelope; revocation of a Communication Mandate has no practical meaning (the envelope has either been issued or it has not). Revocation applies to Delegation Mandates only.
 
@@ -487,6 +507,7 @@ The notarized claim. Wraps the human principal, agent, channel, communication de
 | `policy` | object | yes | See §7.1.7. |
 | `notarization` | object | yes | See §7.1.8. |
 | `appleAurAcceptance` | object | no | Registered optional extension; omitted when absent. See §7.5.1. |
+| `audience` | object | no | Who may accept this envelope, and optionally on which delivery coordinates. Omitted when absent — absence is the producer's decision to issue a bearer credential. See §7.1.13. |
 | `actClassification` | object | no | What the sender says this act MEANS, against independently published vocabularies. Omitted when absent. See §7.1.12. |
 
 #### 7.1.3 `HumanPrincipalRef`
@@ -517,6 +538,7 @@ Identifies the channel transport and recipient addressing.
 |---|---|---|---|
 | `kind` | string | yes | One of the closed channel-kind enum values: `slack`, `email`, `discord`, `teams`, `whatsapp`, `google_chat`, `imessage`, `service`, `squillo`. New channel kinds are additive in 0.x minor versions. *(Erratum 2026-08-12: earlier drafts spelled this value `googleChat`; every published example and signed fixture emits `google_chat`, so the snake_case form is normative.)* |
 | `recipientAddressing` | JSON object | yes | Channel-shaped opaque addressing payload. The exact field set is channel-specific; see §7.4 for per-channel shapes. |
+| `recipientClass` | string | no | Who CONSUMES what lands there, from the closed set `human`, `agent` (RFC 0005). OPTIONAL, omitted when absent — absence means the producer makes no claim, and every envelope minted before this field existed is byte-identical. ⚠ Emitting is version-gated, same structural rule as §7.1.12/§7.1.13: a producer MUST NOT emit it until it has reason to believe the recipient understands it (§10.1). |
 
 `kind` names the END-DELIVERY MEDIUM — where the message lands for its human
 recipient — and never the subsystem that emitted it, the agent-to-agent rail
@@ -527,6 +549,19 @@ Where a sender's own routing concept has no entry in the enum above, the
 closure already decides the question: the correct value is the kind naming the
 medium the message ultimately delivers on, not a coinage for the routing
 concept.
+
+WHO consumes the message is the other axis, and it is `recipientClass`, not a
+kind (RFC 0005). The generalization test that ruled it: a refinement that must
+be applied to every member of a set — `a2a_email`, `a2a_slack`, `a2a_teams`, …
+— is not a member of that set but a second dimension wearing a member's
+clothes, and encoding it as members doubles the vocabulary at every
+refinement. Two orthogonal values compose instead: `kind: email` +
+`recipientClass: agent` is unattended machine consumption of ordinary mail. A
+recipient class asserted by the sender is a CLAIM, not a proof — it constrains
+an honest-but-over-broad agent, which is the actual threat (one's own agent
+doing more than one meant), and does not constrain a hostile one. What binds
+it in a mandate is the human's own signature over `allowedRecipientClasses`
+(§6.1).
 
 Requesting a new value for this or any other closed vocabulary in §7.1 is an
 ordinary change request, not a private extension: open an RFC
@@ -1071,6 +1106,41 @@ Interior key-casing note: the `vaultMutation` object's interior keys are `snake_
 
 ---
 
+#### 7.1.13 `Audience`
+
+Who may accept this envelope (RFC 0003). OPTIONAL, omitted when absent: an
+envelope without it is byte-identical to one written before the field
+existed, every signature over those bytes stays valid, and absence is the
+producer's DECISION to issue a bearer credential — available as an explicit
+choice rather than as the silent default, which was the defect.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | string (DID) | yes | The DID of the endpoint entitled to accept this envelope. §8.3 step 5a compares it against the verifier's own identity and refuses on difference (`APH_E017`). |
+| `channelBinding` | object | no | Restates the delivery coordinates the envelope authorizes, so an envelope addressed to one channel cannot be spent on another. `kind` is REQUIRED within it and drawn from the closed set (§7.1.5); every other member is channel-shaped coordinate data, compared member-by-member against the act's coordinates. A member the act's coordinates lack is a mismatch — a constraint that cannot be checked is refused, not skipped. |
+
+```json
+"audience": {
+  "id": "did:web:ssot.example.com",
+  "channelBinding": { "kind": "slack", "teamId": "T01234567", "channelId": "C01234567" }
+}
+```
+
+The check this feeds is a COMPARISON, not cryptography: it binds acceptance
+to a named party, and what that buys is that a captured envelope — from a
+message archive, a relay hop, a debug log — stops being a reusable
+authorization against ANY recipient. What it does not buy is anything about
+the one recipient it names, and an envelope with no `audience` remains a
+bearer credential in every hand that holds it.
+
+**⚠ Emitting this field is version-gated** for the same structural reason as
+`actClassification` (§7.1.12): §7.1's parse is strict, so a verifier built
+before this field existed fails an envelope carrying it at STRICT PARSE,
+below the protocol's own error vocabulary. A producer MUST NOT emit
+`audience` until it has reason to believe the recipient understands it; the
+AgentCard extension declaration (§10.1) is the existing mechanism for
+forming that belief.
+
 ## 8. Signing + Verification
 
 ### 8.1 Supported algorithms
@@ -1119,11 +1189,15 @@ A Recipient Endpoint MUST execute the following verification steps before accept
 3. **Build the base for THIS proof (§7.2.1).** Take a working copy of the envelope and set the proof's own `proofValue` to the empty string — do NOT remove the member. For a lone notary proof that is the whole rule. In a chain: for the **principal** proof, discard the notary proof so `proof` is a ONE-ELEMENT ARRAY holding the principal's alone (§7.2.1 — the array form is normative; collapsing it to an object changes the bytes); for the **notary** proof, keep both with the principal's `proofValue` complete. Never include a proof that comes *after* the one being verified — it did not exist when that signature was made.
 4. **Canonicalize.** Apply JCS (RFC 8785) to the working copy.
 5. **Verify the signature.** Validate `proof.proofValue` against the canonical bytes using the public key from step 2 and the algorithm pinned by `proof.cryptosuite` or the JWS protected header `alg`.
-6. **Validate the time window.** Confirm `validFrom <= now <= validUntil` where `now` is the verifier's current wall clock. Allow a small clock-skew tolerance (RECOMMENDED: 60 seconds).
+
+   5a. **Audience check (RFC 0003).** When `credentialSubject.audience` is present, the verifier MUST compare `audience.id` against its own identity and MUST reject with `APH_E017` when they differ. When `audience.channelBinding` is present, the verifier MUST additionally compare each member it names — `kind` included — against the delivery coordinates of the act it is being asked to perform, and MUST reject on any mismatch, a member those coordinates lack included. A verifier that cannot determine its own identity, or the act's coordinates while a `channelBinding` is present, MUST reject rather than skip the step: a check a verifier may skip when inconvenient is not a check. An envelope with no `audience` member skips this step — absence is the producer's decision to issue a bearer credential (§7.1.13). Sub-numbered per this section's idiom (see step 8a's note).
+6. **Validate the time window.** Confirm `validFrom <= now <= validUntil` where `now` is the verifier's current wall clock. Allow a small clock-skew tolerance (RECOMMENDED: 60 seconds). Failure — either side, or an unparseable timestamp, which fails closed — is `APH_E019`, the envelope's OWN window judged against the verifier's clock; `APH_E003` remains a *mandate* consulted past its expiry, and the two were conflated in practice until this code existed.
 7. **Validate the algorithm.** Confirm the algorithm is in the supported set (`ES256` or `EdDSA`). Reject `alg: none`. Reject any vendor-specific algorithm not explicitly opted into.
 8. **Validate the body hash (conditional MUST).** When the recipient has the actual outbound body bytes — the channel transport delivered both the envelope and the payload — it MUST compute SHA-256 over the body, compare against `credentialSubject.communication.bodySha256`, and reject on mismatch with `APH_E009`. When the body is NOT available to the verifier (a metadata-only relay, a stored envelope inspected after the payload was consumed), the step is SKIPPED AND RECORDED: the verifier notes that body binding was not checked, and MUST NOT report or imply that the payload was verified against its hash. A skip silently folded into a pass would let a metadata-only hop launder an unverified body as a verified one, which is the confusion this step exists to prevent. *(Revised from RECOMMENDED on an implementer report: an unconditional-looking recommendation was being read as "optional even when the bytes are in hand", which is the one case it must never be.)*
 
    8a. **Validate revocation status (§6.3.3).** If the envelope carries `credentialStatus`, derive the status endpoint from the notary's `did:web` (§6.3.3.2), bind any carried `statusListCredential` same-origin against it, obtain and verify the status list credential, and reject the envelope if the bit at `statusListIndex` is set (`APH_E015`) or if status could not be established at all (`APH_E008`). If the envelope carries no `credentialStatus`, skip this step (§6.3.3.4 case 1). Placed after the local checks deliberately: this is the only step that may cost a network round-trip, so every cheap reason to reject has already been taken. Numbered `8a` rather than renumbered into the list because §8.3.1 references steps 9 and 10 by number, and the sub-numbered insertion is this section's own idiom for adding a step without moving them.
+
+   8b. **Single-use (RFC 0003).** The envelope is spent by acceptance: the verifier MUST record `id` at the moment it commits to the act — acceptance in the RFC 5321 §6.1 sense — and MUST reject any later presentation of the same `id` with `APH_E018`. Recording at the commit moment, not before, means a crash between check and act cannot spend the envelope twice, and a verifier that rejects for any OTHER reason has not consumed it. The record MUST be retained at least until the envelope's `validUntil` has passed and MAY be discarded thereafter, because step 6 already refuses the envelope from then on — retention is bounded by the longest window a verifier accepts, which is one more reason windows are minutes (§6.3). Where the record lives is deliberately unspecified: a single process may use a set, a cluster needs shared state, a notary MAY offer a burn endpoint. The obligation is per-verifier — two independent verifiers each accept once, because strangers share no state — which is exactly the gap the audience check (step 5a) closes, and why neither mechanism is sufficient alone.
 
 9. **Emit the verified credential.** If all checks pass, the recipient MAY render a "Notarized" badge in its UI, store the verified credential for audit, and accept the message.
 
@@ -1165,7 +1239,12 @@ principal proof and no chain, so it skips to 1d.
     falls within the granted scope and window (§7.1.7.1) — the mandate's
     `humanPrincipalDid` MUST equal `credentialSubject.humanPrincipal.id`,
     its `agentDid` MUST equal `credentialSubject.agent.id`, the envelope's
-    channel MUST be in `allowedChannels` (else `APH_E005`), and the
+    channel MUST be in `allowedChannels` (else `APH_E005`), when the mandate
+    carries `allowedRecipientClasses` the envelope's `channel.recipientClass`
+    MUST be present and in that set (else `APH_E020` — declared-outside and
+    declared-nothing both refuse, and the code is distinct from `APH_E005`
+    because the MEDIUM being out of scope and the CONSUMER being out of scope
+    are different repairs), and the
     envelope's window MUST fall inside the mandate's (else `APH_E003`).
     Without those bindings an attacker could staple any validly-signed
     mandate to any envelope. Absent an embedded mandate, the human's
@@ -1533,7 +1612,7 @@ APH identifies both the human principal and the agent via DIDs. v0.1 implementat
 
 ## 11. Error Taxonomy
 
-APH defines a closed set of seventeen error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
+APH defines a closed set of twenty error codes for v0.1. Implementations MUST use the codes below when emitting protocol-level errors and SHOULD include the `suggestedResolution` text (or a localized equivalent) in user-facing error displays.
 
 | Code | Variant | Meaning | Suggested resolution |
 |---|---|---|---|
@@ -1553,7 +1632,10 @@ APH defines a closed set of seventeen error codes for v0.1. Implementations MUST
 | `APH_E014` | `NotaryKeyNotPublished` | No notary key is published at the queried discovery surface: the DNS TXT name carries no APH record (or none matching the named `kid`), or a fetched DID Document names no key under the queried fragment (§8.4.5, §8.4.4). Deliberately distinct from `APH_E008`, which means the surface could not be REACHED — §8.4.6's no-downgrade rule turns on exactly this distinction (absence advances the resolution sequence; failure stops it), and a taxonomy that flattened the two would force every implementation's error surface to flatten them again. | Publish the key at the queried surface, or direct verifiers to a surface the notary actually publishes to. |
 | `APH_E015` | `MandateRevoked` | The parent Delegation Mandate's bit is SET in the revocation status list the issuing notary publishes (§6.3.3): the human withdrew the standing authority this envelope was issued under. The envelope's signatures are still valid — this is a withdrawn authorization, not a forged one, and reporting it as a signature failure would send an operator to inspect key material when the answer is a human decision. Deliberately distinct from `APH_E003`, which is authority that ran out on schedule rather than authority that was pulled. | Obtain a fresh Delegation Mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2). |
 | `APH_E016` | `MandateRequired` | A human-not-present notarization (§9.2) was attempted with no matching, unexpired Delegation Mandate — nothing authorized this act. Deliberately distinct from THREE neighbours, because the remedies differ completely: `APH_E007` is *nobody was asked* (an AskEveryTime human was unreachable — remedy: reach the human); this code is *nothing authorized this* (remedy: the human mints a mandate); `APH_E011` is *the authorization presented is invalid* (remedy: inspect the mandate and its signatures); `APH_E015` is *the authorization was withdrawn*. Reporting an ABSENT mandate under any of those conflates absence with failure, and the distinction between the two is load-bearing everywhere else in this specification (§8.4.6). | Issue a Delegation Mandate covering this channel and scope, or route the act through the human-present flow (§9.1). |
-| `APH_E017` | `AudienceMismatch` | The envelope names an audience that is not this verifier: `credentialSubject.audience.id` differs from the verifier's own identity, or a present `audience.channelBinding` member differs from the delivery coordinates of the act being performed (RFC 0003 §1's step, quoted: *"A verifier that cannot determine its own identity MUST reject rather than skip the step"*). **Defined ahead of its RFC**: the `audience` field itself is RFC 0003 (Draft) and is not yet in this specification — this code is registered now, per Appendix A's additive-codes rule, so an implementation exercising the draft ahead of ratification emits a stable code instead of minting a private one. An envelope with no `audience` member never produces this code: absence is the producer's decision to issue a bearer credential. | Deliver the envelope to the endpoint it names, or re-issue naming the intended recipient. |
+| `APH_E017` | `AudienceMismatch` | The envelope names an audience that is not this verifier: `credentialSubject.audience.id` differs from the verifier's own identity, or a present `audience.channelBinding` member differs from the delivery coordinates of the act being performed (RFC 0003 §1's step, quoted: *"A verifier that cannot determine its own identity MUST reject rather than skip the step"*). *(This code was registered ahead of RFC 0003 under Appendix A's additive-codes rule; the RFC is now Accepted and the field is §7.1.13, so the head start is discharged.)* An envelope with no `audience` member never produces this code: absence is the producer's decision to issue a bearer credential. | Deliver the envelope to the endpoint it names, or re-issue naming the intended recipient. |
+| `APH_E018` | `EnvelopeAlreadySpent` | The envelope was already accepted once: §8.3 step 8b's single-use record holds this `id`, and a second presentation is a replay by definition, whoever presents it. The record is per-verifier — this code says nothing about what OTHER verifiers have seen. | Mint a fresh envelope for a new act; acceptance consumes an envelope by design. |
+| `APH_E019` | `EnvelopeWindowInvalid` | The envelope's own validity window fails against the verifier's clock (§8.3 step 6): `validFrom` is in the future, `validUntil` is in the past, or a timestamp is unparseable (which fails closed). Deliberately distinct from `APH_E003`, a *mandate* consulted past its expiry — before this code, implementations refusing an expired envelope had to invent a refusal or miscite `APH_E003`. | Mint a fresh envelope with a current window; single-act windows should be minutes, not hours (§6.3). |
+| `APH_E020` | `RecipientClassNotAllowed` | The mandate constrains who may consume (`allowedRecipientClasses`, RFC 0005) and the envelope declares a recipient class outside the grant — or none at all, which refuses for the same reason: a constraint the envelope lets nobody check would be escapable by omission. Distinct from `APH_E005`: that is the MEDIUM out of scope, this is the CONSUMER out of scope on an allowed medium. | Declare the recipient class the act actually has, or ask the principal for a grant that covers it. |
 
 ---
 

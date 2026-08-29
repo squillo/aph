@@ -2,7 +2,7 @@
  * APH error taxonomy (spec §11) and the two failure kinds that deliberately
  * carry NO §11 code.
  *
- * §11 is a CLOSED set of sixteen protocol-level codes. Two things that can go
+ * §11 is a CLOSED set of twenty protocol-level codes. Two things that can go
  * wrong in this implementation are outside it, and inventing a code for either
  * would widen a set the specification closed:
  *
@@ -20,7 +20,7 @@
  */
 
 /**
- * The sixteen codes of §11, enumerated rather than counted. The `as const`
+ * The twenty codes of §11, enumerated rather than counted. The `as const`
  * tuple is the enumeration: `APH_ERROR_CODES.length` is derived from it, so a
  * code added here cannot leave a stated count stale.
  */
@@ -41,7 +41,10 @@ export const APH_ERROR_CODES = [
   'APH_E014', // NotaryKeyNotPublished
   'APH_E015', // MandateRevoked
   'APH_E016', // MandateRequired — unrooted authority: §9.2 with no mandate at all
-  'APH_E017', // AudienceMismatch — registered ahead of RFC 0003; no audience field exists yet
+  'APH_E017', // AudienceMismatch — §8.3 step 5a (RFC 0003, Accepted; the ahead-of-RFC head start is discharged)
+  'APH_E018', // EnvelopeAlreadySpent — §8.3 step 8b: acceptance consumes the id, per-verifier
+  'APH_E019', // EnvelopeWindowInvalid — the envelope's OWN window vs the verifier's clock; E003 stays mandate-scoped
+  'APH_E020', // RecipientClassNotAllowed — the CONSUMER out of scope on an allowed medium (E005 is the medium)
 ] as const;
 
 export type AphErrorCode = (typeof APH_ERROR_CODES)[number];
@@ -65,9 +68,12 @@ export const APH_ERROR_VARIANTS: Readonly<Record<AphErrorCode, string>> = {
   APH_E015: 'MandateRevoked',
   APH_E016: 'MandateRequired',
   APH_E017: 'AudienceMismatch',
+  APH_E018: 'EnvelopeAlreadySpent',
+  APH_E019: 'EnvelopeWindowInvalid',
+  APH_E020: 'RecipientClassNotAllowed',
 };
 
-/** A protocol-level refusal carrying one of the sixteen §11 codes. */
+/** A protocol-level refusal carrying one of the twenty §11 codes. */
 export class AphError extends Error {
   readonly code: AphErrorCode;
 

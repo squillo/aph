@@ -11,7 +11,7 @@
   "id": "urn:uuid:00000000-0000-4000-8000-000000000009",
   "issuer": "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov",
   "validFrom": "2026-05-21T00:00:00Z",
-  "validUntil": "2026-05-22T00:00:00Z",
+  "validUntil": "2026-05-21T00:10:00Z",
   "credentialSubject": {
     "humanPrincipal": {
       "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",
@@ -62,6 +62,6 @@
     "verificationMethod": "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov",
     "created": "2026-05-21T00:00:01Z",
     "proofPurpose": "assertionMethod",
-    "proofValue": "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il0sImN0eSI6InZjK2xkK2pzb24iLCJraWQiOiJkaWQ6a2V5OnpEbmFlckdCRDdaeHphdTJmZGZFRmFhYVREWUJ1NVhFQllkR1YyQm1FUnAzTURTb3YjekRuYWVyR0JEN1p4emF1MmZkZkVGYWFhVERZQnU1WEVCWWRHVjJCbUVScDNNRFNvdiIsInR5cCI6ImFwaCtqd3MifQ..MEYCIQD_Kg_3WK6ULFF0bM6fK0n-QcmiubgmndMQlR0HtV8RnwIhAL5rCKSs4U_Km7tnDnf6qNhc8d1nCEbv4crroFjLKwMT"
+    "proofValue": "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il0sImN0eSI6InZjK2xkK2pzb24iLCJraWQiOiJkaWQ6a2V5OnpEbmFlckdCRDdaeHphdTJmZGZFRmFhYVREWUJ1NVhFQllkR1YyQm1FUnAzTURTb3YjekRuYWVyR0JEN1p4emF1MmZkZkVGYWFhVERZQnU1WEVCWWRHVjJCbUVScDNNRFNvdiIsInR5cCI6ImFwaCtqd3MifQ..MEUCIQC-tS22ABw0txxkfzZkfXSBDPLCs36VlYyNMWyl_LjfjwIgWXxkQ0NfGU4or9XYhLBuWsXQHsWyDFTD9SKQoH64KMU"
   }
 }

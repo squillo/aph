@@ -4,8 +4,11 @@
     "https://www.w3.org/ns/credentials/v2",
     "https://w3id.org/aph/v1"
   ],
-  "type": ["VerifiableCredential", "AgentSendAuthorizationCredential"],
-  "id": "urn:uuid:00000000-0000-4000-8000-000000000006",
+  "type": [
+    "VerifiableCredential",
+    "AgentSendAuthorizationCredential"
+  ],
+  "id": "urn:uuid:00000000-0000-4000-8000-00000000000d",
   "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
   "validFrom": "2026-05-21T00:00:00Z",
   "validUntil": "2026-05-21T00:10:00Z",
@@ -21,17 +24,19 @@
       "version": "1.0"
     },
     "channel": {
-      "kind": "google_chat",
+      "kind": "slack",
       "recipientAddressing": {
-        "spaceId": "spaces/AAAAAAAAAAA"
+        "teamId": "T01234567",
+        "channelId": "C01234567",
+        "parentTs": "1716249600.000100"
       }
     },
     "communication": {
-      "contentClass": "Mention",
+      "contentClass": "Reply",
       "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bodySize": 1573,
+      "bodySize": 1842,
       "previewLines": 3,
-      "preview": "@team — sharing the deploy notes here:\n• rollout window 14:00-15:00 UTC\n• rollback runbook attached"
+      "preview": "Hey team — quick update on the deploy:\n• prod rollout finished at 14:02 UTC\n• no error spikes in the first hour"
     },
     "policy": {
       "decision": "AskEveryTime",
@@ -47,6 +52,14 @@
       },
       "decisionTimestamp": "2026-05-21T00:00:01Z",
       "decisionLatencyMs": 1834
+    },
+    "audience": {
+      "id": "did:web:ssot.example.com",
+      "channelBinding": {
+        "kind": "slack",
+        "teamId": "T01234567",
+        "channelId": "C01234567"
+      }
     }
   },
   "linkedMandate": null,

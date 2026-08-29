@@ -11,7 +11,7 @@
   "id": "urn:uuid:00000000-0000-4000-8000-000000000008",
   "issuer": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
   "validFrom": "2026-05-21T00:00:00Z",
-  "validUntil": "2026-05-22T00:00:00Z",
+  "validUntil": "2026-05-21T00:10:00Z",
   "credentialSubject": {
     "humanPrincipal": {
       "id": "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy",

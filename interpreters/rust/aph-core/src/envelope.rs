@@ -518,6 +518,19 @@ pub struct CredentialSubject {
   /// deserialize cleanly).
   #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
   pub apple_aur_acceptance: std::option::Option<AppleAurAcceptanceClaim>,
+  /// Who may accept this envelope (RFC 0003 §1). OPTIONAL, omitted when
+  /// absent: an envelope without it is byte-identical to one written before
+  /// the field existed, every signature over those bytes stays valid, and
+  /// absence is the producer's DECISION to issue a bearer credential rather
+  /// than an oversight the verifier forgives.
+  ///
+  /// ⚠ EMITTING THIS IS VERSION-GATED for the same structural reason as
+  /// `act_classification` below: every wire struct here carries
+  /// `deny_unknown_fields`, so a pre-RFC-0003 verifier fails an envelope
+  /// carrying this at STRICT PARSE. A producer MUST NOT emit it until it has
+  /// reason to believe the recipient understands it (§10.1).
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub audience: std::option::Option<Audience>,
   /// Last-position additive field. What the sender says this act MEANS, in
   /// terms of one or more independently published vocabularies (RFC 0006).
   ///
@@ -596,6 +609,16 @@ pub struct ChannelDescriptor {
   pub kind: ChannelKind,
   /// Channel-shaped opaque blob (opaque to APH core).
   pub recipient_addressing: serde_json::Value,
+  /// Who consumes what lands there (§7.1.5, RFC 0005). OPTIONAL, omitted
+  /// when absent: absence means the producer makes no claim, and every
+  /// envelope minted before the field existed stays byte-identical.
+  ///
+  /// ⚠ EMITTING THIS IS VERSION-GATED, same structural rule as
+  /// `audience` and `act_classification`: strict parse fails an unknown
+  /// field BELOW the error vocabulary, so a producer MUST NOT emit it
+  /// until it has reason to believe the recipient understands it (§10.1).
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub recipient_class: std::option::Option<RecipientClass>,
 }
 
 /// What was sent: classification plus the hash that binds this credential
@@ -921,6 +944,92 @@ impl<'de> serde::Deserialize<'de> for PolicyDecision {
   }
 }
 
+/// Who consumes what lands on the channel: the closed recipient-class set
+/// (§7.1.5, RFC 0005).
+///
+/// The SECOND DIMENSION the a2a_email request was really asking for: a
+/// refinement that must be applied to every member of a set is not a member
+/// of that set, so "agent mail" is `kind: email` + `recipientClass: agent`
+/// rather than an eighth kind that doubles the vocabulary. Two values,
+/// closed at two DELIBERATELY — grown by amendment like every closed set
+/// here, not by a producer minting one.
+///
+/// A recipient class asserted by the sender is a CLAIM, not a proof: it
+/// constrains an honest-but-over-broad agent — the actual threat, one's own
+/// agent doing more than one meant — and does not constrain a hostile one.
+/// No caller should present it as the latter.
+#[derive(std::fmt::Debug, std::clone::Clone, std::marker::Copy, std::cmp::PartialEq, std::cmp::Eq)]
+pub enum RecipientClass {
+  /// Wire value `human`: a person reads what lands.
+  Human,
+  /// Wire value `agent`: unattended machine consumption at machine rate.
+  Agent,
+}
+
+impl RecipientClass {
+  /// Every member of the closed set, in §7.1.5 order.
+  pub const ALL: [Self; 2] = [Self::Human, Self::Agent];
+
+  /// The exact wire spelling. Exhaustive on purpose.
+  pub fn label(&self) -> &'static str {
+    match self {
+      Self::Human => "human",
+      Self::Agent => "agent",
+    }
+  }
+
+  /// The whole closed set, comma-joined, for the strict-parse refusal
+  /// message — DERIVED from [`Self::ALL`], per the siblings' reasoning.
+  fn labels_for_error() -> std::string::String {
+    Self::ALL
+      .iter()
+      .map(Self::label)
+      .collect::<std::vec::Vec<&'static str>>()
+      .join(", ")
+  }
+}
+
+impl std::fmt::Display for RecipientClass {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::write!(f, "{}", self.label())
+  }
+}
+
+impl std::str::FromStr for RecipientClass {
+  type Err = std::string::String;
+
+  /// The inverse of [`RecipientClass::label`]. Error shape per
+  /// [`ChannelKind::from_str`]'s documentation: a plain message, because
+  /// §8.3 step 1 classifies an unrecognized value as a strict-parse
+  /// rejection, below the protocol's closed set of error codes.
+  fn from_str(label: &str) -> std::result::Result<Self, Self::Err> {
+    match label {
+      "human" => std::result::Result::Ok(Self::Human),
+      "agent" => std::result::Result::Ok(Self::Agent),
+      other => std::result::Result::Err(std::format!(
+        "`{}` is not in the closed set {{{}}}",
+        other,
+        Self::labels_for_error()
+      )),
+    }
+  }
+}
+
+impl serde::Serialize for RecipientClass {
+  fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+    serializer.serialize_str(self.label())
+  }
+}
+
+impl<'de> serde::Deserialize<'de> for RecipientClass {
+  fn deserialize<D: serde::Deserializer<'de>>(
+    deserializer: D,
+  ) -> std::result::Result<Self, D::Error> {
+    let raw = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
+    <Self as std::str::FromStr>::from_str(&raw).map_err(serde::de::Error::custom)
+  }
+}
+
 /// What a sender says an act MEANS, against vocabularies both parties can
 /// resolve independently (RFC 0006).
 ///
@@ -965,6 +1074,67 @@ pub struct ActClassification {
   /// routing it implies. Carrying one would discard the verdicts a
   /// recipient's policy most wants.
   pub labels: std::vec::Vec<ActLabel>,
+}
+
+/// Who may accept this envelope, and — optionally — on which delivery
+/// coordinates (§7.1.13, RFC 0003).
+///
+/// The check this feeds is a COMPARISON, not cryptography: §8.3's audience
+/// step compares `id` against the verifier's own identity and refuses on
+/// difference (`APH_E017`). What that buys is that a captured envelope stops
+/// being a reusable authorization against ANY recipient; what it does not
+/// buy is anything about the one recipient it names.
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Audience {
+  /// DID of the endpoint entitled to accept this envelope.
+  pub id: String,
+  /// Restates the delivery coordinates the envelope authorizes, so an
+  /// envelope addressed to one channel cannot be spent on another. OPTIONAL:
+  /// audience binding without coordinate binding is a coarser but still
+  /// meaningful restriction.
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub channel_binding: std::option::Option<AudienceChannelBinding>,
+}
+
+/// The delivery coordinates an audience-bound envelope may be spent on
+/// (§7.1.13). `kind` is drawn from the same closed set as the channel block;
+/// every OTHER member is channel-shaped and flattened, mirroring
+/// `ChannelDescriptor.recipient_addressing`'s opacity — APH core compares
+/// these members for equality against the coordinates of the act being
+/// performed and forms no other opinion about them.
+///
+/// The ONE wire struct in this module without `deny_unknown_fields`, and
+/// deliberately: its open members ARE the payload. `serde(flatten)` makes
+/// every unrecognized member a coordinate rather than an error, which is
+/// exactly the semantics §8.3's audience step assigns them ("compare each
+/// member").
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct AudienceChannelBinding {
+  /// Channel kind, drawn from the closed set (§7.1.5).
+  pub kind: ChannelKind,
+  /// Every other member: the channel-shaped coordinates themselves
+  /// (`teamId`, `channelId`, an address — whatever the kind's addressing
+  /// uses). Compared member-by-member; a member the act's coordinates lack
+  /// is a mismatch, because a constraint that cannot be checked is refused
+  /// rather than skipped.
+  #[serde(flatten)]
+  pub coordinates: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 /// Refuses an empty `vocabularies` array at parse (§7.1.12: the member is
@@ -1149,6 +1319,7 @@ mod tests {
         "channelId": "C01234567",
         "parentTs": "1716249600.000100"
       }),
+      recipient_class: std::option::Option::None,
     }
   }
 
@@ -1227,6 +1398,7 @@ mod tests {
       policy: sample_policy(),
       notarization: sample_notarization_metadata(),
       apple_aur_acceptance: std::option::Option::None,
+      audience: std::option::Option::None,
       act_classification: std::option::Option::None,
     }
   }
@@ -1886,6 +2058,7 @@ mod tests {
       policy: sample_policy(),
       notarization: sample_notarization_metadata(),
       apple_aur_acceptance: std::option::Option::Some(claim.clone()),
+      audience: std::option::Option::None,
       act_classification: std::option::Option::None,
     };
     let s = serde_json::to_string(&subject).unwrap();

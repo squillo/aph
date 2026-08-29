@@ -50,8 +50,8 @@ export const TS_MINTED_FILE = 'ts_minted_envelope.json';
 export const TS_MINTED_BODY = 'prod rollout finished at 14:02 UTC\n';
 
 /** RFC 3339 constants. The ordering §7.2.1 requires is visible in the values. */
-const VALID_FROM = '2026-06-01T00:00:00Z';
-const VALID_UNTIL = '2026-06-02T00:00:00Z';
+const VALID_FROM = '2026-06-01T11:55:00Z';
+const VALID_UNTIL = '2026-06-01T12:05:00Z';
 const DECISION_AT = '2026-06-01T00:00:00Z';
 const PRINCIPAL_SIGNED_AT = '2026-06-01T00:00:01Z';
 const NOTARY_COUNTERSIGNED_AT = '2026-06-01T00:00:02Z';

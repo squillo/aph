@@ -20,6 +20,7 @@ import {
   APH_VERSION,
   ATTESTATION_MODES,
   CHANNEL_KINDS,
+  RECIPIENT_CLASSES,
   CONTENT_CLASSES,
   CONTEXT_APH_V1,
   CONTEXT_VC_V2,
@@ -172,8 +173,11 @@ function parseAgent(value: unknown, path: string): void {
 }
 
 function parseChannel(value: unknown, path: string): void {
-  const record = members(value, path, ['kind', 'recipientAddressing'], []);
+  const record = members(value, path, ['kind', 'recipientAddressing'], ['recipientClass']);
   closedEnum(record, path, 'kind', CHANNEL_KINDS);
+  if ('recipientClass' in record) {
+    closedEnum(record, path, 'recipientClass', RECIPIENT_CLASSES);
+  }
   // §7.4: opaque by design. Strict-parsing a channel vendor's addressing blob
   // would make every new field that vendor adds a protocol break.
   object(record.recipientAddressing, `${path}.recipientAddressing`);
@@ -218,7 +222,7 @@ export function parseDelegationMandate(value: unknown, path: string): void {
       'principalSignature',
       'notarySignature',
     ],
-    ['rateLimitPerHour'],
+    ['rateLimitPerHour', 'allowedRecipientClasses'],
   );
   str(record, path, 'id');
   str(record, path, 'humanPrincipalDid');
@@ -234,6 +238,13 @@ export function parseDelegationMandate(value: unknown, path: string): void {
   const channels = closedEnumArray(record, path, 'allowedChannels', CHANNEL_KINDS);
   if (channels.length === 0) {
     throw new AphParseError(`${path}.allowedChannels`, '§6.1 requires at least one entry');
+  }
+  if ('allowedRecipientClasses' in record) {
+    // §6.2 (RFC 0005): closed like allowedChannels, but an EMPTY array is
+    // admitted — "no consumer at all" is a coherent grant, where absence is
+    // merely an unconstrained one. The asymmetry with allowedChannels'
+    // at-least-one rule is deliberate and documented there.
+    closedEnumArray(record, path, 'allowedRecipientClasses', RECIPIENT_CLASSES);
   }
   if ('rateLimitPerHour' in record && record.rateLimitPerHour !== null) {
     uint(record, path, 'rateLimitPerHour');
@@ -310,7 +321,7 @@ function parseCredentialSubject(value: unknown, path: string): void {
     value,
     path,
     ['humanPrincipal', 'agent', 'channel', 'communication', 'policy', 'notarization'],
-    ['appleAurAcceptance', 'actClassification'],
+    ['appleAurAcceptance', 'audience', 'actClassification'],
   );
   parseHumanPrincipal(record.humanPrincipal, `${path}.humanPrincipal`);
   parseAgent(record.agent, `${path}.agent`);
@@ -321,8 +332,28 @@ function parseCredentialSubject(value: unknown, path: string): void {
   if ('appleAurAcceptance' in record) {
     parseAppleAurAcceptance(record.appleAurAcceptance, `${path}.appleAurAcceptance`);
   }
+  if ('audience' in record) {
+    parseAudience(record.audience, `${path}.audience`);
+  }
   if ('actClassification' in record) {
     parseActClassification(record.actClassification, `${path}.actClassification`);
+  }
+}
+
+/**
+ * §7.1.13. `id` is required; `channelBinding` is optional and OPEN except
+ * for `kind`, which must come from the closed set — the binding restates
+ * delivery coordinates, and legislating their names would make every
+ * channel vendor's coordinate a protocol break, exactly as with
+ * `recipientAddressing`. Structure is refused, coordinates are not.
+ */
+function parseAudience(value: unknown, path: string): void {
+  const record = members(value, path, ['id'], ['channelBinding']);
+  str(record, path, 'id');
+  if ('channelBinding' in record) {
+    const bindingPath = `${path}.channelBinding`;
+    const binding = object(record.channelBinding, bindingPath);
+    closedEnum(binding, bindingPath, 'kind', CHANNEL_KINDS);
   }
 }
 

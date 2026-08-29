@@ -187,23 +187,31 @@ test('APH_E010 — a JWS protected header with alg:none is refused', async () =>
   assert.equal(await refusalCode(value), 'APH_E010');
 });
 
-test('APH_E003 — an envelope evaluated outside its window is expired', async () => {
+test("APH_E019 — an envelope evaluated outside its OWN window is refused with the window's code", async () => {
   // Well past validUntil plus the 60-second skew §8.3 step 6 recommends.
+  // This test PINNED the APH_E003 miscite for months — the envelope's own
+  // window refusing under the mandate-expiry code — which is exactly the
+  // conflation RFC 0003 registered APH_E019 to end. The rename is the fix
+  // being visible: E003 now appears in this suite only where a MANDATE ran
+  // out.
   await assert.rejects(
     () =>
       verifyEnvelope(readExample(GOLDEN_FILE), {
         now: '2027-01-01T00:00:00Z',
         keys: goldenSuppliedKeys(),
       }),
-    (error: unknown) => error instanceof AphError && error.code === 'APH_E003',
+    (error: unknown) => error instanceof AphError && error.code === 'APH_E019',
   );
 });
 
-test('APH_E003 — the skew tolerance is applied, so a verifier a few seconds fast still admits', async () => {
+test('the skew tolerance is applied, so a verifier a few seconds fast still admits', async () => {
   // The complement of the test above: §8.3 step 6 RECOMMENDS 60 seconds, and a
   // verifier without it would refuse healthy traffic at every window edge.
+  // 30 seconds past the golden's validUntil — which is minutes-order now, per
+  // §6.3's RFC 0003 guidance, so the edge sits at 00:10:00 and not at a
+  // 24-hour mark the threat model already disowned.
   const verified = await verifyEnvelope(readExample(GOLDEN_FILE), {
-    now: '2026-05-22T00:00:30Z',
+    now: '2026-05-21T00:10:30Z',
     keys: goldenSuppliedKeys(),
   });
   assert.equal(verified.attestationMode, 'PrincipalSigned');

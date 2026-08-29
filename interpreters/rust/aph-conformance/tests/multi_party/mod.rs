@@ -387,6 +387,7 @@ impl Party {
       human_principal_did: self.principal_did(),
       agent_did: String::from(self.agent_did),
       allowed_channels: request.allowed_channels.clone(),
+      allowed_recipient_classes: std::option::Option::None,
       rate_limit_per_hour: std::option::Option::Some(20),
       valid_from: request.mandate_valid_from.clone(),
       valid_until: request.mandate_valid_until.clone(),
@@ -457,6 +458,7 @@ impl Party {
             "channelId": "C01234567",
             "teamId": "T01234567"
           }),
+          recipient_class: std::option::Option::None,
         },
         communication: aph_core::CommunicationDescriptor {
           content_class: aph_core::ContentClass::Reply,
@@ -485,6 +487,7 @@ impl Party {
           decision_latency_ms: 12,
         },
         apple_aur_acceptance: std::option::Option::None,
+        audience: std::option::Option::None,
         act_classification: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,
@@ -1228,6 +1231,7 @@ fn instant_is_inside_window(from: &str, until: &str, at: &str) -> bool {
     human_principal_did: String::new(),
     agent_did: String::new(),
     allowed_channels: std::vec::Vec::new(),
+    allowed_recipient_classes: std::option::Option::None,
     rate_limit_per_hour: std::option::Option::None,
     valid_from: String::from(from),
     valid_until: String::from(until),

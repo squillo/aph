@@ -63,6 +63,7 @@ fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
       channel: crate::envelope::ChannelDescriptor {
         kind: crate::envelope::ChannelKind::Slack,
         recipient_addressing: serde_json::json!({"opaque": "addressing"}),
+        recipient_class: std::option::Option::None,
       },
       communication: crate::envelope::CommunicationDescriptor {
         content_class: crate::envelope::ContentClass::Reply,
@@ -91,6 +92,7 @@ fn minimal_envelope() -> crate::envelope::NotarizationEnvelope {
         decision_latency_ms: 1834,
       },
       apple_aur_acceptance: std::option::Option::None,
+      audience: std::option::Option::None,
       act_classification: std::option::Option::None,
     },
     linked_mandate: std::option::Option::None,
@@ -176,6 +178,7 @@ proptest! {
         channel: crate::envelope::ChannelDescriptor {
           kind: channel_kind,
           recipient_addressing: serde_json::json!({"opaque": "addressing"}),
+          recipient_class: std::option::Option::None,
         },
         communication: crate::envelope::CommunicationDescriptor {
           content_class: content_class,
@@ -204,6 +207,7 @@ proptest! {
           decision_latency_ms: 1834,
         },
         apple_aur_acceptance: std::option::Option::None,
+        audience: std::option::Option::None,
         act_classification: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,
@@ -309,6 +313,7 @@ proptest! {
       human_principal_did: std::format!("did:key:{}", human_did_tail),
       agent_did: std::format!("did:web:{}", agent_did_tail),
       allowed_channels: channels.clone(),
+      allowed_recipient_classes: std::option::Option::None,
       rate_limit_per_hour: std::option::Option::None,
       valid_from: std::string::String::from(FIXED_VALID_FROM),
       valid_until: std::string::String::from(FIXED_VALID_UNTIL),
