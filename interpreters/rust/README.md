@@ -19,6 +19,7 @@ cargo clippy --all-targets -- -D warnings
 | [`aph-cli`](aph-cli/) | The `aph` binary — `validate` (with `--json` for CI gates), `inspect`, `golden`, and the publication renderers `render-txt`, `render-did`, `render-vocab`. |
 | [`aph-ts`](aph-ts/) | WebAssembly binding: the six-operation roster — `parseEnvelopeJson`, `serializeEnvelope`, `verifyProofStructure`, `requireAttestationMode`, `mandateIsValidAt`, `verifyEmbeddedMandateBinding`. |
 | [`aph-py`](aph-py/) | Python binding (pyo3, module `aph`): the same six operations in snake_case. Its README carries the four-column parity table across all four bindings. |
+| [`aph-sealed`](aph-sealed/) | EXPERIMENTAL, `publish = false`: the draft implementation of RFC 0008 sealed payloads — RFC 9180 HPKE, one pinned suite, context-authenticated AAD. Deliberately off the 0.1 wire; in the default gate set so its suite runs on every bare `cargo test`. |
 | [`aph-resolver`](aph-resolver/) | Ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` fetch adapters over `aph-core`'s discovery ports, for adopters with no adapter layer of their own. The ONLY crate carrying HTTP/DNS/runtime dependencies. |
 | [`aph-js-harness`](aph-js-harness/) | A TEST harness — not a binding, not published: it runs the [TypeScript implementation](../typescript/)'s compiled crypto-free core (canonicalization, strict parse, proof structure, the §11 codes) under a second ECMAScript engine inside the cargo process, against the same expectation table that implementation's own suite reads. Needs `../typescript/dist` on disk. |
 

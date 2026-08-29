@@ -1,6 +1,7 @@
 # RFC 0008 — Sealed payloads: carriage without readership
 
 - **Status:** Draft
+- **Author:** Scott Wyatt
 - **Issue:** requested by the maintainer from two recurring integration
   scenarios; this document is the proposal and the experimental
   implementation's design of record, not a ruling
@@ -107,16 +108,24 @@ discipline, applied to ciphersuites from birth.
 
 ### 3. The two bindings that make it safe
 
-- **AAD = the envelope `id`.** Sealing happens BEFORE signing: the sealer
-  seals with the envelope's `id` as HPKE additional authenticated data,
-  places the result in `credentialSubject`, and then the envelope is
-  signed. A ciphertext lifted into a different envelope fails AEAD open —
-  a sealed payload cannot be re-staged under a different authorization,
-  even by a party who can read it.
+- **AAD = the seal context.** Sealing happens BEFORE signing, and the
+  HPKE additional authenticated data is the canonical serialization of
+  everything the sealed payload CLAIMS about itself plus the envelope
+  staging it: `{suite, reader.id, reader.kid, envelope id}`, as a JSON
+  object with exactly that field order. The opener rebuilds the context
+  from the payload's OWN claimed fields, so a ciphertext lifted into a
+  different envelope refuses AEAD open — and so does a payload relabeled
+  about its own reader or suite, which the envelope signature would catch
+  only AFTER signing and which the seal must therefore catch itself. (An
+  earlier draft bound only the envelope id; the implementation's audit
+  probe demonstrated the relabeling gap and the widened context is the
+  fix, with the probe kept as a test.)
 - **`bodySha256` binds the ciphertext.** When the sealed payload IS the
-  act's body, `communication.bodySha256` is computed over the ciphertext
-  bytes, so §8.3 step 8 verifies body binding WITHOUT plaintext — every
-  hop runs the full verification list blind. Verification and readership
+  act's body, `communication.bodySha256` is computed over the RAW
+  ciphertext octets — the base64url-DECODED `ciphertext` value, tag
+  included, never the JSON serialization around it — so §8.3 step 8
+  verifies body binding WITHOUT plaintext and two implementations cannot
+  disagree about which bytes were hashed. Verification and readership
   stay independent, which is the whole point.
 
 ### 4. Verification (the one new sentence §8.3 needs at v0.2)
@@ -142,12 +151,37 @@ closure exists to refuse.
 `interpreters/rust/aph-sealed` — an EXPERIMENTAL, `publish = false` crate:
 the `SealedPayload` type exactly as §2 shapes it, `seal` / `unseal` over
 RFC 9180 single-shot HPKE (pure-Rust `hpke` crate; this repository writes
-no cryptography), AAD binding per §3, and tests deriving keys from RFC 9180
+no cryptography), context-AAD binding per §3 (probe-hardened), and tests deriving keys from RFC 9180
 test-vector IKM. It is deliberately NOT wired into `NotarizationEnvelope`:
 the 0.1 parse is strict and final, so an envelope carrying `sealedPayload`
 today is refused at strict parse by every conformant verifier — which is
 correct, and which the version-gated emission rule (§10.1 reasoning) will
 govern at v0.2 exactly as it governed `audience` and `recipientClass`.
+
+## Security considerations
+
+- **Length leaks.** ChaCha20-Poly1305 hides content, not size: the
+  ciphertext is plaintext length + 16, visible to every hop. A sender for
+  whom length is itself the secret pads BEFORE sealing; this RFC defines
+  no padding scheme and says so rather than gesturing at one.
+- **The RNG is load-bearing.** The seal's ephemeral key comes from the
+  caller-supplied CSPRNG; in production that argument MUST be an
+  operating-system CSPRNG. The implementation's API makes the RNG a
+  parameter for testability, and its documentation carries this MUST.
+- **A `keyAgreement` key compromise reads everything ever sealed to it.**
+  There is no forward secrecy across envelopes in single-shot HPKE base
+  mode. The mitigation is the one the protocol already practices for
+  signing keys: rotation through the §8.4 surfaces, short key lifetimes,
+  and — at v0.2 — the same retirement visibility rules. Readers SHOULD
+  treat sealing keys as more rotation-worthy than signing keys, not less.
+- **Metadata stays visible by design.** Who sealed, to whom, under which
+  envelope, on which channel: all readable, because hops verify and route
+  on it. This RFC seals CONTENT; senders needing recipient privacy need a
+  different protocol (see the onion-routing note above).
+- **The seal does not authenticate the SENDER to the reader.** HPKE base
+  mode proves nothing about who sealed; sender authenticity comes from
+  the ENVELOPE — the principal's signature and mandate — which is why §4
+  ties seal-opening to envelope verification rather than replacing it.
 
 ## What this deliberately does not do
 

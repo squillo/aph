@@ -17,9 +17,12 @@
 //! The cryptography is RFC 9180 HPKE single-shot, one pinned suite
 //! (X25519-HKDF-SHA256 / HKDF-SHA256 / ChaCha20-Poly1305), through the
 //! pure-Rust `hpke` crate — this repository writes no cryptography. The
-//! load-bearing choice is the AAD: the envelope `id` authenticates every
-//! seal, so a ciphertext lifted into a different envelope fails open even
-//! for its rightful reader. Errors are this crate's own type, deliberately
+//! load-bearing choice is the AAD: a canonical CONTEXT — suite, reader id,
+//! reader kid, envelope id — authenticates every seal, so a ciphertext
+//! lifted into a different envelope OR relabeled about itself (a different
+//! claimed reader, a different claimed suite) fails open even for its
+//! rightful key. The audit probe that forced the widening is kept as a
+//! test. Errors are this crate's own type, deliberately
 //! NOT `APH_E`-prefixed: the §11 set is closed, and RFC 0008 §5 assigns
 //! codes when a version exists that can declare them.
 
@@ -100,14 +103,42 @@ pub enum SealError {
   /// three are indistinguishable BY DESIGN (that is what AEAD promises),
   /// so the refusal names all three rather than guessing.
   #[error(
-    "the seal did not open: wrong reader key, tampered ciphertext, or a seal \
-     staged under a different envelope id"
+    "the seal did not open: wrong reader key, tampered ciphertext, a seal \
+     staged under a different envelope id, or a payload relabeled about its \
+     own suite or reader"
   )]
   OpenRefused,
   /// The HPKE encapsulation step itself failed (a malformed reader key
   /// surfaces here when it parses but cannot be used).
   #[error("sealing failed: {0}")]
   SealFailed(String),
+}
+
+/// The authenticated context: everything a sealed payload CLAIMS about
+/// itself, plus the envelope that stages it. Serialized as JSON from a
+/// struct with a fixed field order — deterministic for these string
+/// fields, and unambiguous where a delimiter-joined string would not be
+/// (a `|` inside a DID would otherwise collide field boundaries).
+///
+/// Both sides derive it independently: the sealer from its inputs, the
+/// opener from the sealed payload's OWN claimed fields — which is exactly
+/// why a relabeled `reader` or `suite` refuses AEAD open.
+#[derive(serde::Serialize)]
+struct SealContext<'a> {
+  suite: &'a str,
+  reader_id: &'a str,
+  reader_kid: &'a str,
+  envelope_id: &'a str,
+}
+
+fn context_aad(suite: &str, reader: &SealedReader, envelope_id: &str) -> Vec<u8> {
+  serde_json::to_vec(&SealContext {
+    suite,
+    reader_id: &reader.id,
+    reader_kid: &reader.kid,
+    envelope_id,
+  })
+  .expect("four string fields serialize infallibly")
 }
 
 fn b64(bytes: &[u8]) -> String {
@@ -123,16 +154,20 @@ fn unb64(text: &str, field: &'static str) -> std::result::Result<Vec<u8>, SealEr
 }
 
 /// Seals `plaintext` so that ONLY the holder of `reader`'s private key can
-/// open it, bound to `envelope_id` (RFC 0008 §3: the AAD). Sealing happens
+/// open it, bound to the full seal CONTEXT — suite, reader, envelope id —
+/// as HPKE additional authenticated data (RFC 0008 §3). Sealing happens
 /// BEFORE the envelope is signed, so the signature covers the ciphertext
 /// and every hop verifies blind.
 ///
 /// `reader_public_key` is the reader's X25519 `keyAgreement` public key,
 /// 32 raw bytes, discovered through the §8.4 surfaces. The RNG is a caller
 /// parameter for the same reason `now` is one in verification: this
-/// function stays deterministic under test and honest about its inputs.
+/// function stays deterministic under test and honest about its inputs —
+/// and in PRODUCTION the argument must be an operating-system CSPRNG
+/// (`rand::rngs::OsRng`); a seeded RNG there reuses ephemeral keys, which
+/// is key compromise by another name.
 pub fn seal(
-  csprng: &mut (impl rand::RngCore + rand::CryptoRng),
+  csprng: &mut impl rand::CryptoRng,
   reader: SealedReader,
   reader_public_key: &[u8],
   envelope_id: &str,
@@ -140,12 +175,13 @@ pub fn seal(
 ) -> std::result::Result<SealedPayload, SealError> {
   let pk = <Kem as KemTrait>::PublicKey::from_bytes(reader_public_key)
     .map_err(|_| SealError::MalformedKey("reader public"))?;
+  let aad = context_aad(SUITE, &reader, envelope_id);
   let (encapped, ciphertext) = hpke::single_shot_seal::<ChaCha20Poly1305, HkdfSha256, Kem, _>(
     &OpModeS::Base,
     &pk,
     INFO,
     plaintext,
-    envelope_id.as_bytes(),
+    &aad,
     csprng,
   )
   .map_err(|e| SealError::SealFailed(std::format!("{e}")))?;
@@ -157,8 +193,10 @@ pub fn seal(
   })
 }
 
-/// Opens a seal with the reader's private key, under the SAME envelope id
-/// it was sealed to. Any mismatch — key, bytes, or envelope — refuses with
+/// Opens a seal with the reader's private key, under the SAME context it
+/// was sealed to — with `suite` and `reader` taken from the sealed
+/// payload's OWN claims, so a payload relabeled about itself refuses.
+/// Any mismatch — key, bytes, envelope, or claimed context — refuses with
 /// one indistinguishable [`SealError::OpenRefused`], and RFC 0008 §4 tells
 /// a reader-verifier what that refusal means: refuse the ENVELOPE, because
 /// an unopenable seal addressed to you is evidence, not an inconvenience.
@@ -176,28 +214,29 @@ pub fn unseal(
   let encapped = <Kem as KemTrait>::EncappedKey::from_bytes(&encapped_bytes)
     .map_err(|_| SealError::MalformedKey("encapsulated"))?;
   let ciphertext = unb64(&sealed.ciphertext, "ciphertext")?;
+  let aad = context_aad(&sealed.suite, &sealed.reader, envelope_id);
   hpke::single_shot_open::<ChaCha20Poly1305, HkdfSha256, Kem>(
     &OpModeR::Base,
     &sk,
     &encapped,
     INFO,
     &ciphertext,
-    envelope_id.as_bytes(),
+    &aad,
   )
   .map_err(|_| SealError::OpenRefused)
 }
 
-/// Derives a deterministic X25519 keypair from input keying material —
-/// exposed for TESTS and examples only, so fixtures need no stored private
-/// keys. Production keys come from an operator's own key management, never
-/// from this function; the doc comment is the fence.
-pub fn derive_keypair_for_tests(ikm: &[u8]) -> (Vec<u8>, Vec<u8>) {
-  let (sk, pk) = Kem::derive_keypair(ikm);
-  (sk.to_bytes().to_vec(), pk.to_bytes().to_vec())
-}
-
 #[cfg(test)]
 mod tests {
+  /// Derives a deterministic X25519 keypair from input keying material.
+  /// TEST-ONLY BY CONSTRUCTION: this lives inside `#[cfg(test)]`, so no
+  /// consumer can derive a production key from low-entropy material — the
+  /// compiler is the fence, where a doc comment was one an audit ago.
+  fn derive_keypair_for_tests(ikm: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    use hpke::{Kem as KemTrait, Serializable};
+    let (sk, pk) = super::Kem::derive_keypair(ikm);
+    (sk.to_bytes().to_vec(), pk.to_bytes().to_vec())
+  }
   // TEST-ONLY key material: every keypair below is DERIVED in-test from a
   // fixed, clearly-labeled IKM string via RFC 9180 DeriveKeyPair — nothing
   // secret is stored, and nothing here is a production key.
@@ -205,7 +244,7 @@ mod tests {
   const SENDER_IKM: &[u8] = b"APH-SEALED-TEST-SENDER-IKM---0001";
   const ENVELOPE_ID: &str = "urn:uuid:00000000-0000-4000-8000-0000000000e1";
 
-  fn rng() -> impl rand::RngCore + rand::CryptoRng {
+  fn rng() -> impl rand::CryptoRng {
     // Deterministic under test: the seal's ephemeral key comes from a
     // seeded RNG so failures reproduce byte-for-byte.
     <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(7)
@@ -221,7 +260,7 @@ mod tests {
     // The sending agent holds only the SealedPayload — ciphertext and an
     // encapsulated key useless without the receiver's private half — and
     // the receiver opens it under the envelope id it arrived in.
-    let (receiver_sk, receiver_pk) = super::derive_keypair_for_tests(RECEIVER_IKM);
+    let (receiver_sk, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
     let sealed = super::seal(
       &mut rng(),
       reader("did:web:receiver.example.com"),
@@ -238,7 +277,7 @@ mod tests {
     // The carrier's view: without the private key there is nothing to try —
     // pinned here by the SENDER's own key failing to open it, which also
     // pins that a seal is not symmetric.
-    let (sender_sk, _) = super::derive_keypair_for_tests(SENDER_IKM);
+    let (sender_sk, _) = derive_keypair_for_tests(SENDER_IKM);
     std::assert_eq!(
       super::unseal(&sealed, &sender_sk, ENVELOPE_ID).unwrap_err(),
       super::SealError::OpenRefused,
@@ -250,7 +289,7 @@ mod tests {
     // The second scenario is the same mechanism with the reader pointed at
     // the SENDER: the receiving agent can carry, store, and prove receipt
     // of bytes it cannot open.
-    let (sender_sk, sender_pk) = super::derive_keypair_for_tests(SENDER_IKM);
+    let (sender_sk, sender_pk) = derive_keypair_for_tests(SENDER_IKM);
     let sealed = super::seal(
       &mut rng(),
       reader("did:web:sender.example.com"),
@@ -260,7 +299,7 @@ mod tests {
     )
     .expect("sealing to one's own key is the same operation");
 
-    let (receiver_sk, _) = super::derive_keypair_for_tests(RECEIVER_IKM);
+    let (receiver_sk, _) = derive_keypair_for_tests(RECEIVER_IKM);
     std::assert_eq!(
       super::unseal(&sealed, &receiver_sk, ENVELOPE_ID).unwrap_err(),
       super::SealError::OpenRefused,
@@ -274,7 +313,7 @@ mod tests {
     // so re-staging a ciphertext under a different authorization fails
     // AEAD open even with the right key. Without this, a sealed payload
     // would be a bearer blob any envelope could adopt.
-    let (receiver_sk, receiver_pk) = super::derive_keypair_for_tests(RECEIVER_IKM);
+    let (receiver_sk, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
     let sealed = super::seal(
       &mut rng(),
       reader("did:web:receiver.example.com"),
@@ -295,7 +334,7 @@ mod tests {
     // Integrity through untrusted hops is the messenger half of the
     // generals' problem: one flipped bit anywhere in the ciphertext and
     // the AEAD tag refuses.
-    let (receiver_sk, receiver_pk) = super::derive_keypair_for_tests(RECEIVER_IKM);
+    let (receiver_sk, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
     let mut sealed = super::seal(
       &mut rng(),
       reader("did:web:receiver.example.com"),
@@ -318,7 +357,7 @@ mod tests {
     // Closed-set discipline for ciphersuites from birth: a verifier meeting
     // a suite it does not compile refuses by NAME, before touching a byte
     // of key material.
-    let (receiver_sk, receiver_pk) = super::derive_keypair_for_tests(RECEIVER_IKM);
+    let (receiver_sk, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
     let mut sealed = super::seal(
       &mut rng(),
       reader("did:web:receiver.example.com"),
@@ -339,7 +378,7 @@ mod tests {
     // The serde shape IS the RFC's §2 wire member; review reads this test
     // instead of trusting the prose. Strict on its own members exactly as
     // every wire struct in the reference is.
-    let (_, receiver_pk) = super::derive_keypair_for_tests(RECEIVER_IKM);
+    let (_, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
     let sealed = super::seal(
       &mut rng(),
       reader("did:web:receiver.example.com"),
@@ -358,6 +397,41 @@ mod tests {
     std::assert!(
       serde_json::from_str::<super::SealedPayload>(&smuggled).is_err(),
       "an unknown member is refused at strict parse, like every wire struct"
+    );
+  }
+
+  #[test]
+  fn a_relabeled_reader_or_suite_refuses_even_with_the_right_key() {
+    // AUDIT PROBE, kept as the weld: the seal must authenticate its OWN
+    // wire context — suite and reader — not only the envelope id. Before
+    // the context-AAD fix, a party holding the payload pre-signing could
+    // relabel `reader` (mis-routing who is asked to open) or `suite`
+    // without the AEAD noticing; the envelope signature catches it later,
+    // but a seal that lies about itself until signing is a seam.
+    let (receiver_sk, receiver_pk) = derive_keypair_for_tests(RECEIVER_IKM);
+    let sealed = super::seal(
+      &mut rng(),
+      reader("did:web:receiver.example.com"),
+      &receiver_pk,
+      ENVELOPE_ID,
+      b"context-bound",
+    )
+    .expect("seal succeeds");
+
+    let mut relabeled = sealed.clone();
+    relabeled.reader.id = std::string::String::from("did:web:attacker.example.com");
+    std::assert_eq!(
+      super::unseal(&relabeled, &receiver_sk, ENVELOPE_ID).unwrap_err(),
+      super::SealError::OpenRefused,
+      "a relabeled reader must refuse: the seal authenticates its context"
+    );
+
+    let mut rekidded = sealed.clone();
+    rekidded.reader.kid = std::string::String::from("enc-2");
+    std::assert_eq!(
+      super::unseal(&rekidded, &receiver_sk, ENVELOPE_ID).unwrap_err(),
+      super::SealError::OpenRefused,
+      "a relabeled kid must refuse for the same reason"
     );
   }
 }
