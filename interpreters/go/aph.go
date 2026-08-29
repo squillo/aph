@@ -46,7 +46,7 @@
 // # Export parity, a four-way contract
 //
 // This binding, the wasm/TS binding, the Python binding and the Elixir binding
-// expose the SAME four envelope-facing operations, with the same semantics and
+// expose the SAME six envelope-facing operations, with the same semantics and
 // the same error identity, each in its language's idiom:
 //
 //	wasm/TS                   Python                      Elixir                            Go
@@ -54,8 +54,11 @@
 //	serializeEnvelope         serialize_envelope          APH.serialize_envelope/1          Runtime.SerializeEnvelope
 //	verifyProofStructure      verify_proof_structure      APH.verify_proof_structure/1      Runtime.VerifyProofStructure
 //	requireAttestationMode    require_attestation_mode    APH.require_attestation_mode/2    Runtime.RequireAttestationMode
+//	mandateIsValidAt          mandate_is_valid_at         APH.mandate_is_valid_at/2         Runtime.MandateIsValidAt
+//	verifyEmbeddedMandate-    verify_embedded_mandate-    APH.verify_embedded_mandate-      Runtime.VerifyEmbeddedMandate-
+//	Binding                   _binding                    _binding/1                        Binding
 //
-// None of the four may grow an operation, a semantic, or an error spelling the
+// None of the four bindings may grow an operation, a semantic, or an error spelling the
 // others lack: bindings that teach different things about one protocol are how
 // a protocol acquires several meanings. Operatively — a change to this surface
 // is unfinished until the same change lands in the other three, and the reverse.
@@ -139,6 +142,8 @@ type Runtime struct {
 	serializeEnvelope      api.Function
 	verifyProofStructure   api.Function
 	requireAttestationMode api.Function
+	mandateIsValidAt       api.Function
+	verifyMandateBinding   api.Function
 }
 
 // New compiles the embedded APH module and instantiates it.
@@ -180,6 +185,8 @@ func New(ctx context.Context) (*Runtime, error) {
 		serializeEnvelope:      module.ExportedFunction("aph_serialize_envelope"),
 		verifyProofStructure:   module.ExportedFunction("aph_verify_proof_structure"),
 		requireAttestationMode: module.ExportedFunction("aph_require_attestation_mode"),
+		mandateIsValidAt:       module.ExportedFunction("aph_mandate_is_valid_at"),
+		verifyMandateBinding:   module.ExportedFunction("aph_verify_embedded_mandate_binding"),
 	}
 
 	if err := r.checkExports(); err != nil {
@@ -259,5 +266,40 @@ func (r *Runtime) RequireAttestationMode(ctx context.Context, envelope, required
 		envelope,
 		required,
 	)
+	return err
+}
+
+// MandateIsValidAt reports whether a Delegation Mandate (JSON text) is valid
+// at `at` (RFC 3339), per the mandate's own validFrom/validUntil window.
+//
+// The semantics are aph-core's, verbatim: an unparseable timestamp — in the
+// argument OR in the mandate — yields false, never an error, because the core
+// documents "parsing failure returns false" and a binding that invented
+// stricter semantics would be a second definition of one check. A mandate
+// that does not strict-parse is the error case, as at every JSON boundary in
+// this binding. The verdict crosses the ABI as text ("true" | "false"): this
+// boundary is string-in string-out everywhere, and one bool does not justify
+// a second calling convention.
+func (r *Runtime) MandateIsValidAt(ctx context.Context, mandate, at string) (bool, error) {
+	verdict, err := r.callTextPair(
+		ctx,
+		"MandateIsValidAt",
+		r.mandateIsValidAt,
+		mandate,
+		at,
+	)
+	if err != nil {
+		return false, err
+	}
+	return verdict == "true", nil
+}
+
+// VerifyEmbeddedMandateBinding verifies the §7.1.7.1 binding between an
+// envelope (JSON text) and the Delegation Mandate embedded at
+// policy.delegationMandate — everything aph-core's check performs, nothing
+// more. An envelope with NO embedded mandate returns nil, exactly as the
+// core has it: absence of the optional block is not a binding failure.
+func (r *Runtime) VerifyEmbeddedMandateBinding(ctx context.Context, envelope string) error {
+	_, err := r.callText(ctx, "VerifyEmbeddedMandateBinding", r.verifyMandateBinding, envelope)
 	return err
 }

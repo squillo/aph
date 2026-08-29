@@ -164,4 +164,32 @@ defmodule APH do
   """
   @spec require_attestation_mode(envelope_json(), mode()) :: :ok | {:error, refusal()}
   defdelegate require_attestation_mode(json, required), to: APH.Native
+
+  @doc """
+  Whether a Delegation Mandate (JSON text) is valid at `at` (RFC 3339), per
+  the mandate's own `validFrom`/`validUntil` window.
+
+  The semantics are `aph-core`'s, verbatim: an unparseable timestamp — in the
+  argument OR in the mandate — yields `{:ok, false}`, never an error, because
+  the core documents "parsing failure returns false" and a binding that
+  invented stricter semantics would be a SECOND definition of one check. What
+  IS refused (`{:error, reason}`) is a mandate that does not strict-parse:
+  that is the JSON boundary's job in every export of this module.
+  """
+  @spec mandate_is_valid_at(String.t(), String.t()) :: {:ok, boolean()} | {:error, refusal()}
+  defdelegate mandate_is_valid_at(mandate_json, at), to: APH.Native
+
+  @doc """
+  Verifies the §7.1.7.1 binding between an envelope (JSON text) and the
+  Delegation Mandate embedded at `policy.delegationMandate`: the three
+  identity equalities, the window, and the mandate signatures' presence rules
+  — everything `aph-core`'s check performs, nothing more.
+
+  An envelope with NO embedded mandate returns `:ok`, exactly as the core has
+  it: absence of the optional block is not a binding failure. Returns bare
+  `:ok` for the same reason `require_attestation_mode/2` does — success here
+  carries no value.
+  """
+  @spec verify_embedded_mandate_binding(envelope_json()) :: :ok | {:error, refusal()}
+  defdelegate verify_embedded_mandate_binding(json), to: APH.Native
 end

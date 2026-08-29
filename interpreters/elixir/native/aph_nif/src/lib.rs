@@ -118,6 +118,31 @@ fn require_attestation_mode_impl(
   aph_core::require_mode(&envelope, required_mode).map_err(|e| std::format!("{}", e))
 }
 
+/// Whether a Delegation Mandate JSON is valid at `at` (RFC 3339). The
+/// semantics are `aph-core`'s verbatim — an unparseable timestamp yields
+/// `false`, never an error, because the core documents "parsing failure
+/// returns false" and a binding that invented stricter semantics would be a
+/// SECOND definition of one check. A mandate that does not strict-parse is
+/// the error case: that is the JSON boundary's job in every export here.
+fn mandate_is_valid_at_impl(
+  mandate_json: &str,
+  at: &str,
+) -> std::result::Result<bool, std::string::String> {
+  let mandate: aph_core::DelegationMandate =
+    serde_json::from_str(mandate_json).map_err(|e| std::format!("{}", e))?;
+  std::result::Result::Ok(mandate.is_valid_at(at))
+}
+
+/// Runs `aph_core::verify_embedded_mandate_binding` on envelope JSON text.
+/// An envelope with NO embedded mandate is ok, exactly as the core has it:
+/// absence of the optional block is not a binding failure.
+fn verify_embedded_mandate_binding_impl(
+  json: &str,
+) -> std::result::Result<(), std::string::String> {
+  let envelope = parse_envelope(json)?;
+  aph_core::verify_embedded_mandate_binding(&envelope).map_err(|e| std::format!("{}", e))
+}
+
 /// Encodes a text result as `{:ok, binary} | {:error, binary}`.
 ///
 /// Refusals are RETURN VALUES here rather than raised NIF exceptions: a
@@ -196,6 +221,28 @@ fn require_attestation_mode<'a>(
   encode_unit_result(env, require_attestation_mode_impl(&json, &required))
 }
 
+/// `APH.Native.mandate_is_valid_at/2`.
+#[rustler::nif]
+fn mandate_is_valid_at<'a>(
+  env: Env<'a>,
+  mandate_json: std::string::String,
+  at: std::string::String,
+) -> Term<'a> {
+  match mandate_is_valid_at_impl(&mandate_json, &at) {
+    std::result::Result::Ok(valid) => rustler::Encoder::encode(&(ok(), valid), env),
+    std::result::Result::Err(message) => rustler::Encoder::encode(&(error(), message), env),
+  }
+}
+
+/// `APH.Native.verify_embedded_mandate_binding/1`.
+#[rustler::nif]
+fn verify_embedded_mandate_binding<'a>(
+  env: Env<'a>,
+  json: std::string::String,
+) -> Term<'a> {
+  encode_unit_result(env, verify_embedded_mandate_binding_impl(&json))
+}
+
 // The module name is the Erlang spelling of `APH.Native`; the BEAM looks the
 // NIFs up under exactly this atom, so it must track the Elixir module name
 // character for character. The explicit function list is this rustler
@@ -206,6 +253,8 @@ rustler::init!(
     parse_envelope_json,
     serialize_envelope,
     verify_proof_structure,
-    require_attestation_mode
+    require_attestation_mode,
+    mandate_is_valid_at,
+    verify_embedded_mandate_binding
   ]
 );

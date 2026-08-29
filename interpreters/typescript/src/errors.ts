@@ -41,6 +41,7 @@ export const APH_ERROR_CODES = [
   'APH_E014', // NotaryKeyNotPublished
   'APH_E015', // MandateRevoked
   'APH_E016', // MandateRequired — unrooted authority: §9.2 with no mandate at all
+  'APH_E017', // AudienceMismatch — registered ahead of RFC 0003; no audience field exists yet
 ] as const;
 
 export type AphErrorCode = (typeof APH_ERROR_CODES)[number];
@@ -63,6 +64,7 @@ export const APH_ERROR_VARIANTS: Readonly<Record<AphErrorCode, string>> = {
   APH_E014: 'NotaryKeyNotPublished',
   APH_E015: 'MandateRevoked',
   APH_E016: 'MandateRequired',
+  APH_E017: 'AudienceMismatch',
 };
 
 /** A protocol-level refusal carrying one of the sixteen §11 codes. */

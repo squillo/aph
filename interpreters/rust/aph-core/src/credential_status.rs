@@ -218,7 +218,7 @@ impl CredentialStatusEntry {
   ///
   /// `APH_E008` for anything that is not a base-10 integer inside `u64`.
   /// §6.3.3.1 routes a malformed status reference to §8.3 step 1, but the
-  /// §11 taxonomy is a CLOSED set of fifteen with no "malformed envelope"
+  /// §11 taxonomy is a CLOSED set of seventeen with no "malformed envelope"
   /// code; `APH_E008` is §6.3.3.4 case 2 — "the verifier could not establish
   /// the status" — which is literally what an unreadable index leaves. The
   /// envelope is refused either way; only the reported code differs.

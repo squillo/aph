@@ -4,7 +4,7 @@ description: >-
   APH (Agent per Human) protocol crash course and reference. Use when working with
   APH, NotarizationEnvelope JSON, envelope validation or verification, notarization
   flows, a Delegation Mandate or Communication Mandate, the notary service, the
-  "agent driver's license" model, APH error codes (APH_E001..APH_E016), signing
+  "agent driver's license" model, APH error codes (APH_E001..APH_E017), signing
   profiles (eddsa-jcs-2022, ecdsa-jcs-2019, detached JWS), notary public-key
   discovery (did:key, did:web, DNS TXT), channel kinds, or the A2A notarization
   extension. Also covers OPERATING a Notary Service — signing-key loss, pre-authorized
@@ -141,6 +141,7 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E014` | `NotaryKeyNotPublished` | Nothing published at the queried discovery surface: no TXT record at the name, or the DID Document names no matching key. ABSENT, held distinct from E008 (offered-and-broke) |
 | `APH_E015` | `MandateRevoked` | The parent Delegation Mandate's bit is SET in the notary's published revocation status list (§6.3.3). Signatures are still valid — a withdrawn authorization, not a forged one. Distinct from E003, which is authority that ran out on schedule |
 | `APH_E016` | `MandateRequired` | A human-not-present act (§9.2) with NO matching unexpired Delegation Mandate — nothing authorized this. Distinct from E007 (nobody was asked), E011 (the authorization presented is invalid), and E015 (it was withdrawn); reporting absence under any of those conflates absence with failure |
+| `APH_E017` | `AudienceMismatch` | The envelope's `audience.id` is not this verifier, or a `channelBinding` member differs from the act's delivery coordinates. REGISTERED AHEAD OF RFC 0003 (Draft) so early implementations emit a stable code — the `audience` field itself is not in the spec yet, and an envelope without one NEVER produces this code |
 
 ## Trust model — WHO signs (the most important section here)
 

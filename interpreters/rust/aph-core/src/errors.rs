@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E016. Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E017. Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -165,6 +165,29 @@ pub enum AphError {
     /// Channel kind the act targeted.
     channel_kind: String,
   },
+
+  /// `APH_E017` — the envelope names an audience that is not this verifier:
+  /// its `audience.id` differs from the verifier's own identity, or a
+  /// present `channelBinding` member differs from the delivery coordinates
+  /// of the act being performed.
+  ///
+  /// REGISTERED AHEAD OF ITS RFC. The `audience` field is RFC 0003 (Draft)
+  /// and no type in this crate carries it yet — the code exists now, per the
+  /// specification's additive-codes rule, so an implementation exercising
+  /// the draft ahead of ratification emits a stable code instead of minting
+  /// a private one. That is the same reasoning that added `APH_E016` from a
+  /// field report: the first consumer to need a code should not have to
+  /// misuse a neighbour. An envelope with no `audience` member never
+  /// produces this code — absence is the producer's decision to issue a
+  /// bearer credential, and RFC 0003 is explicit that a verifier that cannot
+  /// determine its OWN identity rejects rather than skips.
+  #[error("APH_E017: audience mismatch: envelope names `{audience_id}`, this verifier is `{verifier_id}`")]
+  AudienceMismatch {
+    /// The audience the envelope names (`credentialSubject.audience.id`).
+    audience_id: String,
+    /// The verifier's own identity, as it knows itself.
+    verifier_id: String,
+  },
 }
 
 impl AphError {
@@ -189,6 +212,7 @@ impl AphError {
       Self::NotaryKeyNotPublished { .. } => "APH_E014",
       Self::MandateRevoked { .. } => "APH_E015",
       Self::MandateRequired { .. } => "APH_E016",
+      Self::AudienceMismatch { .. } => "APH_E017",
     }
   }
 
@@ -211,6 +235,7 @@ impl AphError {
       Self::NotaryKeyNotPublished { .. } => "Publish the key at this surface (§8.4.4/§8.4.5), or query one the notary publishes to",
       Self::MandateRevoked { .. } => "Obtain a fresh delegation mandate from the human principal; a revoked mandate cannot be re-activated (§6.3.2)",
       Self::MandateRequired { .. } => "Issue a delegation mandate covering this channel and scope, or route the act through the human-present flow (§9.1)",
+      Self::AudienceMismatch { .. } => "Deliver the envelope to the endpoint it names, or re-issue naming the intended recipient",
     }
   }
 
@@ -314,6 +339,19 @@ impl AphError {
       channel_kind: channel_kind.into(),
     }
   }
+
+  /// Builds an `APH_E017` naming both identities, so the operator's first
+  /// question — for WHOM was this envelope, and who am I — is answered by
+  /// the error itself.
+  pub fn audience_mismatch(
+    audience_id: impl std::convert::Into<String>,
+    verifier_id: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::AudienceMismatch {
+      audience_id: audience_id.into(),
+      verifier_id: verifier_id.into(),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -336,12 +374,13 @@ mod tests {
       super::AphError::notary_key_not_published("_aph._notary.example.com"),
       super::AphError::mandate_revoked("urn:uuid:00000000-0000-4000-8000-000000000002"),
       super::AphError::mandate_required("did:key:zTestAgent", "slack"),
+      super::AphError::audience_mismatch("did:web:other.example.com", "did:web:this.example.com"),
     ]
   }
 
   #[test]
   fn every_code_in_the_closed_set_is_unique() {
-    // The spec (§11) fixes a CLOSED set of exactly sixteen codes, and
+    // The spec (§11) fixes a CLOSED set of exactly seventeen codes, and
     // other implementations branch on them. A duplicate would make two
     // distinct failures indistinguishable to a remote verifier. The count
     // is pinned so that adding a code without amending §11 fails here.
@@ -359,7 +398,7 @@ mod tests {
     // and rotted); the pinned count below is the tripwire, kept in exactly
     // one place.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 16);
+    std::assert_eq!(errors.len(), 17);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();

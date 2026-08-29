@@ -466,3 +466,76 @@ func TestAClosedSetValueThisBuildDoesNotDefineIsRefused(t *testing.T) {
 		})
 	}
 }
+
+// TestTheGoldensEmbeddedMandateAnswersValidityAtBothSidesOfItsWindow pins
+// MandateIsValidAt, one of the two verification exports the parity contract
+// owes every binding. Inputs are DERIVED from the published golden — the
+// mandate embedded at policy.delegationMandate, timestamps inside and after
+// its own validFrom/validUntil — so nothing asserts a fact the corpus does
+// not carry. False for garbage time is the core's documented "parsing
+// failure returns false", delegated and not re-invented; an error is
+// reserved for a mandate that does not strict-parse.
+func TestTheGoldensEmbeddedMandateAnswersValidityAtBothSidesOfItsWindow(t *testing.T) {
+	ctx := context.Background()
+	runtime := newTestRuntime(t)
+	var envelope map[string]any
+	if err := json.Unmarshal([]byte(principalSignedGolden(t)), &envelope); err != nil {
+		t.Fatalf("the golden parses as JSON: %v", err)
+	}
+	subject := envelope["credentialSubject"].(map[string]any)
+	policy := subject["policy"].(map[string]any)
+	mandateBytes, err := json.Marshal(policy["delegationMandate"])
+	if err != nil {
+		t.Fatalf("the embedded mandate serializes: %v", err)
+	}
+	mandate := string(mandateBytes)
+
+	valid, err := runtime.MandateIsValidAt(ctx, mandate, "2026-05-21T12:00:00Z")
+	if err != nil || !valid {
+		t.Fatalf("inside the window must be valid: %v %v", valid, err)
+	}
+	valid, err = runtime.MandateIsValidAt(ctx, mandate, "2026-06-01T00:00:00Z")
+	if err != nil || valid {
+		t.Fatalf("after the window must be invalid: %v %v", valid, err)
+	}
+	valid, err = runtime.MandateIsValidAt(ctx, mandate, "not-a-timestamp")
+	if err != nil || valid {
+		t.Fatalf("garbage time is false, never an error (the core's contract): %v %v", valid, err)
+	}
+	if _, err := runtime.MandateIsValidAt(ctx, "{not json", "2026-05-21T12:00:00Z"); err == nil {
+		t.Fatal("a mandate that does not strict-parse must be refused")
+	}
+}
+
+// TestTheGoldensMandateBindingVerifiesAndARetargetedMandateRefuses pins the
+// other owed verification export: the admit half runs the WHOLE core check
+// on the published golden; the refusal retargets the embedded mandate's
+// agentDid so one §7.1.7.1 identity equality fails and nothing else moves.
+func TestTheGoldensMandateBindingVerifiesAndARetargetedMandateRefuses(t *testing.T) {
+	ctx := context.Background()
+	runtime := newTestRuntime(t)
+	golden := principalSignedGolden(t)
+	if err := runtime.VerifyEmbeddedMandateBinding(ctx, golden); err != nil {
+		t.Fatalf("the published golden's embedded mandate binds: %v", err)
+	}
+	var envelope map[string]any
+	if err := json.Unmarshal([]byte(golden), &envelope); err != nil {
+		t.Fatalf("the golden parses as JSON: %v", err)
+	}
+	subject := envelope["credentialSubject"].(map[string]any)
+	policy := subject["policy"].(map[string]any)
+	mandate := policy["delegationMandate"].(map[string]any)
+	mandate["agentDid"] = "did:web:other-agent.example"
+	brokenBytes, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("the retargeted envelope serializes: %v", err)
+	}
+	bindErr := runtime.VerifyEmbeddedMandateBinding(ctx, string(brokenBytes))
+	if bindErr == nil {
+		t.Fatal("a retargeted mandate must refuse to bind")
+	}
+	if !strings.Contains(bindErr.Error(), "APH_E") {
+		t.Fatalf("the refusal carries a protocol code — the binding check sits above the parse layer: %v", bindErr)
+	}
+}
+

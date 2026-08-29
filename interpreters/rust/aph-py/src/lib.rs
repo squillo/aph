@@ -176,6 +176,37 @@ pub fn require_attestation_mode(json: &str, required: &str) -> pyo3::PyResult<()
 
 /// APH (Agent per Human) protocol envelope types — a binding of the Rust
 /// reference implementation. Envelopes cross as JSON text in both directions.
+/// Whether a Delegation Mandate (given as JSON text) is valid at `at`
+/// (RFC 3339), per the mandate's own `validFrom`/`validUntil` window.
+///
+/// The semantics are `aph-core`'s, verbatim: an unparseable timestamp — in
+/// the argument OR in the mandate — yields `False`, never an exception,
+/// because the core documents "parsing failure returns false" and a binding
+/// that invented stricter semantics would be a SECOND definition of one
+/// check. What IS refused (`AphError`) is a mandate that does not
+/// strict-parse: that is the JSON boundary's job in every export here.
+#[pyo3::pyfunction]
+pub fn mandate_is_valid_at(mandate_json: &str, at: &str) -> pyo3::PyResult<bool> {
+  let mandate: aph_core::DelegationMandate =
+    serde_json::from_str(mandate_json).map_err(|e| AphError::new_err(std::format!("{}", e)))?;
+  std::result::Result::Ok(mandate.is_valid_at(at))
+}
+
+/// Verify the §7.1.7.1 binding between an envelope (given as JSON text) and
+/// the Delegation Mandate embedded at `policy.delegationMandate`: the three
+/// identity equalities, the window, and the mandate's own signatures'
+/// presence rules — everything `aph-core`'s check performs, nothing more.
+///
+/// An envelope with NO embedded mandate returns without raising, exactly as
+/// the core does: absence of the optional block is not a binding failure.
+/// Raises `AphError` (code included in the text) on any violation.
+#[pyo3::pyfunction]
+pub fn verify_embedded_mandate_binding(json: &str) -> pyo3::PyResult<()> {
+  let envelope = parse_envelope(json).map_err(AphError::new_err)?;
+  aph_core::verify_embedded_mandate_binding(&envelope)
+    .map_err(|e| AphError::new_err(std::format!("{}", e)))
+}
+
 #[pyo3::pymodule]
 mod aph {
   // `#[pymodule_export]` is the declarative module macro's own syntax for
@@ -185,11 +216,15 @@ mod aph {
   #[pymodule_export]
   use super::AphError;
   #[pymodule_export]
+  use super::mandate_is_valid_at;
+  #[pymodule_export]
   use super::parse_envelope_json;
   #[pymodule_export]
   use super::require_attestation_mode;
   #[pymodule_export]
   use super::serialize_envelope;
+  #[pymodule_export]
+  use super::verify_embedded_mandate_binding;
   #[pymodule_export]
   use super::verify_proof_structure;
 }
@@ -480,6 +515,45 @@ mod tests {
     names
   }
 
+
+  #[test]
+  fn the_goldens_embedded_mandate_answers_validity_at_both_sides_of_its_window() {
+    // WHY: `mandate_is_valid_at` is one of the two verification exports the
+    // parity contract owes every binding; inputs DERIVED from the published
+    // golden — the embedded mandate, and timestamps inside/after its own
+    // window — so nothing asserts a fact the corpus does not carry.
+    // PINS: true inside; false after; false for garbage time (the core's
+    // documented "parsing failure returns false", delegated not re-invented);
+    // AphError for a mandate that is not JSON.
+    let envelope: serde_json::Value =
+      serde_json::from_str(PRINCIPAL_SIGNED_GOLDEN).expect("the golden parses as JSON");
+    let mandate =
+      serde_json::to_string(&envelope["credentialSubject"]["policy"]["delegationMandate"])
+        .expect("the embedded mandate serializes");
+    std::assert!(super::mandate_is_valid_at(&mandate, "2026-05-21T12:00:00Z").expect("ok"));
+    std::assert!(!super::mandate_is_valid_at(&mandate, "2026-06-01T00:00:00Z").expect("ok"));
+    std::assert!(!super::mandate_is_valid_at(&mandate, "not-a-timestamp").expect("ok"));
+    std::assert!(super::mandate_is_valid_at("{not json", "2026-05-21T12:00:00Z").is_err());
+  }
+
+  #[test]
+  fn the_goldens_mandate_binding_verifies_and_a_broken_binding_refuses() {
+    // WHY: the other owed verification export. Admit half runs the WHOLE
+    // core check on the published golden; the refusal retargets the embedded
+    // mandate's `agentDid` so one §7.1.7.1 identity equality fails and
+    // nothing else moves.
+    super::verify_embedded_mandate_binding(PRINCIPAL_SIGNED_GOLDEN)
+      .expect("the published golden's embedded mandate binds");
+    let mut envelope: serde_json::Value =
+      serde_json::from_str(PRINCIPAL_SIGNED_GOLDEN).expect("the golden parses as JSON");
+    envelope["credentialSubject"]["policy"]["delegationMandate"]["agentDid"] =
+      serde_json::Value::String(std::string::String::from("did:web:other-agent.example"));
+    let broken = serde_json::to_string(&envelope).expect("it serializes");
+    std::assert!(
+      super::verify_embedded_mandate_binding(&broken).is_err(),
+      "a retargeted mandate must refuse to bind"
+    );
+  }
 
   #[test]
   fn every_conformance_file_strict_parses_through_this_binding() {

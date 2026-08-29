@@ -1020,7 +1020,7 @@ pub fn sign_status_list(
 /// `String` the sender produced, so the struct a recipient reasons about is one
 /// the RECIPIENT built. An unknown field is a hard error (§7.1's
 /// `deny_unknown_fields`), which is why the error is a message rather than an
-/// `AphError`: §11's fifteen codes describe protocol outcomes, and bytes that
+/// `AphError`: §11's seventeen codes describe protocol outcomes, and bytes that
 /// are not an envelope at all never reach one.
 pub fn receive(bytes: &str) -> std::result::Result<aph_core::NotarizationEnvelope, String> {
   serde_json::from_str(bytes).map_err(|error| error.to_string())
@@ -1179,7 +1179,7 @@ pub fn verify_inbound(
   // wrong party's answer. §6.3.3.2 derives the status origin from
   // `notaryService.id`; §8.3 resolves the key from `proof.verificationMethod`.
   // Requiring them to name the same DID is this harness's policy, stated
-  // because §11's fifteen codes have no dedicated binding failure and
+  // because §11's seventeen codes have no dedicated binding failure and
   // APH_E013 is the nearest — it is a malformed proof block, in that the proof
   // does not belong to the notary the envelope names.
   let signing_did = aph_core::DidUrl::parse(&notary_proof.verification_method).did;

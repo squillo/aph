@@ -166,4 +166,45 @@ defmodule APHTest do
              "a strict-parse refusal must not claim a protocol code, got: #{message}"
     end
   end
+
+  test "the golden's embedded mandate answers validity at both sides of its window" do
+    # WHY: `mandate_is_valid_at/2` is one of the two verification exports the
+    # parity contract owes every binding; inputs DERIVED from the published
+    # golden — the mandate embedded at `policy.delegationMandate`, timestamps
+    # inside and after its own validFrom/validUntil — so nothing asserts a
+    # fact the corpus does not carry.
+    # PINS: {:ok, true} inside; {:ok, false} after; {:ok, false} for garbage
+    # time (the core's documented "parsing failure returns false", delegated
+    # and not re-invented); {:error, _} for a mandate that is not JSON.
+    golden = APH.TestCorpus.principal_signed_golden()
+    envelope = Jason.decode!(golden)
+    mandate = Jason.encode!(envelope["credentialSubject"]["policy"]["delegationMandate"])
+
+    assert {:ok, true} = APH.mandate_is_valid_at(mandate, "2026-05-21T12:00:00Z")
+    assert {:ok, false} = APH.mandate_is_valid_at(mandate, "2026-06-01T00:00:00Z")
+    assert {:ok, false} = APH.mandate_is_valid_at(mandate, "not-a-timestamp")
+    assert {:error, _} = APH.mandate_is_valid_at("{not json", "2026-05-21T12:00:00Z")
+  end
+
+  test "the golden's mandate binding verifies and a retargeted mandate refuses" do
+    # WHY: the other owed verification export. Admit half runs the WHOLE core
+    # check on the published golden; the refusal retargets the embedded
+    # mandate's `agentDid` so one §7.1.7.1 identity equality fails and
+    # nothing else moves.
+    golden = APH.TestCorpus.principal_signed_golden()
+    assert :ok = APH.verify_embedded_mandate_binding(golden)
+
+    broken =
+      golden
+      |> Jason.decode!()
+      |> put_in(
+        ["credentialSubject", "policy", "delegationMandate", "agentDid"],
+        "did:web:other-agent.example"
+      )
+      |> Jason.encode!()
+
+    assert {:error, message} = APH.verify_embedded_mandate_binding(broken)
+    assert message =~ "APH_E"
+  end
+
 end

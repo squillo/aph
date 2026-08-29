@@ -35,3 +35,19 @@ base64 = { workspace = true }
 # widens the dependency graph by nothing (minimalism rung 5, settled
 # deliberately after an earlier lane declined to add it mid-flight).
 sha2 = { workspace = true }
+
+[dev-dependencies]
+# The byte-identity rig (`tests/byte_identity_test.rs`) drives the second
+# implementation's compiled canonicalizer under the embedded second
+# ECMAScript engine and compares its canonical bytes against `aph-core`'s,
+# corpus-wide. The rig must live in a DEFAULT workspace member — canonical
+# bytes are what signatures cover, so the byte gate has to run on every
+# plain `cargo test` — while the harness crate itself stays outside the
+# default set. This edge is safe on both counts that keep it outside:
+# building the harness needs no Node toolchain (the engine is an ordinary
+# Rust dependency, already in the lockfile), and the compiled JavaScript is
+# looked for at RUN time — when `interpreters/typescript/dist` is absent the
+# rig announces a loud SKIP of that one comparison instead of failing, so
+# testing the protocol crates still never requires npm to have run. The
+# cost of the edge is compile time only.
+aph-js-harness = { path = "../aph-js-harness" }

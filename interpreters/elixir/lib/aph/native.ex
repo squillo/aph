@@ -60,4 +60,10 @@ defmodule APH.Native do
 
   @doc false
   def require_attestation_mode(_json, _required), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc false
+  def mandate_is_valid_at(_mandate_json, _at), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc false
+  def verify_embedded_mandate_binding(_json), do: :erlang.nif_error(:nif_not_loaded)
 end

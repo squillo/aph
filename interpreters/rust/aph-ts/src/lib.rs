@@ -23,8 +23,9 @@
 //! # Export parity with `aph-py` and the Elixir binding
 //!
 //! This crate, the sibling Python binding and the Elixir binding under
-//! `interpreters/elixir` expose the SAME four envelope-facing operations —
-//! parse, serialize, verify-structure, require-mode — with the same semantics
+//! `interpreters/elixir` expose the SAME six envelope-facing operations —
+//! parse, serialize, verify-structure, require-mode, mandate-validity, and
+//! embedded-mandate-binding — with the same semantics
 //! and the same error identity (an APH code a caller can match exactly). That
 //! parity is a CONTRACT, stated in all three so it cannot drift silently: a
 //! function added to one binding is owed to the other two in the same change,
@@ -144,6 +145,54 @@ pub fn require_attestation_mode(
 ) -> std::result::Result<(), wasm_bindgen::JsValue> {
   require_attestation_mode_impl(json, required)
     .map_err(|e| wasm_bindgen::JsValue::from_str(&e))
+}
+
+/// Whether a Delegation Mandate (given as JSON text) is valid at `at`
+/// (RFC 3339), per the mandate's own `validFrom`/`validUntil` window.
+///
+/// The semantics are `aph-core`'s, verbatim: an unparseable timestamp — in
+/// the argument OR in the mandate — yields `false`, never an exception,
+/// because the core documents "parsing failure returns false" and a binding
+/// that invented stricter semantics would be a SECOND definition of one
+/// check. What IS refused here is a mandate that does not strict-parse:
+/// that is the JSON boundary's job in every export of this crate.
+fn mandate_is_valid_at_impl(
+  mandate_json: &str,
+  at: &str,
+) -> std::result::Result<bool, std::string::String> {
+  let mandate: aph_core::DelegationMandate =
+    serde_json::from_str(mandate_json).map_err(|e| std::format!("{}", e))?;
+  std::result::Result::Ok(mandate.is_valid_at(at))
+}
+
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = mandateIsValidAt)]
+pub fn mandate_is_valid_at(
+  mandate_json: &str,
+  at: &str,
+) -> std::result::Result<bool, wasm_bindgen::JsValue> {
+  mandate_is_valid_at_impl(mandate_json, at).map_err(|e| wasm_bindgen::JsValue::from_str(&e))
+}
+
+/// Verify the §7.1.7.1 binding between an envelope (given as JSON text) and
+/// the Delegation Mandate embedded at `policy.delegationMandate`: the three
+/// identity equalities, the window, and the mandate's own signatures'
+/// presence rules — everything `aph-core`'s check performs, nothing more.
+///
+/// An envelope with NO embedded mandate returns ok, exactly as the core
+/// does: absence of the optional block is not a binding failure. Throws the
+/// `AphError` text (code included) on any violation.
+fn verify_embedded_mandate_binding_impl(
+  json: &str,
+) -> std::result::Result<(), std::string::String> {
+  let envelope = parse_envelope(json)?;
+  aph_core::verify_embedded_mandate_binding(&envelope).map_err(|e| std::format!("{}", e))
+}
+
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = verifyEmbeddedMandateBinding)]
+pub fn verify_embedded_mandate_binding(
+  json: &str,
+) -> std::result::Result<(), wasm_bindgen::JsValue> {
+  verify_embedded_mandate_binding_impl(json).map_err(|e| wasm_bindgen::JsValue::from_str(&e))
 }
 
 #[cfg(test)]
@@ -306,6 +355,55 @@ mod tests {
     std::assert!(
       crate::require_attestation_mode_impl(LEGACY_SLACK_REPLY, "Notarized").is_err(),
       "an unknown mode string must error, never default to a mode"
+    );
+  }
+
+  #[test]
+  fn the_goldens_embedded_mandate_answers_validity_at_both_sides_of_its_window() {
+    // WHY: `mandateIsValidAt` is one of the two verification exports the
+    // parity contract owes every binding, and its inputs here are DERIVED
+    // from the published golden rather than invented — the mandate is the
+    // one embedded at `policy.delegationMandate`, and the timestamps sit
+    // inside and after its own validFrom/validUntil window, so nothing in
+    // this test asserts a fact the corpus does not already carry.
+    //
+    // PINS: true inside the window; false after it; false for garbage time
+    // (the core's documented "parsing failure returns false", delegated and
+    // not re-invented); and a refusal for a mandate that is not JSON.
+    let envelope: serde_json::Value =
+      serde_json::from_str(PRINCIPAL_SIGNED_GOLDEN).expect("the golden parses as JSON");
+    let mandate = serde_json::to_string(&envelope["credentialSubject"]["policy"]["delegationMandate"])
+      .expect("the embedded mandate serializes");
+    std::assert!(super::mandate_is_valid_at_impl(&mandate, "2026-05-21T12:00:00Z").expect("valid call"));
+    std::assert!(!super::mandate_is_valid_at_impl(&mandate, "2026-06-01T00:00:00Z").expect("valid call"));
+    std::assert!(!super::mandate_is_valid_at_impl(&mandate, "not-a-timestamp").expect("valid call"));
+    std::assert!(super::mandate_is_valid_at_impl("{not json", "2026-05-21T12:00:00Z").is_err());
+  }
+
+  #[test]
+  fn the_goldens_mandate_binding_verifies_and_a_broken_binding_refuses() {
+    // WHY: the other verification export owed by the parity contract. The
+    // admit half runs the WHOLE core check against the published golden; the
+    // refusal is derived by ONE text edit, in view of the reader, that
+    // breaks an identity equality the binding requires.
+    super::verify_embedded_mandate_binding_impl(PRINCIPAL_SIGNED_GOLDEN)
+      .expect("the published golden's embedded mandate binds");
+
+    // The refusal: retarget the embedded mandate's `agentDid` so the
+    // §7.1.7.1 identity equality (`mandate.agentDid == subject.agent.id`)
+    // fails, and nothing else moves.
+    let mut envelope: serde_json::Value =
+      serde_json::from_str(PRINCIPAL_SIGNED_GOLDEN).expect("the golden parses as JSON");
+    envelope["credentialSubject"]["policy"]["delegationMandate"]["agentDid"] =
+      serde_json::Value::String(std::string::String::from("did:web:other-agent.example"));
+    let broken = serde_json::to_string(&envelope).expect("it serializes");
+    let err = super::verify_embedded_mandate_binding_impl(&broken)
+      .expect_err("a retargeted mandate must refuse to bind");
+    std::assert!(
+      err.contains("APH_E"),
+      "the refusal carries a protocol code, because the BINDING check sits \
+       above the parse layer: {}",
+      err
     );
   }
 

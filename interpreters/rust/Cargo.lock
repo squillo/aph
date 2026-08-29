@@ -41,6 +41,7 @@ name = "aph-conformance"
 version = "0.1.0-alpha.1"
 dependencies = [
  "aph-core",
+ "aph-js-harness",
  "base64",
  "ed25519-dalek",
  "p256",

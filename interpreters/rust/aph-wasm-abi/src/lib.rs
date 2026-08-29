@@ -240,6 +240,33 @@ fn verify_proof_structure_impl(
 /// spelling (`PrincipalSigned` | `NotaryAttested`); anything else is an error
 /// rather than a silent default, because a typo that defaulted to the weaker
 /// mode would BE the downgrade this gate exists to refuse.
+fn mandate_is_valid_at_impl(
+  mandate_json: &str,
+  at: &str,
+) -> std::result::Result<std::string::String, std::string::String> {
+  // The bool crosses the ABI as text ("true" | "false") — this boundary is
+  // string-in string-out everywhere, and a third record shape for one bool
+  // would be a second calling convention. Semantics are aph-core's verbatim:
+  // an unparseable timestamp is `false`, never an error ("parsing failure
+  // returns false" is the core's own documented contract); a mandate that
+  // does not strict-parse is the error case, as at every JSON boundary here.
+  let mandate: aph_core::DelegationMandate =
+    serde_json::from_str(mandate_json).map_err(|e| std::format!("{}", e))?;
+  std::result::Result::Ok(std::string::String::from(if mandate.is_valid_at(at) {
+    "true"
+  } else {
+    "false"
+  }))
+}
+
+fn verify_embedded_mandate_binding_impl(
+  json: &str,
+) -> std::result::Result<(), std::string::String> {
+  let envelope: aph_core::NotarizationEnvelope =
+    serde_json::from_str(json).map_err(|e| std::format!("{}", e))?;
+  aph_core::verify_embedded_mandate_binding(&envelope).map_err(|e| std::format!("{}", e))
+}
+
 fn require_attestation_mode_impl(
   json: &str,
   required: &str,
@@ -457,4 +484,56 @@ pub unsafe extern "C" fn aph_require_attestation_mode(
     }
   };
   encode_unit_result(require_attestation_mode_impl(json, required))
+}
+
+/// Whether a Delegation Mandate is valid at `at` (RFC 3339). Returns the
+/// verdict as TEXT — `"true"` | `"false"` — because this boundary is
+/// string-in string-out everywhere and one bool does not justify a second
+/// calling convention. Semantics are `aph-core`'s verbatim; see the impl.
+///
+/// # Safety
+///
+/// Both pointer/length pairs must describe readable buffers per the module
+/// docs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aph_mandate_is_valid_at(
+  mandate_ptr: *const u8,
+  mandate_len: usize,
+  at_ptr: *const u8,
+  at_len: usize,
+) -> *mut u8 {
+  let mandate_json = match unsafe { borrow_utf8(mandate_ptr, mandate_len) } {
+    std::result::Result::Ok(json) => json,
+    std::result::Result::Err(message) => {
+      return encode_result(std::result::Result::Err(message));
+    }
+  };
+  let at = match unsafe { borrow_utf8(at_ptr, at_len) } {
+    std::result::Result::Ok(at) => at,
+    std::result::Result::Err(message) => {
+      return encode_result(std::result::Result::Err(message));
+    }
+  };
+  encode_result(mandate_is_valid_at_impl(mandate_json, at))
+}
+
+/// Verifies the §7.1.7.1 embedded-mandate binding. Success is an OK record
+/// with an EMPTY payload, as `aph_require_attestation_mode` spells it; an
+/// envelope with NO embedded mandate is ok, exactly as `aph-core` has it —
+/// absence of the optional block is not a binding failure.
+///
+/// # Safety
+///
+/// `ptr`/`len` must describe a readable buffer per the module docs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aph_verify_embedded_mandate_binding(
+  ptr: *const u8,
+  len: usize,
+) -> *mut u8 {
+  match unsafe { borrow_utf8(ptr, len) } {
+    std::result::Result::Ok(json) => {
+      encode_unit_result(verify_embedded_mandate_binding_impl(json))
+    }
+    std::result::Result::Err(message) => encode_result(std::result::Result::Err(message)),
+  }
 }
