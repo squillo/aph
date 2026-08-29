@@ -538,10 +538,10 @@ schema to consult. The exports are the same four in BEAM idiom —
 `APH.verify_proof_structure/1`, `APH.require_attestation_mode/2` — answering
 `{:ok, result} | {:error, code}` rather than raising, because a refused
 envelope is an ordinary outcome there; the `APH_E*` code travels as the wire
-string, so `APH_E013` is matched exactly as it is in the other two.
+string, so `APH_E013` is matched exactly as it is in the other three.
 
 That parity is a contract, not a coincidence: an addition to any one binding is
-unfinished until it lands in the other two, because bindings teaching different
+unfinished until it lands in the others — a census test now counts every export surface against one roster — because bindings teaching different
 things is how one protocol acquires several meanings. None is a second
 implementation — that question is answered by `interpreters/typescript/`, which
 shares no code with this workspace.

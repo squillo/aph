@@ -1,9 +1,12 @@
 # APH — Rust reference implementation
 
-The reference implementation of the [APH protocol](../spec/aph-0.1.md), v0.1.
+**The one implementation every other surface in this repository is measured
+against**: the wire types, the verification steps, the closed vocabularies,
+and the twenty-code refusal taxonomy of the [APH protocol](../spec/aph-0.1.md), v0.1 —
+plus the bindings that carry its exact verdicts into four other languages.
 
 ```sh
-cargo test                      # 185 tests
+cargo test --workspace          # the full suite, thirty-eight green gates deep
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -13,13 +16,13 @@ cargo clippy --all-targets -- -D warnings
 |---|---|
 | [`aph-core`](aph-core/) | The protocol: envelope wire types, mandates, flow state machines, roles, error taxonomy, and signing helpers. No dependency on anything outside serde/chrono/p256/base64/thiserror. |
 | [`aph-conformance`](aph-conformance/) | Golden fixtures, contract tests, the three channel binding specs, and a suite that validates the repo's `examples/` against the implementation. |
-| [`aph-cli`](aph-cli/) | The `aph` binary — `validate`, `inspect`, `golden`. |
-| [`aph-ts`](aph-ts/) | WebAssembly binding: `parseEnvelopeJson`, `serializeEnvelope`, `verifyProofStructure`, `requireAttestationMode`. |
-| [`aph-py`](aph-py/) | Python binding (pyo3, module `aph`): the same four operations in snake_case — `parse_envelope_json`, `serialize_envelope`, `verify_proof_structure`, `require_attestation_mode`. |
+| [`aph-cli`](aph-cli/) | The `aph` binary — `validate` (with `--json` for CI gates), `inspect`, `golden`, and the publication renderers `render-txt`, `render-did`, `render-vocab`. |
+| [`aph-ts`](aph-ts/) | WebAssembly binding: the six-operation roster — `parseEnvelopeJson`, `serializeEnvelope`, `verifyProofStructure`, `requireAttestationMode`, `mandateIsValidAt`, `verifyEmbeddedMandateBinding`. |
+| [`aph-py`](aph-py/) | Python binding (pyo3, module `aph`): the same six operations in snake_case. Its README carries the four-column parity table across all four bindings. |
 | [`aph-resolver`](aph-resolver/) | Ready-made §8.4.5 DNS TXT + §8.4.4 `did:web` fetch adapters over `aph-core`'s discovery ports, for adopters with no adapter layer of their own. The ONLY crate carrying HTTP/DNS/runtime dependencies. |
 | [`aph-js-harness`](aph-js-harness/) | A TEST harness — not a binding, not published: it runs the [TypeScript implementation](../typescript/)'s compiled crypto-free core (canonicalization, strict parse, proof structure, the §11 codes) under a second ECMAScript engine inside the cargo process, against the same expectation table that implementation's own suite reads. Needs `../typescript/dist` on disk. |
 
-`aph-ts` and `aph-py` are two **bindings of this one implementation**, held at
+`aph-ts`, `aph-py`, the Elixir NIF and the Go/wazero module are four **bindings of this one implementation**, held at
 export parity — same operations, same semantics, same error text, each in its
 language's case convention. Neither is a second implementation. Adding an
 operation to one is unfinished until it lands in the other.

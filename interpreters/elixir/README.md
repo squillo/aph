@@ -1,5 +1,9 @@
 # aph-ex
 
+**Gate every agent-sent message in your BEAM pipeline on a verifiable human
+authorization — strict-parse it, check its window, bind it to its mandate —
+with the Rust reference doing the judging and Elixir doing the routing.**
+
 Elixir bindings for the APH (Agent per Human) v0.1 protocol types. The OTP
 application and the public module are both named `aph` / `APH`.
 
@@ -29,11 +33,14 @@ the terms back can produce a one-element proof list or a float `bodySize`
 without noticing. Text in, text out: the only union and number parser that runs
 is `serde_json`'s.
 
-## Parity with the other two bindings, and what none of them is
+## Parity with the other three bindings, and what none of them is
 
-`aph-ex`, the wasm binding and the Python binding are three **bindings of one
-reference implementation**. They export the same four operations, with the same
-semantics and the same error identity, each in its language's idiom:
+`aph-ex`, the wasm binding, the Python binding and the Go binding are four
+**bindings of one reference implementation**. They export the same six
+operations, with the same semantics and the same error identity, each in its
+language's idiom (the Go column lives in
+[aph-py's README](../rust/aph-py/README.md), which carries the full
+four-column table):
 
 | wasm/TS                  | Python                     | Elixir                           |
 |--------------------------|----------------------------|----------------------------------|
@@ -41,6 +48,8 @@ semantics and the same error identity, each in its language's idiom:
 | `serializeEnvelope`      | `serialize_envelope`       | `APH.serialize_envelope/1`       |
 | `verifyProofStructure`   | `verify_proof_structure`   | `APH.verify_proof_structure/1`   |
 | `requireAttestationMode` | `require_attestation_mode` | `APH.require_attestation_mode/2` |
+| `mandateIsValidAt`       | `mandate_is_valid_at`      | `APH.mandate_is_valid_at/2`      |
+| `verifyEmbeddedMandateBinding` | `verify_embedded_mandate_binding` | `APH.verify_embedded_mandate_binding/1` |
 
 None may grow an operation the others lack. Bindings that teach different
 things about one protocol are how a protocol acquires several meanings — so a
@@ -154,7 +163,7 @@ carry the parser's message and no code, because no protocol rule was reached.
 The surface covers JSON round-trip plus proof-structure verification, so a BEAM
 consumer can detect a forged `PrincipalSigned` label instead of trusting the
 self-asserted string. Cryptographic signature verification stays on the Rust
-side. Any addition here is an addition to the other two bindings as well; see
+side. Any addition here is an addition to the other three bindings as well; see
 the parity contract above.
 
 **Not published to hex.pm.** This package has never been pushed, and `mix.exs`

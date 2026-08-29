@@ -2,6 +2,10 @@
 
 ![The APH emblem — a human figure and an AI chip joined in an infinity loop inside a chained seal — surrounded by scenes of people from many cultures and walks of life working alongside robots and AI assistants: an elder signing a document with a robot, a family with tablets, clinicians, office workers at laptops, and a delivery drone, all linked by glowing network lines carrying padlock and document icons.](assets/aph-banner.jpg)
 
+**Your agent just sent an email, posted to Slack, or hit an API on someone's behalf. The receiving side has exactly one question: *did a human actually authorize this?*** APH answers it with cryptography instead of vibes — every agent action ships with a signed, revocable, replay-proof credential that any stranger can verify with nothing but public standards: no account with you, no SDK of yours, no phone call.
+
+**If you build agents that act for people, this is how the other side learns to trust yours. If you receive agent traffic, this is how you tell an authorized act from a freelancing model — before it lands.** One `cargo add aph-core`, `go get`, `pip`, `mix`, or a zero-dependency TypeScript implementation away.
+
 APH is an open protocol for cryptographically notarizing the actions an autonomous agent takes on behalf of a specific human, producing a W3C Verifiable Credential 2.0-shaped envelope that any downstream recipient can independently verify across vendors and across organizations.
 
 **▶ [Watch the explainer video](https://drive.google.com/file/d/1JSqeo4tzvxMWN8M3fe-V-dT8etBiBADb/view?usp=sharing)** — the driver's-license model and the verification story in plain language, before the spec makes them precise.
@@ -214,7 +218,7 @@ aph/
 
 ```toml
 [dependencies]
-aph-core = "0.1.0-alpha.1"
+aph-core = "0.1.0"
 ```
 
 ### Verify an envelope you received
@@ -435,11 +439,12 @@ caller matches it on the thrown message. Not published to hex.pm: see
 pure Go, running the reference as WebAssembly under wazero with no cgo; its
 committed wasm artifact is byte-diffed against a pinned-toolchain rebuild on
 every push) are four **bindings of this one
-reference implementation**, held at export parity — the same four operations,
+reference implementation**, held at export parity — the same six operations,
 the same semantics, the same error identity, each in its language's idiom —
 under a standing rule that an addition to any one is unfinished until it lands
-in the other two, so they cannot drift into teaching different things. All
-three cross the FFI as JSON text in both directions, because the envelope's
+in the others — enforced by a census test that counts every export surface
+against one roster, so they cannot drift into teaching different things. All
+four cross the FFI as JSON text in both directions, because the envelope's
 `proof` union is untagged and an object round-trip hands arm selection to a
 second deserializer. None is a second implementation, and none is evidence that
 one can be built: see [interpreters/rust/aph-py/README.md](interpreters/rust/aph-py/README.md).

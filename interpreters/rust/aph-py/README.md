@@ -1,5 +1,8 @@
 # aph-py
 
+**Refuse the agent message no human authorized — from Python, with the Rust
+reference's exact verdict and error codes, JSON text in, JSON text out.**
+
 Python bindings for the APH (Agent per Human) v0.1 protocol types. The Python
 module is named `aph`.
 
@@ -30,6 +33,8 @@ each language's idiom:
 | `serializeEnvelope`      | `serialize_envelope`       | `APH.serialize_envelope/1`       | `SerializeEnvelope(ctx, s)`        |
 | `verifyProofStructure`   | `verify_proof_structure`   | `APH.verify_proof_structure/1`   | `VerifyProofStructure(ctx, s)`     |
 | `requireAttestationMode` | `require_attestation_mode` | `APH.require_attestation_mode/2` | `RequireAttestationMode(ctx, s, m)`|
+| `mandateIsValidAt`       | `mandate_is_valid_at`      | `APH.mandate_is_valid_at/2`      | `MandateIsValidAt(ctx, m, at)`     |
+| `verifyEmbeddedMandateBinding` | `verify_embedded_mandate_binding` | `APH.verify_embedded_mandate_binding/1` | `VerifyEmbeddedMandateBinding(ctx, s)` |
 
 The Go column is methods on a `*Runtime` handle (`New`/`Close`) rather than
 package-level functions — the one idiom divergence in the set, and a justified
@@ -122,5 +127,5 @@ because no protocol rule has been reached yet.
 The surface covers JSON round-trip plus proof-structure verification, so a
 Python consumer can detect a forged `PrincipalSigned` label instead of
 trusting the self-asserted string. Cryptographic signature verification stays
-on the Rust side. Any addition here is an addition to the other two bindings as
+on the Rust side. Any addition here is an addition to the other three bindings as
 well; see the parity contract above.

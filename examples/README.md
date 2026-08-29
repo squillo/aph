@@ -49,16 +49,18 @@ no wire value for a service act (see RFC 0002) — so it is excluded from every
 - `aphVersion`: `"0.1"`
 - `@context`: W3C VC 2.0 + APH v1
 - `type`: `["VerifiableCredential", "AgentSendAuthorizationCredential"]`
-- `validFrom` / `validUntil`: 24-hour window
+- `validFrom` / `validUntil`: a TEN-MINUTE window — §6.3's minutes-order rule for single-act envelopes (RFC 0003); the 24-hour windows the corpus used to ship were the spec losing an argument to its own threat model
 - `agent`: a sample agent DID
 - `communication.bodySha256`: a fixed 64-char lowercase hex in **twelve of the
-  thirteen** files (the SHA-256 of an empty string, used as an anchor for
+  fourteen** files (the SHA-256 of an empty string, used as an anchor for
   deterministic round-trip testing — DOES NOT represent a real message body).
-  `ts_minted_envelope.json` is the exception and carries a real digest of a
-  real body.
+  The two exceptions carry real digests of real bodies:
+  `principal_signed_envelope.json` (over the committed
+  `principal_signed_body.txt`) and `ts_minted_envelope.json` (over the body
+  it carries in `preview`).
 
 `proof` is the one block that varies by design, because §8.1 and §8.2 define
-more than one way to make one. Twelve of the thirteen files use the Data
+more than one way to make one. Thirteen of the fourteen files use the Data
 Integrity form, `"type": "DataIntegrityProof"`: eleven declare `eddsa-jcs-2022`
 (the seven channel files, the extensions file, the `actClassification` file,
 `principal_signed_envelope.json` and `ts_minted_envelope.json`) and

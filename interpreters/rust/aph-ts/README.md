@@ -1,5 +1,8 @@
 # aph-ts
 
+**The Rust reference's exact envelope verdicts in the browser or Node, via
+WebAssembly — same six operations, same twenty error codes, same bytes.**
+
 WebAssembly bindings for the APH (Agent per Human) v0.1 protocol types.
 
 This crate validates envelopes against the canonical Rust
@@ -37,6 +40,8 @@ import init, {
   serializeEnvelope,
   verifyProofStructure,
   requireAttestationMode,
+  mandateIsValidAt,
+  verifyEmbeddedMandateBinding,
 } from 'aph-ts';
 
 await init();

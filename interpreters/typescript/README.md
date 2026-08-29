@@ -1,5 +1,10 @@
 # APH in TypeScript — the second implementation
 
+**Verify a human's authorization behind any agent message from any modern
+JS runtime — with zero runtime dependencies.** The platform's WebCrypto,
+strings in, verdicts out; if it parses, it is exactly what the spec says it
+is, and if it does not, you get the §11 code that says why.
+
 A complete APH v0.1 implementation — **mint and verify** — written from
 `spec/aph-0.1.md` and the published `examples/`. It shares no code with the
 Rust reference: its own RFC 8785 canonicalizer, its own strict parser, its own

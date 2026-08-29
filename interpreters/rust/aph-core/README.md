@@ -1,5 +1,10 @@
 # aph-core
 
+**When an autonomous agent acts on a human's behalf, this crate is how the
+receiving side verifies the human actually said yes** — a signed, revocable,
+audience-bound, single-use credential a total stranger can check with public
+standards alone.
+
 Reference Rust implementation of the [APH (Agent per Human)](https://github.com/squillo/aph)
 notarization protocol, v0.1.
 

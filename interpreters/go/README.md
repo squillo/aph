@@ -1,5 +1,8 @@
 # aph — the Go binding
 
+**Check "did a human authorize this agent's message?" from Go — one
+`go get`, no cgo, no C toolchain, one artifact everywhere.**
+
 A Go binding of the APH reference implementation. The reference crate is
 compiled to a plain WebAssembly module and executed in-process by
 [wazero](https://wazero.io), a pure-Go WebAssembly runtime — so `go get`
@@ -26,6 +29,8 @@ defer rt.Close(ctx)
 parsed, err := rt.ParseEnvelopeJSON(ctx, envelopeText)
 mode,   err := rt.VerifyProofStructure(ctx, envelopeText)
 err          = rt.RequireAttestationMode(ctx, envelopeText, "PrincipalSigned")
+inWindow, err := rt.MandateIsValidAt(ctx, mandateText, "2026-05-21T00:05:00Z")
+err          = rt.VerifyEmbeddedMandateBinding(ctx, envelopeText)
 ```
 
 Errors carry the APH protocol code as a matchable string: `errors.As` into
