@@ -129,3 +129,13 @@ jobs:
       - name: Run the compiled core under the second engine
         working-directory: interpreters/rust
         run: cargo test -p aph-js-harness
+      # The byte-identity rig compares the canonical fixed-point of every
+      # corpus file between the reference and the compiled TS core under the
+      # second engine. Elsewhere its TS half skips ANNOUNCED when `dist/` is
+      # absent; this job just built dist, so here a skip would be silent
+      # coverage loss — the flag turns it into a failure instead.
+      - name: Byte-identity rig, TS half required
+        working-directory: interpreters/rust
+        env:
+          APH_BYTE_RIG_REQUIRE_TS: "1"
+        run: cargo test -p aph-conformance --test byte_identity_test

@@ -72,3 +72,21 @@ jobs:
       - name: Run tests
         working-directory: interpreters/rust
         run: cargo test -p aph-py
+
+      # Determinism: two cold builds with canonicalized paths must produce
+      # the same bytes, or this artifact's contents depend on WHERE it was
+      # built — the property the committed-wasm byte-diff enforces for the
+      # go binding, checked here in double-build form because no pyo3
+      # artifact is committed for a reference diff. Same remap roots as
+      # go.yml, same reasoning: rustc embeds source paths (panic locations,
+      # registry paths), and unmapped they make every builder's bytes
+      # unique.
+      - name: Reproducible build check (double build, canonical paths)
+        working-directory: interpreters/rust
+        run: |
+          FLAGS="--remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$HOME/.rustup=/rustup --remap-path-prefix=$(pwd)=/build"
+          RUSTFLAGS="$FLAGS" cargo build --release -p aph-py --target-dir /tmp/det-a
+          RUSTFLAGS="$FLAGS" cargo build --release -p aph-py --target-dir /tmp/det-b
+          cmp /tmp/det-a/release/libaph.so /tmp/det-b/release/libaph.so \
+            && echo "aph-py cdylib is byte-reproducible on this runner" \
+            || { echo "::error::two identical-input builds of aph-py produced different bytes — the build embeds nondeterminism (a path the remap flags miss, a timestamp, an env leak)"; exit 1; }

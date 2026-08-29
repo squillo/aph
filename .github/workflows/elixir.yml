@@ -78,3 +78,17 @@ jobs:
       # can see a term. See the binding's README for what follows from that.
       - name: Run the suite
         run: mix test
+
+      # Determinism: the NIF's double-build twin of the check python.yml
+      # runs — no cdylib is committed, so reproducibility on the runner is
+      # the enforceable property. Built via cargo directly (mix drives the
+      # same crate); remap roots per go.yml.
+      - name: Reproducible build check (double build, canonical paths)
+        working-directory: interpreters/elixir/native/aph_nif
+        run: |
+          FLAGS="--remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$HOME/.rustup=/rustup --remap-path-prefix=$(pwd)=/build"
+          RUSTFLAGS="$FLAGS" cargo build --release --target-dir /tmp/det-a
+          RUSTFLAGS="$FLAGS" cargo build --release --target-dir /tmp/det-b
+          cmp /tmp/det-a/release/libaph_nif.so /tmp/det-b/release/libaph_nif.so \
+            && echo "aph_nif cdylib is byte-reproducible on this runner" \
+            || { echo "::error::two identical-input builds of aph_nif produced different bytes — the build embeds nondeterminism (a path the remap flags miss, a timestamp, an env leak)"; exit 1; }
