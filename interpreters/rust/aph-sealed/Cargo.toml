@@ -1,0 +1,25 @@
+# EXPERIMENTAL — the draft implementation of RFC 0008 (Draft, v0.2 target).
+# `publish = false` is load-bearing twice: the RFC is unratified, and the
+# type this crate defines is deliberately NOT carried by the 0.1 envelope —
+# the final 0.1 parse is strict, and a `sealedPayload` member on today's
+# wire is refused by every conformant verifier, correctly. This crate exists
+# so the RFC's design review reads working code with tests instead of prose.
+[package]
+name = "aph-sealed"
+description = "DRAFT of RFC 0008 sealed payloads: carriage without readership (experimental, off-wire)"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+# RFC 9180 HPKE, pure Rust — this repository writes no cryptography. The
+# single pinned suite (X25519-HKDF-SHA256 / HKDF-SHA256 / ChaCha20-Poly1305)
+# is the one RFC 0008 §1 names; no other suite is compiled in.
+hpke = { version = "0.13", default-features = false, features = ["alloc", "x25519"] }
+# rand 0.9 to match hpke's rand_core 0.9 trait identity exactly.
+rand = "0.9"

@@ -5,6 +5,7 @@ members = [
   "aph-conformance",
   "aph-cli",
   "aph-resolver",
+  "aph-sealed",
   "aph-ts",
   "aph-py",
   "aph-js-harness",
@@ -32,7 +33,11 @@ members = [
 # None of the four may become a prerequisite for testing the protocol itself.
 # aph-resolver is a native crate and IS in the default set, so plain
 # `cargo test` covers it.
-default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver"]
+# aph-sealed is INSIDE the default set on purpose: it is pure Rust, its
+# tests need nothing but cargo, and an experimental crate whose suite the
+# bare gate never runs would be the drift this workspace's welds exist to
+# refuse. Its `publish = false` carries the draft status; the gate does not.
+default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver", "aph-sealed"]
 # The Elixir binding's NIF crate is not a member and is not merely outside the
 # default set: mix (through rustler) is the build driver for a NIF, and two
 # build drivers pointed at one workspace member is a reliability defect — they

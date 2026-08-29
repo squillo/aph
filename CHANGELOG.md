@@ -5,6 +5,12 @@ All notable changes to APH (Agent per Human Notarization Protocol) will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added (non-normative — nothing moves on the 0.1 wire)
+
+- **RFC 0008 (Draft, v0.2 target): sealed payloads — carriage without readership.** Two scenarios, one mechanism: seal to the RECEIVER (intermediate agents verify the envelope and carry what they cannot read) or to the SENDER (the counterparty holds and proves receipt of what it cannot open). RFC 9180 HPKE single-shot, one pinned suite, AAD = the envelope `id` so a seal cannot be re-staged under a different authorization, `bodySha256` over ciphertext so every hop verifies blind. The draft implementation is the experimental `aph-sealed` crate (`publish = false`, inside the default gate set, deliberately NOT wired into the envelope — the final 0.1 strict parse refuses the member, correctly). Error codes deliberately unminted until v0.2 can declare them.
+
 ## [0.1.0] — 2026-08-29
 
 **THE 0.1 CUT.** The specification leaves draft: `0.1.0-draft` → `0.1.0`,
