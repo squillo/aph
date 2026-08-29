@@ -148,6 +148,8 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E019` | `EnvelopeWindowInvalid` | The envelope's OWN `validFrom`/`validUntil` judged against the verifier's clock (§8.3 step 6), unparseable-fails-closed included. Distinct from E003, which is a MANDATE consulted past its expiry — the standing miscite before this code existed |
 | `APH_E020` | `RecipientClassNotAllowed` | The mandate constrains WHO may consume (`allowedRecipientClasses`, RFC 0005) and the envelope declares a class outside it — or NONE, which refuses too: a constraint escapable by omission is not a constraint. Distinct from E005 (the MEDIUM out of scope); this is the CONSUMER out of scope on an allowed medium |
 
+**The v0.2-draft delta** (`spec/aph-0.2-draft.md`) declares three MORE codes the reference already implements — `APH_E021 SealUnopenable`, `APH_E022 SealSuiteUnknown`, `APH_E023 SealReaderKeyUnpublished` — for the `sealedPayload` member (RFC 0008, Accepted: a payload only a named reader can open; HPKE, one suite, context-authenticated AAD, declared from `aphVersion: "0.2"` and refused at strict parse on any 0.1 wire). v0.1.0's closed twenty is UNCHANGED; do not cite E021-E023 as v0.1 codes, and do not expect the independent TypeScript implementation or the bindings to know them yet — the reference is deliberately first.
+
 ## Trust model — WHO signs (the most important section here)
 
 **The principal signs; the notary countersigns.** Get this backwards and you

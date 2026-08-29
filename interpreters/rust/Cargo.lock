@@ -133,11 +133,13 @@ dependencies = [
 name = "aph-sealed"
 version = "0.1.0"
 dependencies = [
+ "aph-core",
  "base64",
  "hpke",
  "rand 0.9.5",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.20",
 ]
 

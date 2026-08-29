@@ -1,6 +1,6 @@
 # RFC 0008 — Sealed payloads: carriage without readership
 
-- **Status:** Draft
+- **Status:** Accepted
 - **Author:** Scott Wyatt
 - **Issue:** requested by the maintainer from two recurring integration
   scenarios; this document is the proposal and the experimental
@@ -196,3 +196,39 @@ govern at v0.2 exactly as it governed `audience` and `recipientClass`.
   in §"The problem".
 - No new discovery mechanism: `keyAgreement` rides the §8.4 surfaces that
   exist.
+
+## Decision
+
+**Accepted 2026-08-29**, by the sole maintainer — a standing arrangement
+ruled the same day and recorded in CONTRIBUTING.md and `rfcs/README.md`
+(deliberately solo within the Squillo organization), which Decision blocks
+now cite instead of re-litigating.
+
+Implemented the same day, with the post-cut discipline the RFC itself
+demanded: v0.1.0 is untouched. What exists now:
+
+- **`spec/aph-0.2-draft.md`** — the versioned DELTA where post-cut
+  accepted RFCs accumulate. It declares the wire member, the authenticated
+  context (as audited: suite + reader + envelope id, not envelope id
+  alone), the wire-version rule (`aphVersion: "0.2"` declares the member;
+  anything earlier carrying it is strict-parse-class malformed), the seal
+  verification step, and the three codes — `APH_E021 SealUnopenable`,
+  `APH_E022 SealSuiteUnknown`, `APH_E023 SealReaderKeyUnpublished` —
+  growing the taxonomy twenty → twenty-three at v0.2.
+- **The reference**: wire types in `aph-core` (so the envelope carries
+  them; the crate's dependency discipline holds — no cryptography moved),
+  the declaration rule as `sealed_payload_is_declared`, the three codes in
+  the error enum with the census at twenty-three, and the envelope-level
+  operations `seal_into_envelope` / `unseal_from_envelope` in `aph-sealed`
+  with the code mapping §2's step specifies. Twelve tests, including both
+  scenarios on a published golden lifted to `aphVersion 0.2`, both
+  directions of the wire-version rule, the code mapping, and the
+  blind-hop `bodySha256` reproduction.
+
+Deliberately still deferred, and the same list §"What this deliberately
+does not do" opened with: multi-recipient sealing, sealed headers, the
+independent TypeScript implementation and the bindings (they follow when
+the 0.2 delta stabilizes — a draft wire taught to five surfaces at once
+is five surfaces to re-teach on every draft revision), and any corpus
+golden (a 0.2 vector would refuse in every 0.1 gate, correctly; vectors
+arrive with the v0.2 cut).

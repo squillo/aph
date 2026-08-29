@@ -96,7 +96,7 @@ pub use envelope::{
   CommunicationDescriptor, ContentClass, CredentialSubject, EnvelopeProof, EnvelopeProofs,
   HumanPrincipalRef, LinkedMandate, NotarizationEnvelope, NotarizationMetadata, NotaryServiceRef,
   Audience, AudienceChannelBinding, PolicyDecision, PolicyDescriptor, RecipientClass,
-  VocabularyRef,
+  SealedPayload, SealedReader, VocabularyRef, sealed_payload_is_declared,
 };
 pub use errors::AphError;
 pub use human_not_present_flow::{

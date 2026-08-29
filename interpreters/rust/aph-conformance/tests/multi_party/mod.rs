@@ -488,6 +488,7 @@ impl Party {
         },
         apple_aur_acceptance: std::option::Option::None,
         audience: std::option::Option::None,
+        sealed_payload: std::option::Option::None,
         act_classification: std::option::Option::None,
       },
       linked_mandate: std::option::Option::None,

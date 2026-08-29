@@ -531,6 +531,13 @@ pub struct CredentialSubject {
   /// reason to believe the recipient understands it (§10.1).
   #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
   pub audience: std::option::Option<Audience>,
+  /// A payload only its named reader can open (spec/aph-0.2-draft.md,
+  /// RFC 0008). OPTIONAL, omitted when absent — and DECLARED ONLY FROM
+  /// aphVersion 0.2: [`sealed_payload_is_declared`] is the rule's teeth,
+  /// and a v0.1.0 verifier refuses the member at strict parse, correctly.
+  /// ⚠ EMITTING is version-gated like every optional sibling here (§10.1).
+  #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
+  pub sealed_payload: std::option::Option<SealedPayload>,
   /// Last-position additive field. What the sender says this act MEANS, in
   /// terms of one or more independently published vocabularies (RFC 0006).
   ///
@@ -1137,6 +1144,77 @@ pub struct AudienceChannelBinding {
   pub coordinates: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
+/// Who may open a sealed payload: a DID and which of its `keyAgreement`
+/// keys (spec/aph-0.2-draft.md §1, RFC 0008 §2). Signing keys are never
+/// converted to encryption keys; the reader publishes a distinct
+/// `keyAgreement` entry through the §8.4 surfaces.
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SealedReader {
+  /// DID whose key opens the seal — the final recipient, the sender itself,
+  /// or a designated third party; that choice IS RFC 0008's two scenarios.
+  pub id: String,
+  /// Which `keyAgreement` key of that DID.
+  pub kid: String,
+}
+
+/// A payload the envelope authorizes but only [`SealedReader`] can read
+/// (spec/aph-0.2-draft.md §1, RFC 0008): verification and readership as
+/// independent capabilities. Every hop runs §8.3 in full — the signature
+/// covers this ciphertext, `bodySha256` MAY bind its raw decoded octets —
+/// and none but the reader learns the plaintext.
+///
+/// The cryptography lives in the `aph-sealed` crate (RFC 9180 HPKE, one
+/// pinned suite, context-authenticated AAD); this type is the WIRE shape
+/// alone, so the core keeps its dependency discipline.
+#[derive(
+  std::fmt::Debug,
+  std::clone::Clone,
+  std::cmp::PartialEq,
+  std::cmp::Eq,
+  serde::Serialize,
+  serde::Deserialize,
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SealedPayload {
+  /// The pinned ciphersuite identifier (`APH-SEAL-1` today). Closed-set
+  /// discipline for ciphersuites: an opener refuses a value it does not
+  /// compile (`APH_E022`).
+  pub suite: String,
+  /// Who can open it.
+  pub reader: SealedReader,
+  /// base64url (unpadded): the HPKE encapsulated key.
+  pub enc: String,
+  /// base64url (unpadded): AEAD ciphertext, tag included.
+  pub ciphertext: String,
+}
+
+/// The wire-version rule spec/aph-0.2-draft.md §1 states: `sealedPayload`
+/// is declared by aphVersion `0.2` and NOTHING EARLIER. A v0.1.0 verifier
+/// refuses the member at strict parse (its structs never learned it); THIS
+/// build's structs have, so the same refusal must come from somewhere —
+/// and it is strict-parse CLASS, a plain message below the error
+/// vocabulary, exactly like an unrecognized closed-set value: the wire is
+/// malformed for the version it claims, which no protocol code describes.
+pub fn sealed_payload_is_declared(
+  envelope: &NotarizationEnvelope,
+) -> std::result::Result<(), String> {
+  if envelope.credential_subject.sealed_payload.is_some() && envelope.aph_version != "0.2" {
+    return std::result::Result::Err(std::format!(
+      "`sealedPayload` is not declared by aphVersion `{}`: the member exists        from aphVersion 0.2 (spec/aph-0.2-draft.md), and an earlier version        carrying it is malformed for the version it claims",
+      envelope.aph_version
+    ));
+  }
+  std::result::Result::Ok(())
+}
+
 /// Refuses an empty `vocabularies` array at parse (§7.1.12: the member is
 /// required AND non-empty). Absent-vs-empty is the §8.4.6 distinction one
 /// field down: an envelope with no claim omits the whole object, and an
@@ -1399,6 +1477,7 @@ mod tests {
       notarization: sample_notarization_metadata(),
       apple_aur_acceptance: std::option::Option::None,
       audience: std::option::Option::None,
+      sealed_payload: std::option::Option::None,
       act_classification: std::option::Option::None,
     }
   }
@@ -2059,6 +2138,7 @@ mod tests {
       notarization: sample_notarization_metadata(),
       apple_aur_acceptance: std::option::Option::Some(claim.clone()),
       audience: std::option::Option::None,
+      sealed_payload: std::option::Option::None,
       act_classification: std::option::Option::None,
     };
     let s = serde_json::to_string(&subject).unwrap();

@@ -13,6 +13,7 @@ license = { workspace = true }
 publish = false
 
 [dependencies]
+aph-core = { path = "../aph-core", version = "0.1.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -23,3 +24,6 @@ base64 = { workspace = true }
 hpke = { version = "0.13", default-features = false, features = ["alloc", "x25519"] }
 # rand 0.9 to match hpke's rand_core 0.9 trait identity exactly.
 rand = "0.9"
+
+[dev-dependencies]
+sha2 = "0.10"

@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E020. Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E023 (E021-E023 declared by spec/aph-0.2-draft.md). Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -237,6 +237,46 @@ pub enum AphError {
     /// The granted classes, comma-joined, so the refusal teaches the fix.
     allowed: String,
   },
+
+  /// `APH_E021` — a sealed payload addressed to THIS verifier did not
+  /// open: wrong key, tampered ciphertext, or a seal staged under a
+  /// different context (envelope, reader, or suite relabeled) — the four
+  /// cases AEAD makes indistinguishable by design. Per RFC 0008 §4 this
+  /// refuses the ENVELOPE, never the seal alone: an unopenable seal
+  /// addressed to you is evidence, not an inconvenience.
+  ///
+  /// DECLARED BY spec/aph-0.2-draft.md, absent from v0.1.0's closed
+  /// twenty; emitted only on wires that declare `sealedPayload`.
+  #[error("APH_E021: sealed payload addressed to this verifier did not open (envelope `{envelope_id}`)")]
+  SealUnopenable {
+    /// The envelope whose seal refused.
+    envelope_id: String,
+  },
+
+  /// `APH_E022` — the sealed payload names a ciphersuite this verifier
+  /// does not compile. One suite per draft, no negotiation; refused by
+  /// name before any key material is touched. Declared by
+  /// spec/aph-0.2-draft.md.
+  #[error("APH_E022: sealed payload suite `{suite}` is not supported (this build seals only `{supported}`)")]
+  SealSuiteUnknown {
+    /// The suite the payload claimed.
+    suite: String,
+    /// The one suite this build compiles.
+    supported: String,
+  },
+
+  /// `APH_E023` — the seal's reader key could not be discovered: the
+  /// reader's DID document publishes no matching `keyAgreement` entry for
+  /// the named `kid`. Held distinct from `APH_E014` exactly as E014 is
+  /// held distinct from E008: WHICH surface came up empty is the repair.
+  /// Declared by spec/aph-0.2-draft.md.
+  #[error("APH_E023: no `keyAgreement` key `{kid}` published for reader `{reader_id}`")]
+  SealReaderKeyUnpublished {
+    /// The reader DID whose document was consulted.
+    reader_id: String,
+    /// The kid the sealed payload named.
+    kid: String,
+  },
 }
 
 impl AphError {
@@ -265,6 +305,9 @@ impl AphError {
       Self::EnvelopeAlreadySpent { .. } => "APH_E018",
       Self::EnvelopeWindowInvalid { .. } => "APH_E019",
       Self::RecipientClassNotAllowed { .. } => "APH_E020",
+      Self::SealUnopenable { .. } => "APH_E021",
+      Self::SealSuiteUnknown { .. } => "APH_E022",
+      Self::SealReaderKeyUnpublished { .. } => "APH_E023",
     }
   }
 
@@ -291,6 +334,9 @@ impl AphError {
       Self::EnvelopeAlreadySpent { .. } => "Mint a fresh envelope for a new act; acceptance consumes an envelope and a replayed one is refused by design",
       Self::EnvelopeWindowInvalid { .. } => "Mint a fresh envelope with a current window; single-act windows should be minutes, not hours",
       Self::RecipientClassNotAllowed { .. } => "Declare the recipient class the act actually has, or ask the principal for a grant that covers it",
+      Self::SealUnopenable { .. } => "Refuse the envelope and tell the sender: re-seal to the current keyAgreement key under this envelope's own context",
+      Self::SealSuiteUnknown { .. } => "Re-seal with the one supported suite; suite agility arrives by amendment, not negotiation",
+      Self::SealReaderKeyUnpublished { .. } => "Publish a keyAgreement entry under that kid, or seal to a key the reader actually publishes",
     }
   }
 
@@ -441,6 +487,27 @@ impl AphError {
       allowed: allowed.into(),
     }
   }
+
+  /// Builds an `APH_E021` naming the envelope whose seal refused.
+  pub fn seal_unopenable(envelope_id: impl std::convert::Into<String>) -> Self {
+    Self::SealUnopenable { envelope_id: envelope_id.into() }
+  }
+
+  /// Builds an `APH_E022` naming both the claimed and the supported suite.
+  pub fn seal_suite_unknown(
+    suite: impl std::convert::Into<String>,
+    supported: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::SealSuiteUnknown { suite: suite.into(), supported: supported.into() }
+  }
+
+  /// Builds an `APH_E023` naming the reader and the missing kid.
+  pub fn seal_reader_key_unpublished(
+    reader_id: impl std::convert::Into<String>,
+    kid: impl std::convert::Into<String>,
+  ) -> Self {
+    Self::SealReaderKeyUnpublished { reader_id: reader_id.into(), kid: kid.into() }
+  }
 }
 
 #[cfg(test)]
@@ -475,12 +542,17 @@ mod tests {
         "urn:uuid:00000000-0000-4000-8000-000000000004",
         "human",
       ),
+      super::AphError::seal_unopenable("urn:uuid:00000000-0000-4000-8000-000000000005"),
+      super::AphError::seal_suite_unknown("APH-SEAL-99", "APH-SEAL-1"),
+      super::AphError::seal_reader_key_unpublished("did:web:reader.example.com", "enc-1"),
     ]
   }
 
   #[test]
   fn every_code_in_the_closed_set_is_unique() {
-    // The spec (§11) fixes a CLOSED set of exactly twenty codes, and
+    // v0.1.0's §11 fixes a CLOSED set of exactly twenty codes, and
+    // spec/aph-0.2-draft.md declares three more (E021-E023) — so this
+    // build's enum holds twenty-three, and
     // other implementations branch on them. A duplicate would make two
     // distinct failures indistinguishable to a remote verifier. The count
     // is pinned so that adding a code without amending §11 fails here.
@@ -498,7 +570,7 @@ mod tests {
     // and rotted); the pinned count below is the tripwire, kept in exactly
     // one place.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 20);
+    std::assert_eq!(errors.len(), 23);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();

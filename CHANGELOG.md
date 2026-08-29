@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (non-normative — nothing moves on the 0.1 wire)
+### Added (v0.2-draft — nothing moves on the 0.1 wire)
+
+- **`spec/aph-0.2-draft.md`**: the versioned delta over v0.1.0 where post-cut accepted RFCs accumulate. First entry: RFC 0008 (Accepted), fully implemented in the reference — `SealedPayload`/`SealedReader` wire types and the `sealed_payload_is_declared` wire-version rule in `aph-core`, codes `APH_E021`-`APH_E023` (enum census twenty-three: v0.1.0's twenty plus the delta's three), and envelope-level `seal_into_envelope`/`unseal_from_envelope` in `aph-sealed` with twelve tests. A v0.1-only verifier still refuses the member at strict parse, which is the compatibility story working.
+
+### Added (earlier, superseded by the above)
 
 - **RFC 0008 (Draft, v0.2 target): sealed payloads — carriage without readership.** Two scenarios, one mechanism: seal to the RECEIVER (intermediate agents verify the envelope and carry what they cannot read) or to the SENDER (the counterparty holds and proves receipt of what it cannot open). RFC 9180 HPKE single-shot, one pinned suite, AAD = the envelope `id` so a seal cannot be re-staged under a different authorization, `bodySha256` over ciphertext so every hop verifies blind. The draft implementation is the experimental `aph-sealed` crate (`publish = false`, inside the default gate set, deliberately NOT wired into the envelope — the final 0.1 strict parse refuses the member, correctly). Error codes deliberately unminted until v0.2 can declare them.
 
