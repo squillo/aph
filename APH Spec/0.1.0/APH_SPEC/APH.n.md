@@ -44,8 +44,9 @@ throughout these files (for example §7.1.5) point into it.
 
 ## Status
 
-`0.1.0-draft`. The wire shape, signing profiles, and state machines are
-published for community review and may change before `0.1.0` final.
+`0.1.0`, FINAL for the 0.1 line (cut 2026-08-29). The wire shape, signing
+profiles, and state machines are frozen for this version; changes are
+versioned from here, and the v0.2 line is named in `rfcs/README.md`.
 
 ## Protocol constants
 

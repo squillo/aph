@@ -1,7 +1,7 @@
 # APH v0.1 — Agent per Human Notarization Protocol
 
-**Version:** 0.1.0-draft
-**Status:** Draft, open for community review
+**Version:** 0.1.0
+**Status:** Final for v0.1 (cut 2026-08-29)
 **Date:** 2026-05-21
 **Repository:** `github.com/squillo/aph`
 **License:** Apache-2.0
@@ -10,10 +10,22 @@
 
 ## 0. Status of This Document
 
-This is a v0.1.0-draft of the APH (Agent per Human) protocol specification, published for community review. The wire shape, signing profiles, and state machines defined here MAY change in incompatible ways before v0.1.0 final. The maintainer of this draft is Squillo, Inc.; the source of truth lives at `github.com/squillo/aph`. Implementers SHOULD pin to a specific commit hash while v0.1 is in draft and SHOULD expect breaking changes before v1.0. Feedback, errata, and conformance reports are welcome via repository issues and pull requests.
+This is v0.1.0 of the APH (Agent per Human) protocol specification, FINAL for the 0.1 line as of 2026-08-29. The pre-production exception under which accepted revisions landed in place inside the draft ENDS with this cut: from here, normative changes are versioned — additive minors within 0.x per CONTRIBUTING.md's rules, and the v0.2 line (`rfcs/README.md` names its planned contents) for anything larger. Per SemVer 0.x semantics, breaking changes remain possible BETWEEN minor versions before v1.0, but never again in place within a published one. The maintainer is Squillo, Inc.; the source of truth lives at `github.com/squillo/aph`. Implementers SHOULD pin a release tag or commit hash. Feedback, errata, and conformance reports are welcome via repository issues and pull requests; the RFC process (`rfcs/README.md`) is the change path.
 
 ---
 
+
+> ### THE 0.1 CUT — 2026-08-29
+>
+> This document is FINAL for v0.1. Twenty error codes, four closed
+> vocabularies welded across every populator, replay closed (audience +
+> single-use), the revocation transport live, six-operation parity across
+> four language bindings, and a corpus whose fourteen goldens are minted
+> through committed, determinism-checked seams. Everything the 0.1 line
+> deliberately left out is the v0.2 line: RFC 0001 (rotation attestation),
+> JSON Schema, published test vectors. Decided by the sole maintainer —
+> deliberately solo within the Squillo organization, ruled 2026-08-29 and
+> recorded rather than implied.
 
 > ### Revision 2026-08-29 — replay closed, the second axis, and a corpus that practices what §6.3 preaches
 >

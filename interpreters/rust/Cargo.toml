@@ -50,12 +50,11 @@ default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver"]
 exclude = ["../elixir/native/aph_nif"]
 
 [workspace.package]
-# PRE-RELEASE while the spec still reads 0.1.0-draft. Cargo does not
-# auto-select a pre-release, so an adopter opts in explicitly — and 0.1.0
-# stays free for the cut that follows the spec leaving draft. NOTE this is the
+# 0.1.0 FINAL — the cut that followed the spec leaving draft (2026-08-29),
+# taking the version the alpha deliberately held free. NOTE this is the
 # CRATE version and is deliberately distinct from the PROTOCOL version
 # (`aph_config::APH_VERSION = "0.1"`, guard-tested); they move independently.
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
 authors = ["APH Protocol Contributors"]

@@ -5,7 +5,14 @@ All notable changes to APH (Agent per Human Notarization Protocol) will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-08-29
+## [0.1.0] — 2026-08-29
+
+**THE 0.1 CUT.** The specification leaves draft: `0.1.0-draft` → `0.1.0`,
+final for the 0.1 line. The pre-production land-in-place exception ends;
+normative changes are versioned from here. `aph-core` and `aph-resolver`
+ship to crates.io at `0.1.0` (the version deliberately held free since
+`0.1.0-alpha.1`). The v0.2 line: RFC 0001 rotation attestation, JSON
+Schema, published test vectors.
 
 ### Added
 

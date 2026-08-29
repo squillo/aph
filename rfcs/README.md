@@ -69,3 +69,5 @@ specification guarantee that lives only in prose.
 | [0005](0005-recipient-class.md) | Recipient class: who is on the other end of the medium | **Accepted** |
 | [0006](0006-published-guardrail-vocabularies.md) | Published guardrail vocabularies: meaning as a resolvable third party | **Accepted** |
 | [0007](0007-in-app-channel-kind.md) | A channel kind for an in-application messaging surface | **Accepted** |
+
+**The v0.2 line (drawn at the 0.1 cut, 2026-08-29):** RFC 0001 (rotation attestation), JSON Schema for the envelope family, and published test vectors. v0.1.0 is final; in-place normative revision ended with the cut, so these land as v0.2 work through this process. Governance note of record: the second-maintainer seat is held deliberately (solo within the Squillo organization, ruled 2026-08-29) — Decision blocks cite this ruling.

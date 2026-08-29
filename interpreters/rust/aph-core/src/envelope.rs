@@ -859,9 +859,9 @@ pub struct AppleAurAcceptanceClaim {
 /// implementation refused an unrecognized value at parse — two
 /// conformant-claiming implementations reaching opposite verdicts on the
 /// same bytes. The reference was the permissive surface, and per the
-/// standing guardrail the permissive surface is the wrong one. The Snapp
-/// had declared this vocabulary as an enum all along; the reference was the
-/// LAST populator without the type.
+/// standing guardrail the permissive surface is the wrong one. The
+/// published protocol bundle had declared this vocabulary as an enum all
+/// along; the reference was the LAST populator without the type.
 ///
 /// The doc-comment on the wire field (§7.1.7) carries the semantic warning:
 /// this records the human's standing CONFIGURATION, never the verdict on

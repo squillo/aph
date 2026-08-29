@@ -28,7 +28,7 @@ dependencies = [
 
 [[package]]
 name = "aph-cli"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "aph-conformance",
  "aph-core",
@@ -38,7 +38,7 @@ dependencies = [
 
 [[package]]
 name = "aph-conformance"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "aph-core",
  "aph-js-harness",
@@ -52,7 +52,7 @@ dependencies = [
 
 [[package]]
 name = "aph-core"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "base64",
  "bs58",
@@ -67,7 +67,7 @@ dependencies = [
 
 [[package]]
 name = "aph-js-harness"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "boa_engine",
  "serde",
@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "aph-py"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "aph-core",
  "pyo3",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "aph-resolver"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "aph-core",
  "futures-util",
@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "aph-ts"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "aph-core",
  "getrandom 0.2.17",
@@ -107,7 +107,7 @@ dependencies = [
 
 [[package]]
 name = "aph-wasm-abi"
-version = "0.1.0-alpha.1"
+version = "0.1.0"
 dependencies = [
  "aph-core",
  "getrandom 0.2.17",

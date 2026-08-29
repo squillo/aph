@@ -1,6 +1,6 @@
 {
   "name": "aph-typescript",
-  "version": "0.1.0-draft",
+  "version": "0.1.0",
   "private": true,
   "description": "An independent TypeScript implementation of the APH v0.1 notarization protocol: strict parse, RFC 8785 canonicalization, mint and verify. Runtime dependencies: none.",
   "license": "Apache-2.0",
