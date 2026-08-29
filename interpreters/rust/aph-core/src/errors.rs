@@ -1,6 +1,6 @@
 //! APH error taxonomy.
 //!
-//! Codes APH_E001 .. APH_E023 (E021-E023 declared by spec/aph-0.2-draft.md). Each variant carries a `code() -> &'static str`
+//! Codes APH_E001 .. APH_E024 (E021-E024 declared by the v0.2 delta). Each variant carries a `code() -> &'static str`
 //! and `suggestion() -> &'static str`.
 
 /// APH protocol error with structured codes and suggestions.
@@ -245,7 +245,7 @@ pub enum AphError {
   /// refuses the ENVELOPE, never the seal alone: an unopenable seal
   /// addressed to you is evidence, not an inconvenience.
   ///
-  /// DECLARED BY spec/aph-0.2-draft.md, absent from v0.1.0's closed
+  /// DECLARED BY spec/aph-0.2.md, absent from v0.1.0's closed
   /// twenty; emitted only on wires that declare `sealedPayload`.
   #[error("APH_E021: sealed payload addressed to this verifier did not open (envelope `{envelope_id}`)")]
   SealUnopenable {
@@ -256,7 +256,7 @@ pub enum AphError {
   /// `APH_E022` — the sealed payload names a ciphersuite this verifier
   /// does not compile. One suite per draft, no negotiation; refused by
   /// name before any key material is touched. Declared by
-  /// spec/aph-0.2-draft.md.
+  /// spec/aph-0.2.md.
   #[error("APH_E022: sealed payload suite `{suite}` is not supported (this build seals only `{supported}`)")]
   SealSuiteUnknown {
     /// The suite the payload claimed.
@@ -269,13 +269,24 @@ pub enum AphError {
   /// reader's DID document publishes no matching `keyAgreement` entry for
   /// the named `kid`. Held distinct from `APH_E014` exactly as E014 is
   /// held distinct from E008: WHICH surface came up empty is the repair.
-  /// Declared by spec/aph-0.2-draft.md.
+  /// Declared by spec/aph-0.2.md.
   #[error("APH_E023: no `keyAgreement` key `{kid}` published for reader `{reader_id}`")]
   SealReaderKeyUnpublished {
     /// The reader DID whose document was consulted.
     reader_id: String,
     /// The kid the sealed payload named.
     kid: String,
+  },
+
+  /// `APH_E024` — a rotation attestation (RFC 0001, v0.2) failed a
+  /// structural rule or its predecessor signature. The message carries the
+  /// SPECIFIC defect — which rule, which value — because "invalid" with no
+  /// reason teaches an operator nothing about a statement whose entire job
+  /// is auditability.
+  #[error("APH_E024: rotation attestation invalid: {reason}")]
+  RotationAttestationInvalid {
+    /// The specific rule that refused, with the offending values.
+    reason: String,
   },
 }
 
@@ -308,6 +319,7 @@ impl AphError {
       Self::SealUnopenable { .. } => "APH_E021",
       Self::SealSuiteUnknown { .. } => "APH_E022",
       Self::SealReaderKeyUnpublished { .. } => "APH_E023",
+      Self::RotationAttestationInvalid { .. } => "APH_E024",
     }
   }
 
@@ -337,6 +349,7 @@ impl AphError {
       Self::SealUnopenable { .. } => "Refuse the envelope and tell the sender: re-seal to the current keyAgreement key under this envelope's own context",
       Self::SealSuiteUnknown { .. } => "Re-seal with the one supported suite; suite agility arrives by amendment, not negotiation",
       Self::SealReaderKeyUnpublished { .. } => "Publish a keyAgreement entry under that kid, or seal to a key the reader actually publishes",
+      Self::RotationAttestationInvalid { .. } => "Re-mint the attestation with the predecessor key it names, over the lone-proof base, with an ordered window",
     }
   }
 
@@ -508,6 +521,11 @@ impl AphError {
   ) -> Self {
     Self::SealReaderKeyUnpublished { reader_id: reader_id.into(), kid: kid.into() }
   }
+
+  /// Builds an `APH_E024` carrying the specific rule that refused.
+  pub fn rotation_attestation_invalid(reason: impl std::convert::Into<String>) -> Self {
+    Self::RotationAttestationInvalid { reason: reason.into() }
+  }
 }
 
 #[cfg(test)]
@@ -545,14 +563,15 @@ mod tests {
       super::AphError::seal_unopenable("urn:uuid:00000000-0000-4000-8000-000000000005"),
       super::AphError::seal_suite_unknown("APH-SEAL-99", "APH-SEAL-1"),
       super::AphError::seal_reader_key_unpublished("did:web:reader.example.com", "enc-1"),
+      super::AphError::rotation_attestation_invalid("illustrative census entry"),
     ]
   }
 
   #[test]
   fn every_code_in_the_closed_set_is_unique() {
     // v0.1.0's §11 fixes a CLOSED set of exactly twenty codes, and
-    // spec/aph-0.2-draft.md declares three more (E021-E023) — so this
-    // build's enum holds twenty-three, and
+    // the v0.2 delta declares four more (E021-E024) — so this
+    // build's enum holds twenty-four, and
     // other implementations branch on them. A duplicate would make two
     // distinct failures indistinguishable to a remote verifier. The count
     // is pinned so that adding a code without amending §11 fails here.
@@ -570,7 +589,7 @@ mod tests {
     // and rotted); the pinned count below is the tripwire, kept in exactly
     // one place.
     let errors = all_variants();
-    std::assert_eq!(errors.len(), 23);
+    std::assert_eq!(errors.len(), 24);
     let codes: std::vec::Vec<&str> = errors.iter().map(|e| e.code()).collect();
     let mut unique = codes.clone();
     unique.sort();

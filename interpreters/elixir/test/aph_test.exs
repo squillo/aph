@@ -208,12 +208,12 @@ defmodule APHTest do
   end
 
 
-  describe "the v0.2-draft wire-version rule at the NIF boundary" do
+  describe "the v0.2 wire-version rule at the NIF boundary" do
     # The shared strict-parse entry in the reference core carries the rule;
     # this pins that the NIF boundary inherited it rather than re-implying it.
     test "the draft vector parses and its downgrade refuses" do
       vector =
-        Path.join([__DIR__, "..", "..", "..", "examples", "v0.2-draft", "sealed_envelope.json"])
+        Path.join([__DIR__, "..", "..", "..", "examples", "v0.2", "sealed_envelope.json"])
         |> File.read!()
 
       assert {:ok, _} = APH.parse_envelope_json(vector)

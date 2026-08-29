@@ -207,7 +207,7 @@ now cite instead of re-litigating.
 Implemented the same day, with the post-cut discipline the RFC itself
 demanded: v0.1.0 is untouched. What exists now:
 
-- **`spec/aph-0.2-draft.md`** — the versioned DELTA where post-cut
+- **`spec/aph-0.2.md`** — the versioned DELTA where post-cut
   accepted RFCs accumulate. It declares the wire member, the authenticated
   context (as audited: suite + reader + envelope id, not envelope id
   alone), the wire-version rule (`aphVersion: "0.2"` declares the member;
@@ -242,7 +242,7 @@ deferred surfaces landed once the shape stopped moving:
   delegates to, so the rule holds at every binding by construction. Each
   boundary carries the proof: the committed vector parses, its downgrade
   refuses naming the rule.
-- **The committed vector.** `examples/v0.2-draft/sealed_envelope.json` —
+- **The committed vector.** `examples/v0.2/sealed_envelope.json` —
   deterministic (derived test keys, seeded RNG, a committed golden as
   base), byte-welded by the same drift-print discipline as the signed
   v0.1 vectors, and opened by the derived reader key in a second test that

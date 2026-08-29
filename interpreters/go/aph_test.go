@@ -542,7 +542,7 @@ func TestTheGoldensMandateBindingVerifiesAndARetargetedMandateRefuses(t *testing
 }
 
 // TestDraftVectorWireVersionRule pins that this boundary inherited the
-// v0.2-draft wire-version rule from the reference's shared strict-parse
+// v0.2 wire-version rule from the reference's shared strict-parse
 // entry (via the committed wasm): the draft vector parses, and the same
 // member relabeled onto an aphVersion 0.1 wire refuses with the rule's
 // message rather than being waved through.
@@ -550,12 +550,12 @@ func TestDraftVectorWireVersionRule(t *testing.T) {
 	ctx := context.Background()
 	rt := newTestRuntime(t)
 
-	raw, err := os.ReadFile(filepath.Join("..", "..", "examples", "v0.2-draft", "sealed_envelope.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "examples", "v0.2", "sealed_envelope.json"))
 	if err != nil {
 		t.Fatalf("reading the draft vector: %v", err)
 	}
 	if _, err := rt.ParseEnvelopeJSON(ctx, string(raw)); err != nil {
-		t.Fatalf("the 0.2-draft vector must strict-parse here: %v", err)
+		t.Fatalf("the 0.2 vector must strict-parse here: %v", err)
 	}
 
 	downgraded := strings.Replace(string(raw), `"aphVersion": "0.2"`, `"aphVersion": "0.1"`, 1)

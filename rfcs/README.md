@@ -62,7 +62,7 @@ specification guarantee that lives only in prose.
 
 | RFC | Title | Status |
 |---|---|---|
-| [0001](0001-rotation-attestation.md) | Signed rotation attestation (v0.2 candidate) | Draft |
+| [0001](0001-rotation-attestation.md) | Signed rotation attestation (v0.2 delta §5) | Accepted |
 | [0002](0002-service-act-channel.md) | A service-act channel binding | **Accepted** |
 | [0003](0003-audience-and-single-use.md) | Audience binding and single-use envelopes | **Accepted** |
 | [0004](0004-vendor-extension-channel-kind.md) | A vendor-extension arm for `ChannelKind` | Rejected |
@@ -71,4 +71,4 @@ specification guarantee that lives only in prose.
 | [0007](0007-in-app-channel-kind.md) | A channel kind for an in-application messaging surface | **Accepted** |
 | [0008](0008-sealed-payloads.md) | Sealed payloads: carriage without readership | **Accepted** |
 
-**The v0.2 line (drawn at the 0.1 cut, 2026-08-29):** accumulating in [`spec/aph-0.2-draft.md`](../spec/aph-0.2-draft.md). In it already: RFC 0008 (sealed payloads — implemented in the reference: wire types in `aph-core`, cryptography and envelope operations in `aph-sealed`, codes E021-E023). Still to draft in: RFC 0001 (rotation attestation), JSON Schema for the envelope family, published test vectors. v0.1.0 is final; in-place normative revision ended with the cut, so these land as v0.2 work through this process. Governance note of record: the second-maintainer seat is held deliberately (solo within the Squillo organization, ruled 2026-08-29) — Decision blocks cite this ruling.
+**The v0.2 line (drawn at the 0.1 cut, 2026-08-29):** accumulating in [`spec/aph-0.2.md`](../spec/aph-0.2.md). In it: RFC 0008 (sealed payloads — wire types in `aph-core`, cryptography and envelope operations in `aph-sealed`, codes E021-E023), RFC 0001 (rotation attestation — `aph-core::rotation`, code E024), the JSON Schema family (`spec/schemas/`, welded to the vectors in CI), and signed test vectors (`examples/v0.2/`). v0.1.0 is final; in-place normative revision ended with the cut, so these land as v0.2 work through this process. Governance note of record: the second-maintainer seat is held deliberately (solo within the Squillo organization, ruled 2026-08-29) — Decision blocks cite this ruling.

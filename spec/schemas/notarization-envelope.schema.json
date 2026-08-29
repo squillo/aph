@@ -1,0 +1,696 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/aph/schemas/notarization-envelope.schema.json",
+  "title": "APH NotarizationEnvelope (v0.1.0 final + the v0.2 delta)",
+  "description": "The envelope family. The prose specs are normative (aph-0.1.md; the v0.2 delta); where this schema disagrees, the schema is the defect. Cross-member rules a schema cannot express are listed in this directory's README \u2014 including the v0.2 wire-version rule: sealedPayload requires aphVersion 0.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aphVersion",
+    "@context",
+    "type",
+    "id",
+    "issuer",
+    "validFrom",
+    "validUntil",
+    "credentialSubject",
+    "proof"
+  ],
+  "properties": {
+    "aphVersion": {
+      "enum": [
+        "0.1",
+        "0.2"
+      ]
+    },
+    "@context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "type": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "id": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "validFrom": {
+      "type": "string"
+    },
+    "validUntil": {
+      "type": "string"
+    },
+    "credentialSubject": {
+      "$ref": "#/$defs/credentialSubject"
+    },
+    "linkedMandate": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ap2IntentMandateUri": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ap2SignedPayloadB64": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "vaultMutation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "grant_scope_id"
+              ],
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/vaultMutationKind"
+                },
+                "grant_scope_id": {
+                  "type": "string"
+                },
+                "ap2_signed_payload_b64": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "credentialStatus": {
+      "$ref": "credential-status-entry.schema.json"
+    },
+    "proof": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/proof"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/proof"
+          },
+          "minItems": 1,
+          "maxItems": 2
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "verificationMethod",
+        "created",
+        "proofPurpose",
+        "proofValue"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "cryptosuite": {
+          "type": "string"
+        },
+        "verificationMethod": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string"
+        },
+        "proofPurpose": {
+          "type": "string"
+        },
+        "proofValue": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "previousProof": {
+          "type": "string"
+        }
+      }
+    },
+    "credentialSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "humanPrincipal",
+        "agent",
+        "channel",
+        "communication",
+        "policy",
+        "notarization"
+      ],
+      "properties": {
+        "humanPrincipal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "displayName"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            }
+          }
+        },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "displayName",
+            "version"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "displayName": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "agentCardUri": {
+              "type": "string"
+            }
+          }
+        },
+        "channel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "recipientAddressing"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "slack",
+                "email",
+                "discord",
+                "teams",
+                "whatsapp",
+                "google_chat",
+                "imessage",
+                "service",
+                "squillo"
+              ]
+            },
+            "recipientAddressing": {
+              "type": "object"
+            },
+            "recipientClass": {
+              "enum": [
+                "human",
+                "agent"
+              ]
+            }
+          }
+        },
+        "communication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contentClass",
+            "bodySha256",
+            "bodySize",
+            "previewLines",
+            "preview"
+          ],
+          "properties": {
+            "contentClass": {
+              "enum": [
+                "Reply",
+                "New",
+                "Mention",
+                "DM",
+                "Channel",
+                "BulkSend",
+                "Broadcast",
+                "Mutation"
+              ]
+            },
+            "bodySha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bodySize": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "previewLines": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "preview": {
+              "type": "string"
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "decision",
+            "matchedScope"
+          ],
+          "properties": {
+            "decision": {
+              "enum": [
+                "AlwaysAllow",
+                "AskEveryTime",
+                "NeverAllow"
+              ]
+            },
+            "matchedScope": {
+              "type": "string"
+            },
+            "delegationMandateId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "attestationMode": {
+              "enum": [
+                "NotaryAttested",
+                "PrincipalSigned"
+              ]
+            },
+            "actChain": {
+              "type": "array"
+            },
+            "delegationMandate": {
+              "$ref": "#/$defs/delegationMandate"
+            }
+          }
+        },
+        "notarization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "notaryService",
+            "decisionTimestamp",
+            "decisionLatencyMs"
+          ],
+          "properties": {
+            "notaryService": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "version"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "attestedDigest": {
+                  "type": "string"
+                },
+                "attestationUri": {
+                  "type": "string"
+                }
+              }
+            },
+            "decisionTimestamp": {
+              "type": "string"
+            },
+            "decisionLatencyMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "appleAurAcceptance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "userId",
+            "deviceId",
+            "aurVersionHash",
+            "acceptedAt",
+            "documentKind"
+          ],
+          "properties": {
+            "userId": {
+              "type": "string"
+            },
+            "deviceId": {
+              "type": "string"
+            },
+            "aurVersionHash": {
+              "type": "string"
+            },
+            "acceptedAt": {
+              "type": "string"
+            },
+            "documentKind": {
+              "type": "string"
+            }
+          }
+        },
+        "audience": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "channelBinding": {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "slack",
+                    "email",
+                    "discord",
+                    "teams",
+                    "whatsapp",
+                    "google_chat",
+                    "imessage",
+                    "service",
+                    "squillo"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "sealedPayload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suite",
+            "reader",
+            "enc",
+            "ciphertext"
+          ],
+          "properties": {
+            "suite": {
+              "type": "string"
+            },
+            "reader": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "kid"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kid": {
+                  "type": "string"
+                }
+              }
+            },
+            "enc": {
+              "type": "string"
+            },
+            "ciphertext": {
+              "type": "string"
+            }
+          }
+        },
+        "actClassification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "vocabularies",
+            "labels"
+          ],
+          "properties": {
+            "vocabularies": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "version",
+                  "digest"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "string"
+                  },
+                  "digest": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "delegationMandate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "humanPrincipalDid",
+        "agentDid",
+        "allowedChannels",
+        "validFrom",
+        "validUntil",
+        "principalSignature",
+        "notarySignature"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "humanPrincipalDid": {
+          "type": "string"
+        },
+        "agentDid": {
+          "type": "string"
+        },
+        "allowedChannels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "slack",
+              "email",
+              "discord",
+              "teams",
+              "whatsapp",
+              "google_chat",
+              "imessage",
+              "service",
+              "squillo"
+            ]
+          }
+        },
+        "allowedRecipientClasses": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "human",
+              "agent"
+            ]
+          }
+        },
+        "rateLimitPerHour": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "validFrom": {
+          "type": "string"
+        },
+        "validUntil": {
+          "type": "string"
+        },
+        "principalSignature": {
+          "type": "string"
+        },
+        "notarySignature": {
+          "type": "string"
+        }
+      }
+    },
+    "vaultMutationKind": {
+      "description": "Internally tagged: the 'kind' member names the variant, the variant's own fields ride beside it in snake_case.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "dest_vault_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "WriteInto"
+            },
+            "dest_vault_id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "src_vault_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "ShareFrom"
+            },
+            "src_vault_id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "artifact_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "CrossVaultPromote"
+            },
+            "artifact_id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "downstream_grantee_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Redelegate"
+            },
+            "downstream_grantee_id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Revoke"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "from_stage",
+            "to_stage"
+          ],
+          "properties": {
+            "kind": {
+              "const": "BridgeStageTransition"
+            },
+            "from_stage": {
+              "type": "string"
+            },
+            "to_stage": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "snapp_id",
+            "mutation_slug"
+          ],
+          "properties": {
+            "kind": {
+              "const": "Custom"
+            },
+            "snapp_id": {
+              "type": "string"
+            },
+            "mutation_slug": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

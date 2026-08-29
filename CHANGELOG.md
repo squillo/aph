@@ -7,11 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (v0.2-draft — nothing moves on the 0.1 wire)
+## [0.2.0] — 2026-08-29
 
-- **`spec/aph-0.2-draft.md`**: the versioned delta over v0.1.0 where post-cut accepted RFCs accumulate. First entry: RFC 0008 (Accepted), fully implemented in the reference — `SealedPayload`/`SealedReader` wire types and the `sealed_payload_is_declared` wire-version rule in `aph-core`, codes `APH_E021`-`APH_E023` (enum census twenty-three: v0.1.0's twenty plus the delta's three), and envelope-level `seal_into_envelope`/`unseal_from_envelope` in `aph-sealed` with twelve tests. A v0.1-only verifier still refuses the member at strict parse, which is the compatibility story working.
+**THE 0.2 CUT.** `spec/aph-0.2.md` is FINAL for the v0.2 line, published
+as an additive DELTA over the untouched v0.1.0. Everything the 0.1 cut
+deferred is in: sealed payloads (RFC 0008), rotation attestation
+(RFC 0001), the JSON Schema family welded to the vectors in CI, and
+signed published vectors. Reference crates ship at `0.2.0`
+(`CredentialSubject` grew members — constructor-breaking, hence minor
+per 0.x SemVer). Error taxonomy: twenty → twenty-four.
 
-- **RFC 0008's deferrals discharged.** One shared strict-parse entry (`aph_core::parse_envelope_json`) folds the wire-version rule into the parse path all four bindings delegate to — a DRY hoist that also retired four identical local copies of the serde parse. Committed v0.2-draft vector at `examples/v0.2-draft/sealed_envelope.json` (deterministic, byte-welded, reader-opened; excluded from the v0.1 corpus with its reason in the manifest). The independent TypeScript implementation takes the delta's non-reader role: admits aphVersion `0.2`, strict-parses `sealedPayload`, enforces the version rule, never opens (WebCrypto has no ChaCha20-Poly1305 — stated, not discovered).
+### Added (v0.2 — nothing moves on the 0.1 wire)
+
+- **`spec/aph-0.2.md`**: the versioned delta over v0.1.0 where post-cut accepted RFCs accumulate. First entry: RFC 0008 (Accepted), fully implemented in the reference — `SealedPayload`/`SealedReader` wire types and the `sealed_payload_is_declared` wire-version rule in `aph-core`, codes `APH_E021`-`APH_E023` (enum census twenty-three: v0.1.0's twenty plus the delta's three), and envelope-level `seal_into_envelope`/`unseal_from_envelope` in `aph-sealed` with twelve tests. A v0.1-only verifier still refuses the member at strict parse, which is the compatibility story working.
+
+- **RFC 0008's deferrals discharged.** One shared strict-parse entry (`aph_core::parse_envelope_json`) folds the wire-version rule into the parse path all four bindings delegate to — a DRY hoist that also retired four identical local copies of the serde parse. Committed v0.2 vector at `examples/v0.2/sealed_envelope.json` (deterministic, byte-welded, reader-opened; excluded from the v0.1 corpus with its reason in the manifest). The independent TypeScript implementation takes the delta's non-reader role: admits aphVersion `0.2`, strict-parses `sealedPayload`, enforces the version rule, never opens (WebCrypto has no ChaCha20-Poly1305 — stated, not discovered).
+
+- **RFC 0001 (Accepted): rotation attestation** (`spec/aph-0.2.md` §5). The current key signs "this named successor is mine": all-required camelCase statement, successor carries its OWN key bytes (closing the kid-without-bytes publication attack), §8.1 JWS alg spellings, lone-proof JCS signing base, published in the DID document under `https://w3id.org/aph/v1#rotationAttestation`. Reference: `aph-core::rotation` (`sign_/verify_rotation_attestation`, every structural rule checked before the signature); `APH_E024 RotationAttestationInvalid` carrying the failed rule by name.
+
+- **`keyAgreement` resolution + `APH_E023` live.** `DidDocument` gains the `keyAgreement` section and `key_agreement_x25519(kid)` — X25519 multicodec enforced, absence and wrong-codec both refuse with `APH_E023 SealReaderKeyUnpublished` (the repair names WHICH surface came up empty).
+
+- **The JSON Schema family** (`spec/schemas/notarization-envelope.schema.json`, `rotation-attestation.schema.json`) — the full envelope family machine-readable, prose normative, schema-the-defect on disagreement. Welded in CI: every committed vector validates, a smuggled member must fail (`aph-conformance/tests/schema_weld_test.rs`). The weld caught two real schema defects at first run — a wrong `contentClass` enum and `vaultMutation.kind` flattened to a string — which is the weld earning its keep before shipping.
+
+- **Signed v0.2 vectors** (`examples/v0.2/`): `sealed_signed_envelope.json` — audience-bound AND sealed, did:key-signed, verified end-to-end KEYLESS by the independent TypeScript implementation (two implementations, one verdict, no plaintext); `rotation_attestation.json` — signed with the RFC 8032 test key, verifying under `verify_rotation_attestation`. Both drift-printed and byte-welded like every v0.1 golden.
 
 ### Added (earlier, superseded by the above)
 

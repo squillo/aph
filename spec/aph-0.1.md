@@ -10,7 +10,7 @@
 
 ## 0. Status of This Document
 
-This is v0.1.0 of the APH (Agent per Human) protocol specification, FINAL for the 0.1 line as of 2026-08-29. The pre-production exception under which accepted revisions landed in place inside the draft ENDS with this cut: from here, normative changes are versioned — additive minors within 0.x per CONTRIBUTING.md's rules, and the v0.2 line (`rfcs/README.md` names its planned contents) for anything larger. Per SemVer 0.x semantics, breaking changes remain possible BETWEEN minor versions before v1.0, but never again in place within a published one. The maintainer is Squillo, Inc.; the source of truth lives at `github.com/squillo/aph`. Implementers SHOULD pin a release tag or commit hash. Feedback, errata, and conformance reports are welcome via repository issues and pull requests; the RFC process (`rfcs/README.md`) is the change path.
+This is v0.1.0 of the APH (Agent per Human) protocol specification, FINAL for the 0.1 line as of 2026-08-29. The pre-production exception under which accepted revisions landed in place inside the draft ENDS with this cut: from here, normative changes are versioned — additive minors within 0.x per CONTRIBUTING.md's rules, and the v0.2 line (`aph-0.2.md`, cut 2026-08-29 as an additive delta) for anything larger. Per SemVer 0.x semantics, breaking changes remain possible BETWEEN minor versions before v1.0, but never again in place within a published one. The maintainer is Squillo, Inc.; the source of truth lives at `github.com/squillo/aph`. Implementers SHOULD pin a release tag or commit hash. Feedback, errata, and conformance reports are welcome via repository issues and pull requests; the RFC process (`rfcs/README.md`) is the change path.
 
 ---
 
@@ -26,6 +26,11 @@ This is v0.1.0 of the APH (Agent per Human) protocol specification, FINAL for th
 > JSON Schema, published test vectors. Decided by the sole maintainer —
 > deliberately solo within the Squillo organization, ruled 2026-08-29 and
 > recorded rather than implied.
+>
+> **The v0.2 line has since been CUT** (`aph-0.2.md`, 2026-08-29): sealed
+> payloads (RFC 0008), rotation attestation (RFC 0001), the JSON Schema
+> family, and signed vectors — all as an additive delta; this document is
+> unchanged by it.
 
 > ### Revision 2026-08-29 — replay closed, the second axis, and a corpus that practices what §6.3 preaches
 >

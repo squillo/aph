@@ -1,10 +1,12 @@
 # RFC 0001 — Signed Key-Rotation Attestation (v0.2 candidate)
 
-- **Status:** Draft — written ahead of the RFC process existing; adopted as
-  RFC 0001 when this directory was created, because it was already an RFC in
-  everything but the number.
-- **Spec sections touched:** none while Draft — a v0.2 candidate; §8.4 when
-  accepted.
+- **Status:** Accepted 2026-08-29 — implemented in the v0.2 delta
+  (`spec/aph-0.2.md` §5) and the reference (`aph-core::rotation`).
+  Written ahead of the RFC process existing; adopted as RFC 0001 when this
+  directory was created, because it was already an RFC in everything but
+  the number.
+- **Spec sections touched:** the v0.2 delta §5 (the statement, its
+  verification, its publication property); §8.4 is unchanged in v0.1.0.
 
 > **NON-NORMATIVE, and not part of APH v0.1.** Nothing in this document
 > changes `spec/aph-0.1.md`. No field described here may be emitted by a
@@ -671,3 +673,36 @@ is a draft nobody argued with.
   If in practice every operator publishing rotation attestations also publishes
   `did:web`, the TXT half is cost with no coverage. The counter-argument is
   §8.4.5's own: DNS survives when the origin does not.
+
+
+## Decision
+
+**Accepted 2026-08-29**, by the sole maintainer — the standing arrangement
+recorded in CONTRIBUTING.md and `rfcs/README.md` (deliberately solo within
+the Squillo organization), which Decision blocks cite instead of
+re-litigating.
+
+Implemented the same day, post-cut discipline intact: v0.1.0 untouched,
+everything lands in the v0.2 delta. What exists now:
+
+- **`spec/aph-0.2.md` §5** — the normative statement: all-required
+  camelCase members, the successor carrying its own key bytes (the
+  kid-without-bytes attack named and closed), §8.1 JWS alg spellings, the
+  lone-proof JCS signing base, publication under
+  `https://w3id.org/aph/v1#rotationAttestation`.
+- **`aph-core::rotation`** — `RotationAttestation`/`RotationSuccessor`
+  (strict serde), `sign_rotation_attestation`,
+  `verify_rotation_attestation`: every structural rule checked before the
+  signature, every refusal `APH_E024` naming the failed rule.
+- **`APH_E024 RotationAttestationInvalid`** — the taxonomy's twenty-fourth
+  code, in the enum census.
+- **`spec/schemas/rotation-attestation.schema.json`** — the statement's
+  schema, proof shape shared with the envelope's by reference, welded to
+  the committed vector in CI.
+- **`examples/v0.2/rotation_attestation.json`** — a signed,
+  byte-pinned vector minted with the RFC 8032 test key.
+
+Of §9's open questions: the `did:key` refusal is IMPLEMENTED as argued
+(the identity IS the key; a rotated `did:key` is a different identifier);
+counter-signatures, concurrent successors, and the TXT carriage remain
+open for a later revision — none blocks the mechanism shipped.

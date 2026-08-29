@@ -25,7 +25,18 @@ pub struct DidDocument {
   /// DID URLs approved for the `assertionMethod` proof purpose.
   #[serde(default, rename = "assertionMethod")]
   pub assertion_method: std::vec::Vec<serde_json::Value>,
+  /// Key-agreement (encryption) keys — the surface RFC 0008's sealed
+  /// payloads resolve readers from. APH's profile carries EMBEDDED entries
+  /// (the same `Multikey` shape as `verificationMethod`), never bare
+  /// string references: a reference points at a key the resolver must
+  /// fetch AGAIN, and the §8.4 surfaces publish whole documents.
+  #[serde(default, rename = "keyAgreement")]
+  pub key_agreement: std::vec::Vec<VerificationMethod>,
 }
+
+/// The X25519 multicodec prefix (0xEC as a varint), the encryption sibling
+/// of the Ed25519 prefix `verificationMethod` keys carry.
+const X25519_MULTICODEC: [u8; 2] = [0xec, 0x01];
 
 /// One entry of a DID Document's `verificationMethod` array.
 #[derive(std::fmt::Debug, std::clone::Clone, serde::Serialize, serde::Deserialize)]
@@ -62,6 +73,35 @@ pub fn parse_did_document(
 }
 
 impl DidDocument {
+  /// Resolves the X25519 `keyAgreement` key named by `kid` — the reader
+  /// key a sealed payload (RFC 0008) points at. Refuses with `APH_E023`
+  /// when the document publishes no matching entry, when the entry carries
+  /// no `publicKeyMultibase`, or when the bytes are not an X25519 multikey
+  /// — all three are "the key you were told to use is not published", and
+  /// which document surface came up empty is exactly what the code's
+  /// distinctness from `APH_E014` exists to say.
+  pub fn key_agreement_x25519(
+    &self,
+    kid: &str,
+  ) -> std::result::Result<[u8; 32], crate::errors::AphError> {
+    let refuse = || crate::errors::AphError::seal_reader_key_unpublished(&self.id, kid);
+    let want = std::format!("{}#{}", self.id, kid);
+    let entry = self
+      .key_agreement
+      .iter()
+      .find(|entry| entry.id == want || entry.id == kid)
+      .ok_or_else(refuse)?;
+    let multibase = entry.public_key_multibase.as_deref().ok_or_else(refuse)?;
+    let bytes =
+      crate::crypto::multibase::base58btc_decode(multibase).map_err(|_| refuse())?;
+    if bytes.len() != 34 || bytes[..2] != X25519_MULTICODEC {
+      return std::result::Result::Err(refuse());
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes[2..]);
+    std::result::Result::Ok(key)
+  }
+
   /// Returns `true` if `did_url` is listed for the `assertionMethod` proof
   /// purpose, which is the purpose APH envelope proofs declare.
   ///
@@ -267,5 +307,51 @@ mod tests {
       super::parse_did_document("{not json").unwrap_err().code(),
       "APH_E008"
     );
+  }
+
+  #[test]
+  fn key_agreement_lookup_resolves_x25519_and_refuses_with_e023_by_name() {
+    // The surface RFC 0008 readers are resolved from, end to end: a
+    // published X25519 multikey resolves to its raw bytes; a missing kid,
+    // and an entry of the WRONG codec (a signing key in the encryption
+    // slot — the conversion this protocol refuses to do), both refuse
+    // with APH_E023 naming reader and kid.
+    let x25519_raw = [7u8; 32];
+    let mut encoded_bytes = std::vec![0xecu8, 0x01];
+    encoded_bytes.extend_from_slice(&x25519_raw);
+    let multibase = crate::crypto::multibase::base58btc_encode(&encoded_bytes);
+    let doc: super::DidDocument = serde_json::from_value(serde_json::json!({
+      "id": "did:web:reader.example.com",
+      "verificationMethod": [],
+      "keyAgreement": [
+        {
+          "id": "did:web:reader.example.com#enc-1",
+          "type": "Multikey",
+          "controller": "did:web:reader.example.com",
+          "publicKeyMultibase": multibase
+        },
+        {
+          "id": "did:web:reader.example.com#sign-as-enc",
+          "type": "Multikey",
+          "controller": "did:web:reader.example.com",
+          "publicKeyMultibase": "z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV"
+        }
+      ]
+    }))
+    .expect("the fixture document parses");
+
+    std::assert_eq!(
+      doc.key_agreement_x25519("enc-1").expect("the published key resolves"),
+      x25519_raw
+    );
+
+    let missing = doc.key_agreement_x25519("enc-9").expect_err("an unpublished kid refuses");
+    std::assert_eq!(missing.code(), "APH_E023");
+    std::assert!(std::format!("{missing}").contains("enc-9"));
+
+    let wrong_codec = doc
+      .key_agreement_x25519("sign-as-enc")
+      .expect_err("an Ed25519 key in the keyAgreement slot is not an encryption key");
+    std::assert_eq!(wrong_codec.code(), "APH_E023");
   }
 }

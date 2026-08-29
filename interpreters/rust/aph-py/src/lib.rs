@@ -713,15 +713,15 @@ mod tests {
   }
 
   #[test]
-  fn the_draft_vector_parses_and_its_downgrade_refuses_at_this_boundary() {
+  fn the_v0_2_vector_parses_and_its_downgrade_refuses_at_this_boundary() {
     // The shared strict-parse entry (hoisted to the core) means the
-    // v0.2-draft wire-version rule holds at THIS boundary by construction;
+    // v0.2 wire-version rule holds at THIS boundary by construction;
     // this test is the proof at the boundary, not a re-implementation.
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-      .join("../../../examples/v0.2-draft/sealed_envelope.json");
+      .join("../../../examples/v0.2/sealed_envelope.json");
     let vector = std::fs::read_to_string(&path)
       .unwrap_or_else(|e| std::panic!("failed to read {:?}: {}", path, e));
-    super::parse_envelope(&vector).expect("the 0.2-draft vector strict-parses here");
+    super::parse_envelope(&vector).expect("the 0.2 vector strict-parses here");
 
     let downgraded = vector.replace("\"aphVersion\": \"0.2\"", "\"aphVersion\": \"0.1\"");
     let err = super::parse_envelope(&downgraded)

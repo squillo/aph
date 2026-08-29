@@ -64,6 +64,7 @@ pub mod communication_mandate;
 pub mod credential_access_envelope;
 pub mod credential_status;
 pub mod crypto;
+pub mod rotation;
 pub mod delegation_mandate;
 pub mod discovery;
 pub mod envelope;
@@ -99,6 +100,10 @@ pub use envelope::{
   SealedPayload, SealedReader, VocabularyRef, parse_envelope_json, sealed_payload_is_declared,
 };
 pub use errors::AphError;
+pub use rotation::{
+  DID_DOC_ROTATION_PROPERTY, ROTATION_ATTESTATION_TYPE, RotationAttestation, RotationSuccessor,
+  sign_rotation_attestation, verify_rotation_attestation,
+};
 pub use human_not_present_flow::{
   HumanNotPresentNotarizationFlow, HumanNotPresentNotarizationState,
 };

@@ -1,0 +1,23 @@
+{
+  "aphVersion": "0.2",
+  "type": "AphRotationAttestation",
+  "id": "urn:uuid:00000000-0000-4000-8000-0000000000a0",
+  "subject": "did:web:notary.squillo.com",
+  "predecessor": "did:web:notary.squillo.com#k1",
+  "successor": {
+    "kid": "k2",
+    "alg": "EdDSA",
+    "publicKeyMultibase": "z6MktwupdmLXVVqTzCw4i46r4uGyosGXRnR3XjN4Zq7oMMsw",
+    "notBefore": "2027-01-01T00:00:00Z",
+    "notAfter": "2029-01-01T00:00:00Z"
+  },
+  "created": "2026-08-29T00:00:00Z",
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "verificationMethod": "did:web:notary.squillo.com#k1",
+    "created": "2026-08-29T00:00:00Z",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5K8LxgubHdHhtTPdeWph6dLB7ojBf2CHtPNXLuJsgXjoWBLDSw2tgN388Mi8EyF6adQaQGweKAJTjxbP4dCgfHPF"
+  }
+}

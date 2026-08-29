@@ -37,6 +37,8 @@ base64 = { workspace = true }
 sha2 = { workspace = true }
 
 [dev-dependencies]
+# The schema weld: every committed vector validated against spec/schemas/ on every run.
+jsonschema = { version = "0.26", default-features = false }
 # The byte-identity rig (`tests/byte_identity_test.rs`) drives the second
 # implementation's compiled canonicalizer under the embedded second
 # ECMAScript engine and compares its canonical bytes against `aph-core`'s,

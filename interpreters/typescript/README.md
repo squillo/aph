@@ -5,7 +5,7 @@ JS runtime — with zero runtime dependencies.** The platform's WebCrypto,
 strings in, verdicts out; if it parses, it is exactly what the spec says it
 is, and if it does not, you get the §11 code that says why.
 
-It also implements the v0.2-draft delta's NON-READER role for
+It also implements the v0.2 delta's NON-READER role for
 `sealedPayload` (RFC 0008): strict parse of the member, the wire-version
 rule, and verification around the seal as opaque bytes. It deliberately
 never OPENS a seal — WebCrypto has no ChaCha20-Poly1305, and faking the

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/aph/schemas/rotation-attestation.schema.json",
+  "title": "APH RotationAttestation (RFC 0001, v0.2)",
+  "description": "The signed key-rotation statement. The prose spec is normative; the predecessor-signs rule, the predecessor-is-a-key-of-subject rule, and the signature itself are cross-member/cryptographic rules a schema cannot express (see README).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["aphVersion", "type", "id", "subject", "predecessor", "successor", "created", "proof"],
+  "properties": {
+    "aphVersion": { "const": "0.2" },
+    "type": { "const": "AphRotationAttestation" },
+    "id": { "type": "string" },
+    "subject": { "type": "string" },
+    "predecessor": { "type": "string" },
+    "successor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kid", "alg", "publicKeyMultibase", "notBefore", "notAfter"],
+      "properties": {
+        "kid": { "type": "string" },
+        "alg": { "enum": ["EdDSA", "ES256"] },
+        "publicKeyMultibase": { "type": "string" },
+        "notBefore": { "type": "string" },
+        "notAfter": { "type": "string" }
+      }
+    },
+    "created": { "type": "string" },
+    "proof": { "$ref": "notarization-envelope.schema.json#/$defs/proof" }
+  }
+}

@@ -60,7 +60,7 @@ A Notary Service is meaningful only if a **third party can independently verify*
 
 ## Status
 
-**v0.1.0 (final, cut 2026-08-29)** — the 0.1 line is frozen; normative changes are versioned from here (the land-in-place exception ended with the cut). The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes). A **second implementation** — sharing no code with it, written from the specification and the published examples — lives under `interpreters/typescript/`, and the two cross-verify each other's minted envelopes in both directions. It is independence of code and not of team: the same authors wrote both, so an outside implementation is still the thing that would test whether this document survives a stranger.
+**v0.1.0 (final, cut 2026-08-29)** — the 0.1 line is frozen; normative changes are versioned from here (the land-in-place exception ended with the cut). **v0.2 (final, cut 2026-08-29)** — published as an additive delta ([`spec/aph-0.2.md`](spec/aph-0.2.md)): sealed payloads (RFC 0008), rotation attestation (RFC 0001), the JSON Schema family, signed vectors; a v0.1-only verifier refuses every new member at strict parse, which is the compatibility story working. The specification text, the canonical envelope shape, and a small set of reference example envelopes are published here for community review. A reference Rust implementation lives in this repository under `interpreters/rust/` (wire types, flow state machines, signing helpers, and a conformance suite that validates the `examples/` envelopes). A **second implementation** — sharing no code with it, written from the specification and the published examples — lives under `interpreters/typescript/`, and the two cross-verify each other's minted envelopes in both directions. It is independence of code and not of team: the same authors wrote both, so an outside implementation is still the thing that would test whether this document survives a stranger.
 
 Machine-readable artifacts exist for part of the surface, not all of it: `spec/schemas/` carries JSON Schemas for the two revocation shapes of §6.3.3 (there is none for the envelope itself — §7.1 plus the strict parser is the normative shape), and exactly four published envelopes carry real signatures rather than placeholders — one for each signing path §8.1/§8.2 make MUST-support and this implementation supports, plus the one the TypeScript implementation minted. [Implementing APH in another language](#implementing-aph-in-another-language) states precisely what is and is not covered, because an implementer who over-trusts the vectors ships a verifier that passes them and fails a stranger.
 
@@ -158,7 +158,9 @@ The envelope ships on the wire in two simultaneous encodings:
 ```
 aph/
   spec/
-    aph-0.1.md          Specification text (v0.1 draft)
+    aph-0.1.md          Specification text (v0.1.0, FINAL)
+    aph-0.2.md          The v0.2 delta (FINAL): sealed payloads, rotation
+    schemas/            JSON Schema family, welded to the vectors in CI
     a2a-extension.md    A2A AgentCard extension descriptor
     security-considerations.md   Threat model / security companion
   assets/

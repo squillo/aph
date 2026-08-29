@@ -1,6 +1,6 @@
 [package]
 name = "aph-core"
-description = "APH (Agent per Human) protocol v0.1 — envelope wire types, mandates, notarization flow state machines, and signing helpers"
+description = "APH (Agent per Human) protocol — envelope wire types, mandates, notarization flow state machines, and signing helpers (spec v0.1.0 + the v0.2 delta)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

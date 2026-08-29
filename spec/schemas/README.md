@@ -15,6 +15,15 @@ implementable, and shipping either one late means shipping it never.
 |---|---|---|
 | `credential-status-entry.schema.json` | §6.3.3.1, §7.1.1 | The OPTIONAL top-level `credentialStatus` member of a `NotarizationEnvelope`. Closed (`additionalProperties: false`), because the envelope parses strictly. |
 | `bitstring-status-list-credential.schema.json` | §6.3.3.3 | The status list credential a notary serves at the derived endpoint. Deliberately OPEN — it is a general W3C artifact carrying members APH does not read. |
+| `notarization-envelope.schema.json` | §7.1 (+ the v0.2 delta) | The whole envelope family: every member of both wire versions, closed exactly where the parse is strict, open exactly where the spec is opaque (`recipientAddressing`, `audience.channelBinding`'s coordinate members). WELDED: a conformance test validates every committed vector — v0.1 corpus and v0.2 — against it on every run, so schema drift fails a gate instead of a stranger. |
+| `rotation-attestation.schema.json` | v0.2 delta §5 (RFC 0001) | The signed key-rotation statement; proof block shared by `$ref` with the envelope schema. |
+
+## One more rule no schema can express
+
+The v0.2 wire-version rule: `sealedPayload` requires `aphVersion: "0.2"`.
+A conditional schema could encode it, but the strict parsers are the
+enforcing surface and the schema stays declarative — the welded validation
+test plus the parsers' own tests carry the rule with teeth.
 
 ## What a schema pass does NOT prove
 

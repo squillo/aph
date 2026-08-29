@@ -1,5 +1,5 @@
 /**
- * WHY THIS FILE EXISTS: the v0.2-draft delta (`spec/aph-0.2-draft.md`)
+ * WHY THIS FILE EXISTS: the v0.2 delta (`spec/aph-0.2.md`)
  * declares `sealedPayload`, and this implementation is the delta's
  * NON-READER role made concrete — it parses the member strictly, enforces
  * the wire-version rule, and verifies AROUND the seal as opaque bytes. It
@@ -8,7 +8,7 @@
  * else. A capability faked in userland cipher code would cost the claim
  * that makes the rest trustworthy.
  *
- * WHAT IT PINS: the committed v0.2-draft vector parses and its version is
+ * WHAT IT PINS: the committed v0.2 vector parses and its version is
  * admitted; the same member on an aphVersion "0.1" wire refuses at strict
  * parse with the declaration message; the member's own shape is strict; and
  * a full verify of the vector proceeds PAST parsing to the signature check
@@ -23,9 +23,9 @@ import { parseEnvelope } from '../src/parse.js';
 import { verifyEnvelope } from '../src/verify.js';
 import { readExample } from '../testkit/corpus.js';
 
-const VECTOR = 'v0.2-draft/sealed_envelope.json';
+const VECTOR = 'v0.2/sealed_envelope.json';
 
-test('the committed v0.2-draft sealed vector strict-parses', () => {
+test('the committed v0.2 sealed vector strict-parses', () => {
   const envelope = parseEnvelope(readExample(VECTOR));
   assert.equal(envelope.aphVersion, '0.2');
   const sealed = envelope.credentialSubject.sealedPayload;
@@ -66,3 +66,20 @@ test('verification treats the seal as opaque carriage, not a bypass', async () =
     (error: unknown) => error instanceof AphError && error.code === 'APH_E001',
   );
 });
+
+test('the SIGNED sealed vector verifies end-to-end in this implementation, keyless', async () => {
+  // The strongest completion artifact this suite holds: a v0.2 envelope
+  // carrying an audience binding AND a sealed payload, signed by a did:key
+  // notary, admitted by the INDEPENDENT implementation with no supplied
+  // keys — the audience step satisfied as the named verifier, the seal
+  // ridden as opaque bytes, the signature verified over the ciphertext it
+  // covers. Two implementations, one verdict, no plaintext.
+  const verified = await verifyEnvelope(readExample('v0.2/sealed_signed_envelope.json'), {
+    now: '2026-05-21T00:05:00Z',
+    verifierId: 'did:web:ssot.example.com',
+    actCoordinates: { kind: 'slack', teamId: 'T01234567', channelId: 'C01234567' },
+  });
+  assert.equal(verified.attestationMode, 'NotaryAttested');
+  assert.ok(verified.envelope.credentialSubject.sealedPayload);
+});
+

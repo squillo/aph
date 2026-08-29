@@ -148,7 +148,7 @@ Any other transition MUST be rejected with `APH_E002`.
 | `APH_E019` | `EnvelopeWindowInvalid` | The envelope's OWN `validFrom`/`validUntil` judged against the verifier's clock (§8.3 step 6), unparseable-fails-closed included. Distinct from E003, which is a MANDATE consulted past its expiry — the standing miscite before this code existed |
 | `APH_E020` | `RecipientClassNotAllowed` | The mandate constrains WHO may consume (`allowedRecipientClasses`, RFC 0005) and the envelope declares a class outside it — or NONE, which refuses too: a constraint escapable by omission is not a constraint. Distinct from E005 (the MEDIUM out of scope); this is the CONSUMER out of scope on an allowed medium |
 
-**The v0.2-draft delta** (`spec/aph-0.2-draft.md`) declares three MORE codes the reference already implements — `APH_E021 SealUnopenable`, `APH_E022 SealSuiteUnknown`, `APH_E023 SealReaderKeyUnpublished` — for the `sealedPayload` member (RFC 0008, Accepted: a payload only a named reader can open; HPKE, one suite, context-authenticated AAD, declared from `aphVersion: "0.2"` and refused at strict parse on any 0.1 wire). v0.1.0's closed twenty is UNCHANGED; do not cite E021-E023 as v0.1 codes. The independent TypeScript implementation and all four bindings now enforce the delta's WIRE rules (the member parses on aphVersion 0.2 and refuses on 0.1, via the reference's shared strict-parse entry) — but only the reference OPENS seals; the TypeScript implementation is deliberately non-reader (WebCrypto has no ChaCha20-Poly1305), and the committed vector lives at `examples/v0.2-draft/sealed_envelope.json`, byte-welded by the aph-sealed suite and excluded from the v0.1 conformance corpus by design.
+**The v0.2 delta** (`spec/aph-0.2.md`, FINAL — cut 2026-08-29) declares four MORE codes the reference already implements — `APH_E021 SealUnopenable`, `APH_E022 SealSuiteUnknown`, `APH_E023 SealReaderKeyUnpublished` for the `sealedPayload` member, and `APH_E024 RotationAttestationInvalid` for RFC 0001's rotation attestation (delta §5, `aph_core::rotation`) (RFC 0008, Accepted: a payload only a named reader can open; HPKE, one suite, context-authenticated AAD, declared from `aphVersion: "0.2"` and refused at strict parse on any 0.1 wire). v0.1.0's closed twenty is UNCHANGED; do not cite E021-E024 as v0.1 codes. The independent TypeScript implementation and all four bindings now enforce the delta's WIRE rules (the member parses on aphVersion 0.2 and refuses on 0.1, via the reference's shared strict-parse entry) — but only the reference OPENS seals; the TypeScript implementation is deliberately non-reader (WebCrypto has no ChaCha20-Poly1305), and the committed vector lives at `examples/v0.2/sealed_envelope.json`, byte-welded by the aph-sealed suite and excluded from the v0.1 conformance corpus by design.
 
 ## Trust model — WHO signs (the most important section here)
 
@@ -331,7 +331,8 @@ signed rotation statement, and neither publication surface is key-authenticated.
 The successor is pre-*authorized* by having been published under the operator's
 domain control while the primary was healthy — the same authority that publishes
 every APH key. Saying it was signed by the predecessor overstates what the wire
-carries; a signed rotation attestation is a v0.2 question. Two honest costs:
+carries under v0.1 alone; the SIGNED rotation attestation now exists at
+v0.2 (RFC 0001, delta §5) for operators who publish one. Two honest costs:
 two keys can sign for this identity for the WHOLE period rather than a 30-day
 window, and an unrehearsed successor is an untested backup (runbook §3.6 is the
 rehearsal, and it is not optional).

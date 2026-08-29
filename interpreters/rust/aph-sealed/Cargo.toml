@@ -1,19 +1,20 @@
-# EXPERIMENTAL — the draft implementation of RFC 0008 (Draft, v0.2 target).
-# `publish = false` is load-bearing twice: the RFC is unratified, and the
-# type this crate defines is deliberately NOT carried by the 0.1 envelope —
-# the final 0.1 parse is strict, and a `sealedPayload` member on today's
-# wire is refused by every conformant verifier, correctly. This crate exists
-# so the RFC's design review reads working code with tests instead of prose.
+# The reference implementation of RFC 0008 sealed payloads (Accepted,
+# spec/aph-0.2.md §1-§4): HPKE seal/unseal under the context AAD, plus the
+# envelope-level operations. Wire TYPES live in aph-core; this crate holds
+# the cryptography, so verifiers that never open a seal never link it. A
+# v0.1-only verifier still refuses the member at strict parse — the
+# compatibility story, not a defect.
 [package]
 name = "aph-sealed"
-description = "DRAFT of RFC 0008 sealed payloads: carriage without readership (experimental, off-wire)"
+description = "APH sealed payloads (RFC 0008, spec v0.2): HPKE carriage without readership over aph-core envelopes"
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
-publish = false
+authors = { workspace = true }
+repository = { workspace = true }
 
 [dependencies]
-aph-core = { path = "../aph-core", version = "0.1.0" }
+aph-core = { path = "../aph-core", version = "0.2.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -27,3 +28,5 @@ rand = "0.9"
 
 [dev-dependencies]
 sha2 = "0.10"
+# The signed 0.2 vectors are minted from RFC 8032 test seeds in this suite.
+ed25519-dalek = { workspace = true }

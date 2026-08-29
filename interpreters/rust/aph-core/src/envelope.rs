@@ -531,7 +531,7 @@ pub struct CredentialSubject {
   /// reason to believe the recipient understands it (§10.1).
   #[serde(default, skip_serializing_if = "std::option::Option::is_none")]
   pub audience: std::option::Option<Audience>,
-  /// A payload only its named reader can open (spec/aph-0.2-draft.md,
+  /// A payload only its named reader can open (spec/aph-0.2.md,
   /// RFC 0008). OPTIONAL, omitted when absent — and DECLARED ONLY FROM
   /// aphVersion 0.2: [`sealed_payload_is_declared`] is the rule's teeth,
   /// and a v0.1.0 verifier refuses the member at strict parse, correctly.
@@ -1145,7 +1145,7 @@ pub struct AudienceChannelBinding {
 }
 
 /// Who may open a sealed payload: a DID and which of its `keyAgreement`
-/// keys (spec/aph-0.2-draft.md §1, RFC 0008 §2). Signing keys are never
+/// keys (spec/aph-0.2.md §1, RFC 0008 §2). Signing keys are never
 /// converted to encryption keys; the reader publishes a distinct
 /// `keyAgreement` entry through the §8.4 surfaces.
 #[derive(
@@ -1166,7 +1166,7 @@ pub struct SealedReader {
 }
 
 /// A payload the envelope authorizes but only [`SealedReader`] can read
-/// (spec/aph-0.2-draft.md §1, RFC 0008): verification and readership as
+/// (spec/aph-0.2.md §1, RFC 0008): verification and readership as
 /// independent capabilities. Every hop runs §8.3 in full — the signature
 /// covers this ciphertext, `bodySha256` MAY bind its raw decoded octets —
 /// and none but the reader learns the plaintext.
@@ -1196,7 +1196,7 @@ pub struct SealedPayload {
   pub ciphertext: String,
 }
 
-/// The wire-version rule spec/aph-0.2-draft.md §1 states: `sealedPayload`
+/// The wire-version rule spec/aph-0.2.md §1 states: `sealedPayload`
 /// is declared by aphVersion `0.2` and NOTHING EARLIER. A v0.1.0 verifier
 /// refuses the member at strict parse (its structs never learned it); THIS
 /// build's structs have, so the same refusal must come from somewhere —
@@ -1208,7 +1208,7 @@ pub fn sealed_payload_is_declared(
 ) -> std::result::Result<(), String> {
   if envelope.credential_subject.sealed_payload.is_some() && envelope.aph_version != "0.2" {
     return std::result::Result::Err(std::format!(
-      "`sealedPayload` is not declared by aphVersion `{}`: the member exists        from aphVersion 0.2 (spec/aph-0.2-draft.md), and an earlier version        carrying it is malformed for the version it claims",
+      "`sealedPayload` is not declared by aphVersion `{}`: the member exists        from aphVersion 0.2 (spec/aph-0.2.md), and an earlier version        carrying it is malformed for the version it claims",
       envelope.aph_version
     ));
   }

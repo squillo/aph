@@ -18,7 +18,7 @@
 import { AphParseError } from './errors.js';
 import {
   APH_VERSION,
-  APH_VERSION_DRAFT,
+  APH_VERSION_0_2,
   ATTESTATION_MODES,
   CHANNEL_KINDS,
   RECIPIENT_CLASSES,
@@ -345,7 +345,7 @@ function parseCredentialSubject(value: unknown, path: string): void {
 }
 
 /**
- * v0.2-draft (RFC 0008). Structure only: every member strict, all four
+ * v0.2 (RFC 0008). Structure only: every member strict, all four
  * required, the reader fully named. Suite MEMBERSHIP is deliberately not
  * closed here — refusing an unknown suite is the OPENER's obligation at
  * open time, and this implementation never opens; a verifier that carried
@@ -535,10 +535,10 @@ export function parseEnvelope(input: string | unknown): NotarizationEnvelope {
   );
 
   const version = str(record, path, 'aphVersion');
-  if (version !== APH_VERSION && version !== APH_VERSION_DRAFT) {
+  if (version !== APH_VERSION && version !== APH_VERSION_0_2) {
     throw new AphParseError(
       '$.aphVersion',
-      `MUST be "${APH_VERSION}" (final) or "${APH_VERSION_DRAFT}" (the additive draft delta), got "${version}"`,
+      `MUST be "${APH_VERSION}" or "${APH_VERSION_0_2}" (the additive v0.2 delta), got "${version}"`,
     );
   }
   // The delta's wire-version rule: `sealedPayload` is declared from
@@ -555,7 +555,7 @@ export function parseEnvelope(input: string | unknown): NotarizationEnvelope {
     ) {
       throw new AphParseError(
         '$.credentialSubject.sealedPayload',
-        '`sealedPayload` is declared from aphVersion "0.2" (spec/aph-0.2-draft.md); ' +
+        '`sealedPayload` is declared from aphVersion "0.2" (spec/aph-0.2.md); ' +
           'an aphVersion "0.1" envelope carrying it is malformed for the version it claims',
       );
     }

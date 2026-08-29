@@ -55,11 +55,13 @@ default-members = ["aph-core", "aph-conformance", "aph-cli", "aph-resolver", "ap
 exclude = ["../elixir/native/aph_nif"]
 
 [workspace.package]
-# 0.1.0 FINAL — the cut that followed the spec leaving draft (2026-08-29),
-# taking the version the alpha deliberately held free. NOTE this is the
-# CRATE version and is deliberately distinct from the PROTOCOL version
-# (`aph_config::APH_VERSION = "0.1"`, guard-tested); they move independently.
-version = "0.1.0"
+# 0.2.0 — THE 0.2 CUT (2026-08-29): `CredentialSubject` grew members
+# (`sealedPayload`), constructor-breaking, hence minor per 0.x SemVer. NOTE
+# this is the CRATE version and is deliberately distinct from the PROTOCOL
+# version (`aph_config::APH_VERSION = "0.1"`, guard-tested — producers still
+# emit 0.1 by default; 0.2 members are opt-in per §10.1); they move
+# independently.
+version = "0.2.0"
 edition = "2024"
 license = "Apache-2.0"
 authors = ["APH Protocol Contributors"]
@@ -70,7 +72,7 @@ repository = "https://github.com/squillo/aph"
 # dependency with no version ("all path dependencies must have a version"),
 # and the published crate carries the version while local builds keep using
 # the path. Keep it equal to workspace.package.version.
-aph-core = { path = "aph-core", version = "0.1.0-alpha.1" }
+aph-core = { path = "aph-core", version = "0.2.0" }
 aph-conformance = { path = "aph-conformance" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
