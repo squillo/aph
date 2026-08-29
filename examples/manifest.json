@@ -35,6 +35,14 @@
     {
       "path": "v0.2/sealed_envelope.json",
       "reason": "An aphVersion 0.2 vector (RFC 0008 sealedPayload): every v0.1 conformance gate refuses it at strict parse BY DESIGN, and the aph-sealed suite byte-welds and opens it instead."
+    },
+    {
+      "path": "v0.2/sealed_signed_envelope.json",
+      "reason": "An aphVersion 0.2 vector, audience-bound AND sealed, did:key-signed: every v0.1 conformance gate refuses it at strict parse BY DESIGN; the aph-sealed suite byte-welds it and the independent TypeScript implementation verifies it end-to-end keyless."
+    },
+    {
+      "path": "v0.2/rotation_attestation.json",
+      "reason": "Not an envelope at all: RFC 0001's rotation attestation (spec/aph-0.2.md \u00a75), signed with the RFC 8032 test key, byte-welded by the aph-sealed suite and verified by aph_core::rotation."
     }
   ]
 }
