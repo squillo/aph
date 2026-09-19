@@ -49,6 +49,7 @@ an existing label is a new base version, where the change is visible.
 ```nlang
 classifiers "APH_JURISDICTION" {
   description = "Which regulatory regime plausibly attaches to this act and warrants review"
+  fail_posture = "fail_closed"
   labels {
     NO_REGIME_IDENTIFIED {
       description = "Nothing on the face of the act triggers any regulatory regime enumerated by this family: no personal or health data, no payment or financial activity, no controlled technology, no privileged material, no cross-border movement. This label reports the absence of a visible trigger only. It is not an opinion that the act is lawful, unregulated, or safe, and must never be presented as clearance."

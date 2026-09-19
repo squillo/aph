@@ -13,7 +13,7 @@ public that neither party controls — one layer up, to meaning.
 
 ## What is here
 
-Sixteen classifier families, 182 labels, in three tiers plus a routing output:
+Sixteen classifier families, 184 labels, in three tiers plus a routing output:
 
 - **Acts** — what the agent is asking for: scheduling, commitment, data
   mutation, access, financial, legal, and the delegation chain itself.
@@ -49,10 +49,20 @@ Three limits, stated so they cannot be discovered later:
 2. **The seals are authored intent.** Whether `sealed = true` is enforced is a
    property of the consuming runtime's fold, not of these bytes. Verify your
    engine refuses overlays against sealed specs before relying on the seal.
-3. **No wire binding exists yet.** Nothing in the APH envelope carries these
-   labels today. How a label crosses the wire — family-qualified or bare, in
-   which field — is deliberately unresolved until it is designed rather than
-   defaulted.
+3. **The wire binding is designed; adoption is young.** An APH envelope
+   carries these labels in `credentialSubject.actClassification`
+   (spec §7.1.12): family-qualified as `FAMILY/LABEL` — a bare label is a
+   strict-parse rejection — as a set across families, citing this
+   vocabulary by `{name, version, digest}`. Publication and resolution
+   ride spec §8.5 (`_aph._vocab.<domain>`, digest-pinned, absent advances
+   / corrupt refuses). The blessed citation for this bundle (ruled
+   2026-08-31): `name = "aph_guardrails"`, `version = "0.1.0-alpha.1"`,
+   `digest = "sha256-DhTpa6O6GraKyoUFz91imP6f9gBYkXAVvDiqwRo2W60="` —
+   the compiled bundle at `snapp/aph_guardrails@0.1.0-alpha.1.json`,
+   which is also the machine-readable registry of the 184 labels.
+   Emission stays version-gated (§7.1.12): do not emit toward a recipient
+   not known to understand the field. What remains genuinely young:
+   published TXT records and deployed consumers.
 
 ## Relationship to the APH protocol
 

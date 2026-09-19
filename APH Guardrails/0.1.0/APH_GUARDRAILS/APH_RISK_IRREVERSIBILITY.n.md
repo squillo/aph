@@ -55,6 +55,7 @@ an existing label is a new base version, where the change is visible.
 ```nlang
 classifiers "APH_RISK_IRREVERSIBILITY" {
   description = "Classifies how an already-described act can be undone if it turns out to be wrong."
+  fail_posture = "fail_closed"
   labels {
     NO_STATE_CHANGE {
       description = "The act changed no durable state anywhere, so there is nothing to reverse. Reads, queries, dry runs, simulations, and analyses whose output was not persisted. If any durable side effect exists — an audit log entry that a counterparty relies on, a rate-limit counter that gates future behaviour, a lock or reservation — this label is wrong and the act belongs to the rung matching that side effect."
