@@ -70,5 +70,9 @@ specification guarantee that lives only in prose.
 | [0006](0006-published-guardrail-vocabularies.md) | Published guardrail vocabularies: meaning as a resolvable third party | **Accepted** |
 | [0007](0007-in-app-channel-kind.md) | A channel kind for an in-application messaging surface | **Accepted** |
 | [0008](0008-sealed-payloads.md) | Sealed payloads: carriage without readership | **Accepted** |
+| [0009](0009-status-dispositions.md) | Named status dispositions for the two passing outcomes | **Accepted** |
+| [0010](0010-vocabulary-digest-semantics.md) | Vocabulary digest semantics: the citation hashes the bytes | **Accepted** |
 
 **The v0.2 line (drawn at the 0.1 cut, 2026-08-29):** accumulating in [`spec/aph-0.2.md`](../spec/aph-0.2.md). In it: RFC 0008 (sealed payloads — wire types in `aph-core`, cryptography and envelope operations in `aph-sealed`, codes E021-E023), RFC 0001 (rotation attestation — `aph-core::rotation`, code E024), the JSON Schema family (`spec/schemas/`, welded to the vectors in CI), and signed test vectors (`examples/v0.2/`). v0.1.0 is final; in-place normative revision ended with the cut, so these land as v0.2 work through this process. Governance note of record: the second-maintainer seat is held deliberately (solo within the Squillo organization, ruled 2026-08-29) — Decision blocks cite this ruling.
+
+**The v0.3 line (opened 2026-08-31):** accumulating in [`spec/aph-0.3-draft.md`](../spec/aph-0.3-draft.md). In it: RFC 0009 (named status dispositions — `StatusAbsent`/`StatusLive`, the evidence rule; filed as issue #2 by the r14n maintainer) and RFC 0010 (SRI-style vocabulary digest semantics, resolving the §7.1.12/§8.5.3 contradiction). Neither adds an envelope member; v0.2.0 is final and untouched.

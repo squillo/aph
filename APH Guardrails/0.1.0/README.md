@@ -56,10 +56,19 @@ Three limits, stated so they cannot be discovered later:
    vocabulary by `{name, version, digest}`. Publication and resolution
    ride spec §8.5 (`_aph._vocab.<domain>`, digest-pinned, absent advances
    / corrupt refuses). The blessed citation for this bundle (ruled
-   2026-08-31): `name = "aph_guardrails"`, `version = "0.1.0-alpha.1"`,
-   `digest = "sha256-DhTpa6O6GraKyoUFz91imP6f9gBYkXAVvDiqwRo2W60="` —
-   the compiled bundle at `snapp/aph_guardrails@0.1.0-alpha.1.json`,
-   which is also the machine-readable registry of the 184 labels.
+   2026-08-31, superseding the same-day alpha.1 blessing):
+   `name = "aph_guardrails"`, `version = "0.1.0"`,
+   `digest = "sha256-iTJRGKxirtZFmyDmoGPdPyRzIevrjVddmWhMnCa6Od0="` —
+   SHA-256 over the fetched artifact bytes (SRI-style, RFC 0010) of the
+   compiled bundle `snapp/aph_guardrails@0.1.0.json`, which is also the
+   machine-readable registry of the 184 labels and the artifact the
+   reference repository's freshness weld regenerates from these sources
+   on every test run. (The bundle's internal `@snapp.integrity` string
+   has no protocol meaning — RFC 0010.) The superseded
+   `aph_guardrails@0.1.0-alpha.1.json` stays in-repo, frozen, for
+   citations already minted against it
+   (`sha256-DhTpa6O6GraKyoUFz91imP6f9gBYkXAVvDiqwRo2W60=` over its
+   bytes).
    Emission stays version-gated (§7.1.12): do not emit toward a recipient
    not known to understand the field. What remains genuinely young:
    published TXT records and deployed consumers.

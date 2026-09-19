@@ -1,6 +1,6 @@
 {
   "name": "aph_guardrails",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0",
   "edition": "2026",
   "description": "APH Guardrail Rosetta Stone: a shared, independently-resolvable vocabulary of agent-act, guard, and risk classifiers, so two agents from different organizations can agree what a phrase means without either one defining it",
   "author": "Scott Wyatt <scott@squillo.com>, APH Protocol Contributors",

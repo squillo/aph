@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (v0.3 line, opened 2026-08-31 — verifier behavior and citation semantics only; no envelope member changes)
+
+- **RFC 0009 (Accepted): named status dispositions.** §6.3.3.4's two PASSING outcomes gain a closed two-term set — `StatusAbsent` (no claim offered) and `StatusLive` (affirmatively live at an instant) — with the evidence rule: a verifier that records evidence MUST use these terms, and `StatusLive` MUST carry the instant and the status-list identifier. Emission stays optional. Filed as issue #2 by the r14n/RLPS maintainer; the first downstream repo had already begun inventing local evidence vocabulary, which is the drift this closes. Evidence-record SHAPE deliberately still undefined.
+- **RFC 0010 (Accepted): SRI-style vocabulary digests.** Resolves a v0.1.0 self-contradiction found by executing against it: §7.1.12 said the digest is the string "the bundle carries" while §8.5.3 requires refusing on fetched-byte mismatch — and a file cannot contain its own hash. At v0.3 the citation digest is SHA-256 over the fetched artifact bytes, carried in the citation (TXT `h` tag, `vocabularies[].digest`), never required inside the artifact. Found when the 2026-09-19 nlang dev drop stopped minting `@snapp` manifests entirely.
+- **`aph_guardrails@0.1.0` blessed** (supersedes same-day alpha.1 blessing): the re-minted bundle `snapp/aph_guardrails@0.1.0.json` (freshness-welded to its sources in CI) — 16 families, 184 labels (the README's "182" was a miscount), explicit `fail_posture = "fail_closed"` on the two risk families — cited SRI-style per RFC 0010. The alpha.1 artifact stays frozen in-repo for citations already minted against it.
+
 ## [0.2.0] — 2026-08-29
 
 **THE 0.2 CUT.** `spec/aph-0.2.md` is FINAL for the v0.2 line, published
