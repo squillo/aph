@@ -90,6 +90,7 @@ version = "0.2.0"
 dependencies = [
  "aph-conformance",
  "aph-core",
+ "ed25519-dalek",
  "serde",
  "serde_json",
 ]

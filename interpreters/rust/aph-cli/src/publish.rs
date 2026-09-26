@@ -237,6 +237,88 @@ fn vocabulary_record(bundle: &serde_json::Value) -> std::result::Result<String, 
 /// The decode is `aph-core`'s, not a second implementation of multibase and
 /// multicodec — this reads the same bytes a verifier reads, which is the
 /// property that makes a published key verifiable at all.
+/// `key-hex <did:key|z-multibase>` — the raw public key bytes as lowercase
+/// hex. The DECODE primitive `render-did` composes, exposed standalone so
+/// owner-run ceremony scripts can compare a locally-derived key against a
+/// published `publicKeyMultibase` without any interpreter beside this CLI
+/// (the no-python rule, 2026-08-21): the shell string-compares two hex
+/// strings and this verb owns the codec.
+pub fn cmd_key_hex(args: &[std::string::String]) -> i32 {
+  let raw = match args.first() {
+    std::option::Option::Some(r) => r.as_str(),
+    std::option::Option::None => {
+      eprintln!("key-hex: a did:key identifier (or bare z-multibase) is required");
+      return 2;
+    }
+  };
+  let did = if raw.starts_with("did:key:") {
+    std::string::String::from(raw)
+  } else {
+    std::format!("did:key:{}", raw)
+  };
+  match public_key_from_did(&did, std::option::Option::None) {
+    std::result::Result::Ok(key) => {
+      println!("{}", hex_lower(&key.key_bytes));
+      0
+    }
+    std::result::Result::Err(message) => {
+      eprintln!("key-hex: {}", message);
+      1
+    }
+  }
+}
+
+/// `key-did <64-hex>` — the `did:key` (equivalently: `z` + the multibase
+/// value a DID Document's `publicKeyMultibase` carries) for a raw Ed25519
+/// public key. The ENCODE inverse of `key-hex`, for the successor-mint
+/// ceremony: openssl emits raw key bytes, this verb names them.
+pub fn cmd_key_did(args: &[std::string::String]) -> i32 {
+  let raw = match args.first() {
+    std::option::Option::Some(r) => r.as_str(),
+    std::option::Option::None => {
+      eprintln!("key-did: 64 hex chars of Ed25519 public key are required");
+      return 2;
+    }
+  };
+  let bytes = match hex_decode32(raw) {
+    std::option::Option::Some(b) => b,
+    std::option::Option::None => {
+      eprintln!("key-did: `{}` is not 64 hex chars", raw);
+      return 2;
+    }
+  };
+  let verifying = match ed25519_dalek::VerifyingKey::from_bytes(&bytes) {
+    std::result::Result::Ok(v) => v,
+    std::result::Result::Err(e) => {
+      eprintln!("key-did: not a valid Ed25519 public key: {}", e);
+      return 1;
+    }
+  };
+  println!("{}", aph_core::did_key_from_ed25519(&verifying));
+  0
+}
+
+fn hex_lower(bytes: &[u8]) -> std::string::String {
+  let mut out = std::string::String::with_capacity(bytes.len() * 2);
+  for b in bytes {
+    out.push_str(&std::format!("{:02x}", b));
+  }
+  out
+}
+
+fn hex_decode32(s: &str) -> std::option::Option<[u8; 32]> {
+  if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+    return std::option::Option::None;
+  }
+  let mut out = [0u8; 32];
+  for (i, chunk) in s.as_bytes().chunks(2).enumerate() {
+    let hi = (chunk[0] as char).to_digit(16)?;
+    let lo = (chunk[1] as char).to_digit(16)?;
+    out[i] = ((hi << 4) | lo) as u8;
+  }
+  std::option::Option::Some(out)
+}
+
 fn public_key_from_did(
   did: &str,
   kid: std::option::Option<&str>,
@@ -264,6 +346,34 @@ mod tests {
   //! the rendered wire forms: those are `aph-core`'s to pin, and a second
   //! copy of the expected bytes here would be exactly the drift this module's
   //! preamble refuses.
+
+  /// WHY: the key-hex/key-did pair exists so ceremony scripts can compare
+  /// keys with NO interpreter beside this CLI — which only holds if the two
+  /// verbs are exact inverses through the same codec `render-did` uses.
+  /// PINS: raw hex -> did:key -> raw hex round-trips byte-identically, on
+  /// the RFC 8032 test-vector public key; and the bare z-multibase spelling
+  /// decodes to the same bytes as the did:key spelling.
+  #[test]
+  fn key_codec_verbs_round_trip_and_agree_on_both_spellings() {
+    let seed = [
+      0x9du8, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60, 0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec,
+      0x2c, 0xc4, 0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19, 0x70, 0x3b, 0xac, 0x03,
+      0x1c, 0xae, 0x7f, 0x60,
+    ];
+    let verifying = ed25519_dalek::SigningKey::from_bytes(&seed).verifying_key();
+    let hex = super::hex_lower(&verifying.to_bytes());
+    let did = aph_core::did_key_from_ed25519(&verifying);
+
+    // Decode side: both spellings resolve to the same raw bytes.
+    let via_did = super::public_key_from_did(&did, std::option::Option::None)
+      .expect("did:key spelling decodes");
+    std::assert_eq!(super::hex_lower(&via_did.key_bytes), hex);
+
+    // Encode side: the hex round-trips to the identical did:key.
+    let decoded = super::hex_decode32(&hex).expect("hex is 64 chars");
+    let rebuilt = ed25519_dalek::VerifyingKey::from_bytes(&decoded).expect("valid key");
+    std::assert_eq!(aph_core::did_key_from_ed25519(&rebuilt), did);
+  }
 
   /// RFC 8032 §7.1 test vector 1's public key, as a `did:key`. A published
   /// test vector, never a production-looking value.

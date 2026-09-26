@@ -31,6 +31,8 @@ commands:
                                each key is a did:key with its kid as fragment
   render-vocab <bundle.json>   the DNS TXT value publishing that vocabulary's
                                digest (\u{a7}8.5.1)  [--domain D]
+  key-hex <did:key|z...>       raw public key bytes as lowercase hex (decode)
+  key-did <64-hex>             the did:key for raw Ed25519 public key bytes (encode)
   help                         show this message";
 
 /// The `--json` verdict contract, printed by `aph help` and by nothing else.
@@ -99,6 +101,8 @@ fn main() {
     std::option::Option::Some("render-txt") => publish::cmd_render_txt(&args[1..]),
     std::option::Option::Some("render-did") => publish::cmd_render_did(&args[1..]),
     std::option::Option::Some("render-vocab") => publish::cmd_render_vocab(&args[1..]),
+    std::option::Option::Some("key-hex") => publish::cmd_key_hex(&args[1..]),
+    std::option::Option::Some("key-did") => publish::cmd_key_did(&args[1..]),
     std::option::Option::Some("help") | std::option::Option::Some("--help") | std::option::Option::Some("-h") => {
       outln(USAGE);
       outln(&json_contract());

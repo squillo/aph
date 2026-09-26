@@ -16,6 +16,9 @@ path = "src/main.rs"
 
 [dependencies]
 aph-core = { workspace = true }
+# key-did needs the VerifyingKey type aph-core's did_key encoder takes;
+# workspace-pinned to the same version aph-core itself uses.
+ed25519-dalek = { workspace = true }
 aph-conformance = { workspace = true }
 serde_json = { workspace = true }
 # Already in the lockfile via aph-core — naming it adds no new supply chain.
