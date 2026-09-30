@@ -25,7 +25,7 @@
   "features": {},
   "channel": null,
   "lens_gate": null,
-  "src_dir": "../",
+  "src_dir": "./",
   "dep_dir": "./deps",
   "build_dir": "./build",
   "out_dir": "../../snapp",
