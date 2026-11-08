@@ -429,11 +429,32 @@ fn check_key_len(
 /// [`super::dns_txt::parse_txt_record`], so the value that comes back is
 /// not the one that went in; and a `;` or control character ends the tag
 /// early, letting one value inject or truncate later tags.
+/// The RFC 0010 digest of a vocabulary artifact: SHA-256 over the bytes a
+/// resolver fetches, spelled `sha256-<base64>` — SRI-style, standard
+/// alphabet, padded.
+///
+/// This is §8.5.1's `h` tag and a §7.1.12 citation's `digest`, as the v0.3
+/// delta §2 defines them. It is computed over the ARTIFACT and never read
+/// from inside it: a file cannot carry its own hash, so an integrity string
+/// a bundle happens to declare is over something other than the fetched
+/// bytes and cannot satisfy §8.5.3's byte check. Publisher and verifier call
+/// this one function on the same bytes — which is what makes the check
+/// performable by a stranger holding nothing but the artifact and the
+/// citation.
+pub fn vocabulary_digest(artifact: &[u8]) -> String {
+  use base64::Engine;
+  use sha2::Digest;
+  let hash = sha2::Sha256::digest(artifact);
+  std::format!("sha256-{}", base64::engine::general_purpose::STANDARD.encode(hash))
+}
+
 /// Renders a §8.5.1 DNS TXT tag-list publishing one vocabulary digest.
 ///
 /// The value goes at `_aph._vocab.<domain>`. Tags are emitted in the §8.5.1
-/// order — `v`, `n`, `ver`, `h` — separated by `"; "`. All three inputs come
-/// from the compiled bundle's own `@snapp` block, VERBATIM: this function is
+/// order — `v`, `n`, `ver`, `h` — separated by `"; "`. `name` and `version`
+/// come from the compiled bundle's own `@snapp` block, VERBATIM; `digest` is
+/// the RFC 0010 value from [`vocabulary_digest`], computed over the artifact
+/// bytes and never read from inside them (v0.3 delta §2). This function is
 /// the §8.5.1 wire form's ONE renderer, beside its §8.4.5 sibling above, and
 /// it validates its inputs with the same guard — a bundle name carrying `;`
 /// would otherwise terminate the entry and inject tags into a published
@@ -447,13 +468,13 @@ fn check_key_len(
 pub fn render_vocab_record(
   name: &str,
   version: &str,
-  integrity: &str,
+  digest: &str,
 ) -> std::result::Result<String, crate::errors::AphError> {
   check_txt_tag_value("n", name)?;
   check_txt_tag_value("ver", version)?;
-  check_txt_tag_value("h", integrity)?;
+  check_txt_tag_value("h", digest)?;
 
-  let record = std::format!("v={}; n={}; ver={}; h={}", APH_TXT_VERSION, name, version, integrity);
+  let record = std::format!("v={}; n={}; ver={}; h={}", APH_TXT_VERSION, name, version, digest);
   if record.len() > 255 {
     return std::result::Result::Err(crate::errors::AphError::unsupported_algorithm(
       std::format!(
@@ -947,6 +968,27 @@ mod tests {
     // bytes against an honest-looking record.
     let refused = super::render_vocab_record("x; h=sha256-attacker", "1.0", "sha256-abc");
     std::assert!(refused.is_err(), "a name carrying `;` must be refused, never rendered");
+  }
+
+  #[test]
+  fn the_vocabulary_digest_is_sri_over_the_bytes_not_a_carried_string() {
+    // WHY: RFC 0010 (v0.3 delta §2) exists because v0.1.0 asked for a string
+    // the bundle carries, and a file cannot carry its own hash. The digest a
+    // publisher renders and the digest a verifier recomputes must be ONE
+    // function over the fetched bytes, or §8.5.3's byte check compares two
+    // different derivations and refuses bytes that are in fact correct.
+    //
+    // PINS: SHA-256 of the empty input (the FIPS 180-4 published vector,
+    // e3b0c442…b855) in standard, padded base64 behind the `sha256-` prefix;
+    // and a bundle whose `@snapp.integrity` says otherwise does not move it.
+    std::assert_eq!(
+      super::vocabulary_digest(b""),
+      "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+    );
+    let carried = br#"{"@snapp":{"integrity":"sha256-carried"}}"#;
+    let digest = super::vocabulary_digest(carried);
+    std::assert!(digest.starts_with("sha256-") && digest.len() == 7 + 44, "{}", digest);
+    std::assert_ne!(digest, "sha256-carried");
   }
 
   #[test]

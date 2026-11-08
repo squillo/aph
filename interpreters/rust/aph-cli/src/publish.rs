@@ -226,14 +226,14 @@ pub fn cmd_render_vocab(args: &[std::string::String]) -> i32 {
     }
   };
 
-  let raw = match std::fs::read_to_string(path) {
+  let raw = match std::fs::read(path) {
     std::result::Result::Ok(r) => r,
     std::result::Result::Err(e) => {
       eprintln!("render-vocab: cannot read {}: {}", path, e);
       return 1;
     }
   };
-  let value: serde_json::Value = match serde_json::from_str(&raw) {
+  let value: serde_json::Value = match serde_json::from_slice(&raw) {
     std::result::Result::Ok(v) => v,
     std::result::Result::Err(e) => {
       eprintln!("render-vocab: {} is not valid JSON: {}", path, e);
@@ -241,7 +241,10 @@ pub fn cmd_render_vocab(args: &[std::string::String]) -> i32 {
     }
   };
 
-  let record = match vocabulary_record(&value) {
+  // RFC 0010: the digest is over the exact bytes just read — the bytes a
+  // resolver will fetch — never a string found inside them.
+  let digest = aph_core::discovery::publish::vocabulary_digest(&raw);
+  let record = match vocabulary_record(&value, &digest) {
     std::result::Result::Ok(r) => r,
     std::result::Result::Err(message) => {
       eprintln!("render-vocab: {}", message);
@@ -257,15 +260,22 @@ pub fn cmd_render_vocab(args: &[std::string::String]) -> i32 {
 
 /// The §8.5.1 record for a compiled bundle, by way of `aph-core`'s renderer.
 ///
-/// This function only LOCATES the three inputs in the bundle's `@snapp`
-/// block; the wire form itself is rendered by
+/// This function only LOCATES the name and version in the bundle's `@snapp`
+/// block and passes the caller's RFC 0010 digest through — the digest is
+/// computed over the artifact bytes by
+/// [`aph_core::discovery::publish::vocabulary_digest`], never read from the
+/// bundle's own `integrity` field (v0.3 delta §2). The wire form itself is
+/// rendered by
 /// [`aph_core::discovery::publish::render_vocab_record`], beside its §8.4.5
 /// sibling — the ONE renderer rule this module's preamble states. That is
 /// also where the tag-injection guard lives: a bundle name carrying `;`
 /// would otherwise terminate the entry and inject tags into a published
 /// record, and the guard belongs with the renderer rather than with every
 /// caller who remembers.
-fn vocabulary_record(bundle: &serde_json::Value) -> std::result::Result<String, std::string::String> {
+fn vocabulary_record(
+  bundle: &serde_json::Value,
+  digest: &str,
+) -> std::result::Result<String, std::string::String> {
   let meta = bundle
     .get("@snapp")
     .and_then(serde_json::Value::as_object)
@@ -276,7 +286,7 @@ fn vocabulary_record(bundle: &serde_json::Value) -> std::result::Result<String, 
       .and_then(serde_json::Value::as_str)
       .ok_or_else(|| std::format!("the bundle's `@snapp` declares no `{}`", key))
   };
-  aph_core::discovery::publish::render_vocab_record(read("name")?, read("version")?, read("integrity")?)
+  aph_core::discovery::publish::render_vocab_record(read("name")?, read("version")?, digest)
     .map_err(|e| std::format!("{}", e))
 }
 
@@ -472,19 +482,23 @@ mod tests {
     // WHY: pinned against the REAL committed bundle, not a fixture. A
     // renderer tested only against a synthetic input has never met the
     // artifact it exists to publish — and this one exists to publish exactly
-    // this file. If the bundle is re-exported and its digest moves, this
-    // reads the new one, because it reads rather than remembers.
+    // this file. If the bundle is re-exported and its bytes move, this
+    // hashes the new ones, because it reads rather than remembers.
     //
-    // PINS: the tag list is assembled from `@snapp`'s own name, version and
-    // integrity, in §8.5.1 order, and the digest is carried VERBATIM.
-    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0.json");
+    // PINS: the tag list is assembled from `@snapp`'s own name and version,
+    // in §8.5.1 order, and `h` is RFC 0010's SHA-256 over the file's bytes —
+    // demonstrably NOT the `@snapp.integrity` string the bundle carries,
+    // which a file cannot compute over itself.
+    let raw = std::include_bytes!("../../../../snapp/aph_guardrails@0.1.0.json");
     let bundle: serde_json::Value =
-      serde_json::from_str(raw).expect("the committed bundle is valid JSON");
-    let record = super::vocabulary_record(&bundle).expect("a shipped bundle renders");
+      serde_json::from_slice(raw).expect("the committed bundle is valid JSON");
+    let digest = aph_core::discovery::publish::vocabulary_digest(raw);
+    let record = super::vocabulary_record(&bundle, &digest).expect("a shipped bundle renders");
 
-    let integrity = bundle["@snapp"]["integrity"]
+    let carried = bundle["@snapp"]["integrity"]
       .as_str()
-      .expect("the bundle declares an integrity digest");
+      .expect("the bundle declares an internal integrity string");
+    std::assert_ne!(digest, carried, "RFC 0010: the artifact digest is not the carried string");
     std::assert!(record.starts_with("v=APHv1; "), "the version tag leads: {}", record);
     let name = bundle["@snapp"]["name"].as_str().expect("the bundle declares a name");
     std::assert!(
@@ -493,8 +507,8 @@ mod tests {
       record
     );
     std::assert!(
-      record.ends_with(&std::format!("h={}", integrity)),
-      "the digest must be carried verbatim, not re-encoded: {}",
+      record.ends_with(&std::format!("h={}", digest)),
+      "the record carries the artifact digest, not a re-encoding: {}",
       record
     );
   }
@@ -507,9 +521,10 @@ mod tests {
     // differently is a defect that only ever surfaces between strangers.
     // Refusing in the renderer is the difference between an error an operator
     // reads and a publication that silently truncates.
-    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0.json");
-    let bundle: serde_json::Value = serde_json::from_str(raw).expect("valid JSON");
-    let record = super::vocabulary_record(&bundle).expect("it renders");
+    let raw = std::include_bytes!("../../../../snapp/aph_guardrails@0.1.0.json");
+    let bundle: serde_json::Value = serde_json::from_slice(raw).expect("valid JSON");
+    let digest = aph_core::discovery::publish::vocabulary_digest(raw);
+    let record = super::vocabulary_record(&bundle, &digest).expect("it renders");
     std::assert!(
       record.len() <= 255,
       "a shipped bundle's record must fit one character-string, got {} bytes",
@@ -524,13 +539,13 @@ mod tests {
     // until someone noticed resolution had been failing.
     let empty = serde_json::json!({});
     std::assert!(
-      super::vocabulary_record(&empty).is_err(),
+      super::vocabulary_record(&empty, "sha256-abc").is_err(),
       "a bundle with no `@snapp` block must not render"
     );
-    let partial = serde_json::json!({"@snapp": {"name": "x", "version": "1"}});
+    let partial = serde_json::json!({"@snapp": {"name": "x"}});
     std::assert!(
-      super::vocabulary_record(&partial).is_err(),
-      "a bundle with no integrity digest must not render"
+      super::vocabulary_record(&partial, "sha256-abc").is_err(),
+      "a bundle with no version must not render"
     );
   }
 

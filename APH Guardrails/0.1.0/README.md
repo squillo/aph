@@ -55,20 +55,23 @@ Three limits, stated so they cannot be discovered later:
    strict-parse rejection — as a set across families, citing this
    vocabulary by `{name, version, digest}`. Publication and resolution
    ride spec §8.5 (`_aph._vocab.<domain>`, digest-pinned, absent advances
-   / corrupt refuses). The blessed citation for this bundle (ruled
-   2026-08-31, superseding the same-day alpha.1 blessing):
-   `name = "aph_guardrails"`, `version = "0.1.0"`,
-   `digest = "sha256-iTJRGKxirtZFmyDmoGPdPyRzIevrjVddmWhMnCa6Od0="` —
+   / corrupt refuses). The blessed citation for this bundle (re-ruled
+   2026-11-08 after the Snapp was re-emitted under its scoped name;
+   supersedes the 2026-08-31 `aph_guardrails` blessing):
+   `name = "@com::squillo/aph_guardrails"`, `version = "0.1.0"`,
+   `digest = "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc="` —
    SHA-256 over the fetched artifact bytes (SRI-style, RFC 0010) of the
    compiled bundle `snapp/aph_guardrails@0.1.0.json`, which is also the
    machine-readable registry of the 184 labels and the artifact the
    reference repository's freshness weld regenerates from these sources
-   on every test run. (The bundle's internal `@snapp.integrity` string
-   has no protocol meaning — RFC 0010.) The superseded
-   `aph_guardrails@0.1.0-alpha.1.json` stays in-repo, frozen, for
-   citations already minted against it
-   (`sha256-DhTpa6O6GraKyoUFz91imP6f9gBYkXAVvDiqwRo2W60=` over its
-   bytes).
+   on every test run; `aph render-vocab` computes exactly this value. (The
+   bundle's internal `@snapp.integrity` string has no protocol meaning —
+   RFC 0010.) Earlier coordinates are RETIRED, not frozen: the 2026-08-31
+   digest (`sha256-iTJRG…`) matched no committed revision of the bundle,
+   and the alpha.1 bundle left the tree with that re-emit (one name, one
+   manifest). A citation minted against either resolves only for a party
+   that pinned those exact bytes.
+
    Emission stays version-gated (§7.1.12): do not emit toward a recipient
    not known to understand the field. What remains genuinely young:
    published TXT records and deployed consumers.

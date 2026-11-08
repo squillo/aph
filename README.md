@@ -304,10 +304,11 @@ cargo run -p aph-cli -- render-vocab "snapp/aph_guardrails@0.1.0.json" --domain 
 ```
 
 `render-did` takes several keys so a rotation overlap (§8.4.7) can be published
-in one document. `render-vocab` READS the digest from the bundle's own
-`@snapp.integrity` rather than recomputing it — two derivations of one fact
-drift, and a drifted digest does not fail loudly: it publishes a value that
-refuses bytes which are in fact correct. The record name goes to stderr and the value to stdout, so a
+in one document. `render-vocab` HASHES the file it is given — SHA-256 over the bytes,
+`sha256-<base64>`, RFC 0010 — and never reads the bundle's internal
+`@snapp.integrity`: a file cannot carry its own hash, so a carried string is
+over something other than the bytes a resolver fetches, and publishing it
+would refuse bytes which are in fact correct. The record name goes to stderr and the value to stdout, so a
 name cannot be captured into the record's content by a redirect.
 
 **Both take PUBLIC key material only.** A `did:key` IS a public key; nothing
