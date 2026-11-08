@@ -477,7 +477,7 @@ mod tests {
     //
     // PINS: the tag list is assembled from `@snapp`'s own name, version and
     // integrity, in §8.5.1 order, and the digest is carried VERBATIM.
-    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0-alpha.1.json");
+    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0.json");
     let bundle: serde_json::Value =
       serde_json::from_str(raw).expect("the committed bundle is valid JSON");
     let record = super::vocabulary_record(&bundle).expect("a shipped bundle renders");
@@ -486,7 +486,12 @@ mod tests {
       .as_str()
       .expect("the bundle declares an integrity digest");
     std::assert!(record.starts_with("v=APHv1; "), "the version tag leads: {}", record);
-    std::assert!(record.contains("n=aph_guardrails; "), "the name is the bundle's: {}", record);
+    let name = bundle["@snapp"]["name"].as_str().expect("the bundle declares a name");
+    std::assert!(
+      record.contains(&std::format!("n={}; ", name)),
+      "the name is the bundle's own, carried VERBATIM: {}",
+      record
+    );
     std::assert!(
       record.ends_with(&std::format!("h={}", integrity)),
       "the digest must be carried verbatim, not re-encoded: {}",
@@ -502,7 +507,7 @@ mod tests {
     // differently is a defect that only ever surfaces between strangers.
     // Refusing in the renderer is the difference between an error an operator
     // reads and a publication that silently truncates.
-    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0-alpha.1.json");
+    let raw = std::include_str!("../../../../snapp/aph_guardrails@0.1.0.json");
     let bundle: serde_json::Value = serde_json::from_str(raw).expect("valid JSON");
     let record = super::vocabulary_record(&bundle).expect("it renders");
     std::assert!(

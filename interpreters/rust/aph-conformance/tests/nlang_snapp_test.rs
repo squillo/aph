@@ -539,11 +539,18 @@ fn every_required_envelope_prop_is_exercised_by_an_example() {
     let props = block_props(&blocks, block_name)
       .unwrap_or_else(|| std::panic!("Snapp has no block `{}`", block_name));
     for (prop_name, prop) in props {
-      let optional = prop
-        .get("@attrs")
-        .and_then(|a| a.as_object())
-        .map(|a| a.keys().any(|k| k.contains("optional")))
-        .unwrap_or(false);
+      // Two toolchain generations spell optionality differently: abi 40
+      // (nlang 0.1.0) puts `"optional": true` on the prop itself, abi 33
+      // wrapped it in an `@attrs` block. A bundle from either generation
+      // must read the same, or a re-emit reports optional props as
+      // unexercised requirements — which is exactly what happened when
+      // the bundle moved to abi 40.
+      let optional = prop.get("optional").and_then(|o| o.as_bool()).unwrap_or(false)
+        || prop
+          .get("@attrs")
+          .and_then(|a| a.as_object())
+          .map(|a| a.keys().any(|k| k.contains("optional")))
+          .unwrap_or(false);
       if optional {
         continue;
       }
