@@ -56,7 +56,7 @@ Three limits, stated so they cannot be discovered later:
    vocabulary by `{name, version, digest}`. Publication and resolution
    ride spec §8.5 (`_aph._vocab.<domain>`, digest-pinned, absent advances
    / corrupt refuses). The blessed citation for this bundle (re-ruled
-   2026-11-08 after PRD-887 W4 re-emitted the Snapp under its scoped name;
+   2026-11-08 after the Snapp was re-emitted under its scoped name;
    supersedes the 2026-08-31 `aph_guardrails` blessing):
    `name = "@com::squillo/aph_guardrails"`, `version = "0.1.0"`,
    `digest = "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc="` —
@@ -68,8 +68,8 @@ Three limits, stated so they cannot be discovered later:
    bundle's internal `@snapp.integrity` string has no protocol meaning —
    RFC 0010.) Earlier coordinates are RETIRED, not frozen: the 2026-08-31
    digest (`sha256-iTJRG…`) matched no committed revision of the bundle,
-   and the alpha.1 bundle left the tree with W4 (one name, one manifest —
-   PRD-887 G3). A citation minted against either resolves only for a party
+   and the alpha.1 bundle left the tree with that re-emit (one name, one
+   manifest). A citation minted against either resolves only for a party
    that pinned those exact bytes.
 
    Emission stays version-gated (§7.1.12): do not emit toward a recipient
