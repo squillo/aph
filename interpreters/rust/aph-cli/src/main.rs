@@ -5,8 +5,12 @@
 //! - `aph inspect <file|->` — parse and print a human-readable summary.
 //! - `aph golden [index]` — list conformance fixtures, or print one raw.
 //! - `aph render-txt <did:key>` — the §8.4.5 DNS TXT value for a notary key.
-//! - `aph render-did <did:web> <did:key#kid>…` — the §8.4.4 DID Document.
+//! - `aph render-did <did:web> <did:key#kid>…` — the §8.4.4 DID Document;
+//!   `--attestation <file>` embeds a signed v0.2 §5 rotation attestation.
 //! - `aph render-vocab <bundle.json>` — the §8.5.1 vocabulary digest record.
+//! - `aph attest-rotation …` — sign a v0.2 §5 rotation attestation with the
+//!   predecessor seed read from STDIN (the one verb holding a private key;
+//!   see the `attest` module for why stdin and nothing else).
 //! - `aph help` — usage, plus the `--json` verdict contract.
 //!
 //! `validate` reads stdin as `-`, which is what makes it usable as a gate on
@@ -16,6 +20,7 @@
 //! `report` module, which also states the shape's stability commitment. Without
 //! `--json` every byte this tool writes is what it has always written.
 
+mod attest;
 mod publish;
 mod report;
 
@@ -29,8 +34,13 @@ commands:
                                [--kid K] [--not-before T] [--not-after T] [--domain D]
   render-did <did:web> <k>...  the DID Document publishing those keys (\u{a7}8.4.4);
                                each key is a did:key with its kid as fragment
+                               [--attestation F] embeds a signed v0.2 \u{a7}5 rotation attestation
   render-vocab <bundle.json>   the DNS TXT value publishing that vocabulary's
                                digest (\u{a7}8.5.1)  [--domain D]
+  attest-rotation <did:web> <pred-kid> <did:key> <succ-kid>
+                               sign a v0.2 \u{a7}5 rotation attestation naming the successor;
+                               the predecessor's 64-hex Ed25519 seed is read from STDIN
+                               --id ID --created T --not-before T --not-after T (all required)
   key-hex <did:key|z...>       raw public key bytes as lowercase hex (decode)
   key-did <64-hex>             the did:key for raw Ed25519 public key bytes (encode)
   help                         show this message";
@@ -103,6 +113,9 @@ fn main() {
     std::option::Option::Some("render-vocab") => publish::cmd_render_vocab(&args[1..]),
     std::option::Option::Some("key-hex") => publish::cmd_key_hex(&args[1..]),
     std::option::Option::Some("key-did") => publish::cmd_key_did(&args[1..]),
+    std::option::Option::Some("attest-rotation") => {
+      attest::cmd_attest_rotation(&args[1..], &mut std::io::stdin().lock())
+    }
     std::option::Option::Some("help") | std::option::Option::Some("--help") | std::option::Option::Some("-h") => {
       outln(USAGE);
       outln(&json_contract());

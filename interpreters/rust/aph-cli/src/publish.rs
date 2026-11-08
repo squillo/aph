@@ -22,6 +22,8 @@
 //! reaching a command line is readable in `ps` by every other process on the
 //! host. A publication tool needs the public half and nothing else, which is
 //! what makes it safe to hand to an operator.
+//! The one verb that does hold a private key, `attest-rotation`, lives in the
+//! `attest` module precisely so this promise stays unqualified.
 
 /// Renders the §8.4.5 DNS TXT tag list for one published key.
 ///
@@ -102,22 +104,47 @@ pub fn cmd_render_txt(args: &[std::string::String]) -> i32 {
 /// with that fragment attached — `did:key:z6Mk…#k1` — which is the same
 /// shape a verifier reads back, so the operator writes the identifier once
 /// rather than pairing a key with a name positionally.
+///
+/// `--attestation <file>` embeds a signed v0.2 §5 rotation attestation — the
+/// output of `attest-rotation` — which `aph-core` verifies under the
+/// PUBLISHED predecessor key before anything is rendered. The file is public
+/// material (it is what the document publishes), so this module's promise
+/// holds.
 pub fn cmd_render_did(args: &[std::string::String]) -> i32 {
-  let did = match args.first() {
+  let mut attestation_path: std::option::Option<&str> = std::option::Option::None;
+  let mut positional: std::vec::Vec<&std::string::String> = std::vec::Vec::with_capacity(args.len());
+  let mut index = 0;
+  while index < args.len() {
+    if args[index] == "--attestation" {
+      match args.get(index + 1) {
+        std::option::Option::Some(path) => attestation_path = std::option::Option::Some(path.as_str()),
+        std::option::Option::None => {
+          eprintln!("render-did: --attestation needs a file path");
+          return 2;
+        }
+      }
+      index += 2;
+    } else {
+      positional.push(&args[index]);
+      index += 1;
+    }
+  }
+
+  let did = match positional.first() {
     std::option::Option::Some(d) => d.as_str(),
     std::option::Option::None => {
       eprintln!("render-did: a did:web identifier and at least one did:key are required");
       return 2;
     }
   };
-  if args.len() < 2 {
+  if positional.len() < 2 {
     eprintln!("render-did: at least one did:key#kid must be published");
     return 2;
   }
 
   let mut keys: std::vec::Vec<aph_core::discovery::NotaryPublicKey> =
-    std::vec::Vec::with_capacity(args.len() - 1);
-  for raw in &args[1..] {
+    std::vec::Vec::with_capacity(positional.len() - 1);
+  for raw in &positional[1..] {
     let (key_did, fragment) = match raw.split_once('#') {
       std::option::Option::Some((k, f)) => (k, std::option::Option::Some(f)),
       std::option::Option::None => (raw.as_str(), std::option::Option::None),
@@ -131,7 +158,28 @@ pub fn cmd_render_did(args: &[std::string::String]) -> i32 {
     }
   }
 
-  match aph_core::discovery::publish::render_did_document(did, &keys) {
+  let rendered = match attestation_path {
+    std::option::Option::None => aph_core::discovery::publish::render_did_document(did, &keys),
+    std::option::Option::Some(path) => {
+      let text = match std::fs::read_to_string(path) {
+        std::result::Result::Ok(t) => t,
+        std::result::Result::Err(e) => {
+          eprintln!("render-did: cannot read attestation `{}`: {}", path, e);
+          return 1;
+        }
+      };
+      // Strict parse: an attestation with a stray member is not one.
+      let attestation: aph_core::RotationAttestation = match serde_json::from_str(&text) {
+        std::result::Result::Ok(a) => a,
+        std::result::Result::Err(e) => {
+          eprintln!("render-did: `{}` is not a rotation attestation: {}", path, e);
+          return 1;
+        }
+      };
+      aph_core::discovery::publish::render_did_document_with_rotation(did, &keys, &attestation)
+    }
+  };
+  match rendered {
     std::result::Result::Ok(document) => {
       println!("{}", document);
       0
@@ -306,7 +354,7 @@ fn hex_lower(bytes: &[u8]) -> std::string::String {
   out
 }
 
-fn hex_decode32(s: &str) -> std::option::Option<[u8; 32]> {
+pub(crate) fn hex_decode32(s: &str) -> std::option::Option<[u8; 32]> {
   if s.len() != 64 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
     return std::option::Option::None;
   }

@@ -221,6 +221,117 @@ pub fn render_did_document(
   did: &str,
   keys: &[super::NotaryPublicKey],
 ) -> std::result::Result<String, crate::errors::AphError> {
+  let document = did_document_value(did, keys)?;
+  std::result::Result::Ok(crate::crypto::jcs::canonicalize_rfc8785(&document))
+}
+
+/// [`render_did_document`], plus a v0.2 §5 rotation attestation under
+/// [`crate::rotation::DID_DOC_ROTATION_PROPERTY`] — the publication RFC 0001
+/// §3.1 specifies: in the document verifiers already fetch, atomic with the
+/// successor key's own entry, no new surface. The DID-document parser is
+/// deliberately not `deny_unknown_fields`, which is what makes an added
+/// top-level property safe for every verifier that does not read it.
+///
+/// Fail-closed BEFORE anything is rendered, because a published attestation
+/// that does not hold is worse than none — it looks like continuity:
+///
+/// * the attestation's `subject` is this document's DID;
+/// * the named predecessor is one of `keys` — an Ed25519 one; a P-256
+///   predecessor is refused by name (`APH_E010`), the honesty arm the
+///   verifier itself carries, rather than failing on a wrong-algorithm
+///   signature — and the statement verifies under THAT key through
+///   [`crate::rotation::verify_rotation_attestation`];
+/// * the named successor is ALSO one of `keys`, published under exactly the
+///   `kid` and `publicKeyMultibase` the attestation names. Otherwise the
+///   chain's far end points at a key the document does not publish.
+///
+/// Every chain failure is `APH_E024` with the failed rule named, the same
+/// code the verifier uses, because the operator's repair is the same.
+pub fn render_did_document_with_rotation(
+  did: &str,
+  keys: &[super::NotaryPublicKey],
+  attestation: &crate::rotation::RotationAttestation,
+) -> std::result::Result<String, crate::errors::AphError> {
+  let refuse = crate::errors::AphError::rotation_attestation_invalid;
+  let mut document = did_document_value(did, keys)?;
+
+  if attestation.subject != did {
+    return std::result::Result::Err(refuse(std::format!(
+      "attestation subject `{}` is not this document's DID `{}`",
+      attestation.subject, did
+    )));
+  }
+  let predecessor_prefix = std::format!("{}#", did);
+  let predecessor_kid = match attestation.predecessor.strip_prefix(&predecessor_prefix) {
+    std::option::Option::Some(kid) => kid,
+    std::option::Option::None => {
+      return std::result::Result::Err(refuse(std::format!(
+        "predecessor `{}` is not a key of `{}`",
+        attestation.predecessor, did
+      )));
+    }
+  };
+  let predecessor = match keys
+    .iter()
+    .find(|k| k.kid.as_deref() == std::option::Option::Some(predecessor_kid))
+  {
+    std::option::Option::Some(k) => k,
+    std::option::Option::None => {
+      return std::result::Result::Err(refuse(std::format!(
+        "predecessor `{}` is not published in this document, so no verifier could chain from it",
+        attestation.predecessor
+      )));
+    }
+  };
+  let predecessor_key = match predecessor.algorithm {
+    super::KeyAlgorithm::Ed25519 => predecessor.to_ed25519()?,
+    super::KeyAlgorithm::P256 => {
+      return std::result::Result::Err(crate::errors::AphError::unsupported_algorithm(
+        "rotation attestations are rendered here for Ed25519 predecessors only (eddsa-jcs-2022)",
+      ));
+    }
+  };
+  crate::rotation::verify_rotation_attestation(attestation, &predecessor_key)?;
+
+  let successor_kid = attestation.successor.kid.as_str();
+  let successor = match keys
+    .iter()
+    .find(|k| k.kid.as_deref() == std::option::Option::Some(successor_kid))
+  {
+    std::option::Option::Some(k) => k,
+    std::option::Option::None => {
+      return std::result::Result::Err(refuse(std::format!(
+        "successor `{}` is not published in this document, so the chain would end at a key no verifier can fetch",
+        successor_kid
+      )));
+    }
+  };
+  if multibase_public_key(successor)? != attestation.successor.public_key_multibase {
+    return std::result::Result::Err(refuse(std::format!(
+      "successor `{}` is published under different key bytes than the attestation names",
+      successor_kid
+    )));
+  }
+
+  let statement = serde_json::to_value(attestation)
+    .map_err(|e| refuse(std::format!("the attestation does not serialize: {e}")))?;
+  match &mut document {
+    serde_json::Value::Object(members) => {
+      members.insert(crate::rotation::DID_DOC_ROTATION_PROPERTY.to_string(), statement);
+    }
+    // `did_document_value` builds a `json!({...})` object; any other shape is
+    // a defect in this file, never in the caller's input.
+    _ => std::unreachable!("did_document_value renders a JSON object"),
+  }
+  std::result::Result::Ok(crate::crypto::jcs::canonicalize_rfc8785(&document))
+}
+
+/// The §8.4.4 document as a JSON value, before canonicalization — built ONCE
+/// here so the plain and the rotation-carrying renderers cannot drift.
+fn did_document_value(
+  did: &str,
+  keys: &[super::NotaryPublicKey],
+) -> std::result::Result<serde_json::Value, crate::errors::AphError> {
   check_did(did)?;
   if keys.is_empty() {
     return std::result::Result::Err(crate::errors::AphError::unsupported_algorithm(
@@ -272,7 +383,7 @@ pub fn render_did_document(
     "id": did,
     "verificationMethod": serde_json::Value::Array(methods),
   });
-  std::result::Result::Ok(crate::crypto::jcs::canonicalize_rfc8785(&document))
+  std::result::Result::Ok(document)
 }
 
 /// The `alg` tag value for an algorithm — the inverse of
@@ -1106,6 +1217,168 @@ mod tests {
     std::assert_eq!(
       super::render_did_document(SPEC_DID, &[]).unwrap_err().code(),
       "APH_E010"
+    );
+  }
+}
+
+#[cfg(test)]
+mod rotation_render_tests {
+  //! The rotation-carrying renderer — RFC 0001 §3.1's publication in the
+  //! document itself. Keys are RFC 8032 §7.1 TEST 1 (the predecessor, the
+  //! vector `rotation.rs` signs with) and TEST 2 (the successor): published
+  //! vectors, authorizing nothing.
+
+  // TEST KEY ONLY: RFC 8032 §7.1 TEST 1 secret key.
+  const TEST1_SEED: [u8; 32] = [
+    0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60, 0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c,
+    0xc4, 0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19, 0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae,
+    0x7f, 0x60,
+  ];
+  // RFC 8032 §7.1 TEST 2 PUBLIC key — the successor needs only a public half.
+  const TEST2_PUBLIC: [u8; 32] = [
+    0x3d, 0x40, 0x17, 0xc3, 0xe8, 0x43, 0x89, 0x5a, 0x92, 0xb7, 0x0a, 0xa7, 0x4d, 0x1b, 0x7e,
+    0xbc, 0x9c, 0x98, 0x2c, 0xcf, 0x2e, 0xc4, 0x96, 0x8c, 0xc0, 0xcd, 0x55, 0xf1, 0x2a, 0xf4,
+    0x66, 0x0c,
+  ];
+  const DID: &str = "did:web:notary.example.com";
+  const WINDOW_FROM: &str = "2026-11-06T00:00:00Z";
+  const WINDOW_UNTIL: &str = "2028-11-06T00:00:00Z";
+
+  fn predecessor() -> ed25519_dalek::SigningKey {
+    ed25519_dalek::SigningKey::from_bytes(&TEST1_SEED)
+  }
+
+  fn key(bytes: [u8; 32], kid: &str) -> crate::discovery::NotaryPublicKey {
+    crate::discovery::NotaryPublicKey {
+      algorithm: crate::discovery::KeyAlgorithm::Ed25519,
+      key_bytes: bytes.to_vec(),
+      kid: std::option::Option::Some(kid.to_string()),
+    }
+  }
+
+  fn k1() -> crate::discovery::NotaryPublicKey {
+    key(predecessor().verifying_key().to_bytes(), "k1")
+  }
+
+  fn successor_multibase() -> String {
+    crate::crypto::did_key::encode_ed25519(
+      &ed25519_dalek::VerifyingKey::from_bytes(&TEST2_PUBLIC).expect("curve point"),
+    )
+    .trim_start_matches("did:key:")
+    .to_string()
+  }
+
+  fn signed(subject: &str, successor_kid: &str) -> crate::rotation::RotationAttestation {
+    let mut attestation = crate::rotation::RotationAttestation {
+      aph_version: std::string::String::from("0.2"),
+      r#type: std::string::String::from(crate::rotation::ROTATION_ATTESTATION_TYPE),
+      id: std::string::String::from("urn:uuid:00000000-0000-4000-8000-0000000000r2"),
+      subject: subject.to_string(),
+      predecessor: std::format!("{subject}#k1"),
+      successor: crate::rotation::RotationSuccessor {
+        kid: successor_kid.to_string(),
+        alg: std::string::String::from("EdDSA"),
+        public_key_multibase: successor_multibase(),
+        not_before: std::string::String::from(WINDOW_FROM),
+        not_after: std::string::String::from(WINDOW_UNTIL),
+      },
+      created: std::string::String::from(WINDOW_FROM),
+      proof: crate::envelope::EnvelopeProof {
+        r#type: std::string::String::from("DataIntegrityProof"),
+        cryptosuite: std::option::Option::Some(std::string::String::from("eddsa-jcs-2022")),
+        verification_method: std::format!("{subject}#k1"),
+        created: std::string::String::from(WINDOW_FROM),
+        proof_purpose: std::string::String::from("assertionMethod"),
+        proof_value: std::string::String::new(),
+        id: std::option::Option::None,
+        previous_proof: std::option::Option::None,
+      },
+    };
+    crate::rotation::sign_rotation_attestation(&mut attestation, &predecessor()).expect("signs");
+    attestation
+  }
+
+  /// WHY: RFC 0001 §3.1 publishes the attestation IN the DID document, which
+  /// only works because the document parser tolerates unknown top-level
+  /// members — this test is where that dependency is pinned, so loosening
+  /// the parser's tolerance breaks here, by name, not in production. PINS:
+  /// (a) the rendered document still strict-parses as a `DidDocument`;
+  /// (b) the statement rides under the full-URI property, equal to the input;
+  /// (c) removing that one property gives back the plain render BYTE FOR
+  /// BYTE — this renderer adds the property and changes nothing else.
+  #[test]
+  fn rotation_render_adds_exactly_the_attestation_property() {
+    let keys = [k1(), key(TEST2_PUBLIC, "k2")];
+    let attestation = signed(DID, "k2");
+    let rendered =
+      super::render_did_document_with_rotation(DID, &keys, &attestation).expect("renders");
+
+    let _parsed: crate::discovery::did_document::DidDocument = serde_json::from_str(&rendered)
+      .expect("a DID document carrying the rotation property still parses");
+
+    let mut value: serde_json::Value = serde_json::from_str(&rendered).expect("json");
+    let embedded: crate::rotation::RotationAttestation =
+      serde_json::from_value(value[crate::rotation::DID_DOC_ROTATION_PROPERTY].clone())
+        .expect("the statement rides under the full-URI property");
+    std::assert_eq!(embedded, attestation);
+
+    value
+      .as_object_mut()
+      .expect("object")
+      .remove(crate::rotation::DID_DOC_ROTATION_PROPERTY);
+    std::assert_eq!(
+      crate::crypto::jcs::canonicalize_rfc8785(&value),
+      super::render_did_document(DID, &keys).expect("plain render"),
+      "the rotation renderer must add the property and change nothing else"
+    );
+  }
+
+  /// WHY: a published attestation that does not hold LOOKS like continuity,
+  /// which is worse than publishing none. PINS: every chain failure refuses
+  /// under `APH_E024` (the verifier's own code, because the repair is the
+  /// same) and renders nothing — successor kid not published; predecessor
+  /// not published; successor published under other bytes than named;
+  /// subject is a different DID; and a statement whose signature no longer
+  /// covers its bytes, proving the verifier actually ran.
+  #[test]
+  fn rotation_render_refuses_a_chain_the_document_does_not_close() {
+    let code = |r: std::result::Result<String, crate::errors::AphError>| -> String {
+      r.expect_err("refuses").code().to_string()
+    };
+    let both = [k1(), key(TEST2_PUBLIC, "k2")];
+
+    std::assert_eq!(
+      code(super::render_did_document_with_rotation(DID, &both, &signed(DID, "k3"))),
+      "APH_E024",
+      "successor kid absent from the document"
+    );
+    let no_predecessor = [key(TEST2_PUBLIC, "k2")];
+    std::assert_eq!(
+      code(super::render_did_document_with_rotation(DID, &no_predecessor, &signed(DID, "k2"))),
+      "APH_E024",
+      "predecessor absent from the document"
+    );
+    let other_bytes = [k1(), key(predecessor().verifying_key().to_bytes(), "k2")];
+    std::assert_eq!(
+      code(super::render_did_document_with_rotation(DID, &other_bytes, &signed(DID, "k2"))),
+      "APH_E024",
+      "successor published under bytes the attestation does not name"
+    );
+    std::assert_eq!(
+      code(super::render_did_document_with_rotation(
+        DID,
+        &both,
+        &signed("did:web:other.example.com", "k2")
+      )),
+      "APH_E024",
+      "subject is another DID"
+    );
+    let mut tampered = signed(DID, "k2");
+    tampered.created = std::string::String::from("2026-11-07T00:00:00Z");
+    std::assert_eq!(
+      code(super::render_did_document_with_rotation(DID, &both, &tampered)),
+      "APH_E024",
+      "a signature that no longer covers the statement"
     );
   }
 }
