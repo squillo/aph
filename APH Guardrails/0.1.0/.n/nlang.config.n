@@ -1,11 +1,11 @@
 {
-  "name": "aph_guardrails",
+  "name": "@com::squillo/aph_guardrails",
   "version": "0.1.0",
   "edition": "2026",
   "description": "APH Guardrail Rosetta Stone: a shared, independently-resolvable vocabulary of agent-act, guard, and risk classifiers, so two agents from different organizations can agree what a phrase means without either one defining it",
   "author": "Scott Wyatt <scott@squillo.com>, APH Protocol Contributors",
   "authors": [],
-  "license": "Apache-2.0 (Snapp contents). N Lang is proprietary to Squillo Inc.; commercially licensable only through Squillo Inc.",
+  "license": "Apache-2.0",
   "tags": [],
   "framework": "n",
   "repository": "https://github.com/squillo/aph",
