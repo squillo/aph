@@ -197,7 +197,7 @@ aph/
     0.1.0/              N Lang Specification Snapp (literate .n.md types)
       how/              Worked examples served by `nlang how --plugin aph`
   snapp/
-    aph@0.1.0-alpha.1.json   Compiled Snapp bundle
+    aph@0.1.0.json           Compiled Snapp bundle
   .claude-plugin/       Agent-plugin + marketplace manifests
   skills/               Agent skill: the protocol crash course (/aph:spec)
   commands/             Agent commands: /aph:validate, /aph:conformance
@@ -300,7 +300,7 @@ cargo run -p aph-cli -- render-did did:web:notary.example.com did:key:z6Mk...#k1
 
 ```sh
 # the DNS TXT value publishing a vocabulary's digest (§8.5.1)
-cargo run -p aph-cli -- render-vocab "snapp/aph_guardrails@0.1.0-alpha.1.json" --domain squillo.com
+cargo run -p aph-cli -- render-vocab "snapp/aph_guardrails@0.1.0.json" --domain squillo.com
 ```
 
 `render-did` takes several keys so a rotation overlap (§8.4.7) can be published
@@ -587,7 +587,7 @@ For OpenAI Codex and any tool following the [agents.md](https://agents.md) conve
 
 ## N Lang Specification Snapp
 
-`APH Spec/0.1.0/` defines the protocol's JSON documents as [N Lang](https://squillo.com/nlang) types, compiled to `snapp/aph@0.1.0-alpha.1.json`. N Lang is a proprietary language by Squillo Inc., commercially licensable only through Squillo Inc.; the Snapp sources themselves are Apache-2.0 like the rest of this repository.
+`APH Spec/0.1.0/` defines the protocol's JSON documents as [N Lang](https://squillo.com/nlang) types, compiled to `snapp/aph@0.1.0.json`. N Lang is a proprietary language by Squillo Inc., commercially licensable only through Squillo Inc.; the Snapp sources themselves are Apache-2.0 like the rest of this repository.
 
 ## Contributing
 

@@ -160,7 +160,7 @@ fn the_protocol_bundle_is_a_fresh_export_of_its_sources() {
       return;
     }
   }
-  assert_bundle_fresh("APH Spec/0.1.0", "aph@0.1.0-alpha.1.json");
+  assert_bundle_fresh("APH Spec/0.1.0", "aph@0.1.0.json");
 }
 
 #[test]
