@@ -1,0 +1,35 @@
+// A cryptosuite the protocol does not know.
+//
+// The protocol names two Data Integrity cryptosuites: eddsa-jcs-2022 for
+// Ed25519 and ecdsa-jcs-2019 for P-256. A proof that names anything else
+// is refused as UnsupportedAlgorithm. The recipient does not try to guess
+// what the suite might mean, and a discovery surface that advertises an
+// unknown algorithm is refused under the same code rather than skipped.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_two_allowed_suites() -> () {
+    let suites: Directional<str> = ["eddsa-jcs-2022", "ecdsa-jcs-2019"]
+    assert_eq!(suites.len(), 2)
+  }
+
+  #[test]
+  fn the_proof_names_neither() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "bbs-2023", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.cryptosuite, "bbs-2023")
+  }
+
+  #[test]
+  fn the_refusal_is_the_algorithm_code() -> () {
+    let refusal: Directional<str> = ["APH_E010", "UnsupportedAlgorithm"]
+    assert_eq!(refusal[1], "UnsupportedAlgorithm")
+  }
+}

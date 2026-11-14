@@ -1,0 +1,35 @@
+// The act chain.
+//
+// act_chain is a directional list of the acts that led to this envelope, in
+// order. It is the narrative a verifier reads when the decision looks odd:
+// who asked, what the policy said, whether a human stepped in, when the
+// mandate was cut, and that notarization came last. A chain is never
+// reordered to look cleaner.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn five_acts_led_here() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "communication_mandate_issued", "notarize"] }
+    assert_eq!(p.act_chain.len(), 5)
+  }
+
+  #[test]
+  fn the_mandate_was_issued_after_approval() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "communication_mandate_issued", "notarize"] }
+    assert_eq!(p.act_chain[3], "communication_mandate_issued")
+  }
+
+  #[test]
+  fn notarization_is_always_last() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "communication_mandate_issued", "notarize"] }
+    assert_eq!(p.act_chain[4], "notarize")
+  }
+}

@@ -1,0 +1,35 @@
+// A state that was skipped.
+//
+// Every envelope sits on a communication mandate. A flow that goes from
+// Drafted to EnvelopeIssued without passing MandateIssued has skipped the
+// step where authority for this one message was fixed, and a verifier
+// refuses it as InvalidFlowTransition. The order of the states is part of
+// the protocol, not a suggestion.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_observed_path_skipped_a_state() -> () {
+    let observed: Directional<str> = ["Drafted", "EnvelopeIssued"]
+    assert_eq!(observed[1], "EnvelopeIssued")
+  }
+
+  #[test]
+  fn the_required_path_has_the_mandate_in_between() -> () {
+    let required: Directional<str> = ["Drafted", "MandateIssued", "EnvelopeIssued"]
+    assert_eq!(required[1], "MandateIssued")
+  }
+
+  #[test]
+  fn the_refusal_is_a_flow_error() -> () {
+    let refusal: Directional<str> = ["InvalidFlowTransition"]
+    assert_eq!(refusal[0], "InvalidFlowTransition")
+  }
+}

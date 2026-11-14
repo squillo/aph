@@ -1,0 +1,35 @@
+// A pinned vocabulary.
+//
+// Labels mean nothing without the vocabulary that defines them. A
+// VocabularyRef pins one by scoped name, exact version, and a digest over
+// the published artifact's bytes in SRI form. A recipient that fetched the
+// artifact and got different bytes must refuse rather than guess what the
+// labels meant.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_name_is_scoped() -> () {
+    let pin: Directional<str> = ["@com::squillo/aph_guardrails", "0.1.0", "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc="]
+    assert_eq!(pin.len(), 3)
+  }
+
+  #[test]
+  fn the_version_is_exact() -> () {
+    let v: VocabularyRef = { name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }
+    assert_eq!(v.version, "0.1.0")
+  }
+
+  #[test]
+  fn the_digest_is_sri_over_the_bytes() -> () {
+    let v: VocabularyRef = { name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }
+    assert_eq!(v.digest, "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=")
+  }
+}

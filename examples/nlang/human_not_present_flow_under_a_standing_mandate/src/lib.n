@@ -1,0 +1,34 @@
+// Nobody was there, and that was fine.
+//
+// Under a valid standing delegation the flow has no PendingDecision and no
+// Approved: the human decided when they signed the delegation. The notary
+// checks the delegation, issues the mandate and the envelope, and the
+// adapter delivers. Four states, all machine time.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn four_states_with_no_decision_wait() -> () {
+    let flow: Directional<str> = ["Drafted", "MandateIssued", "EnvelopeIssued", "Delivered"]
+    assert_eq!(flow.len(), 4)
+  }
+
+  #[test]
+  fn the_mandate_follows_the_draft_directly() -> () {
+    let flow: Directional<str> = ["Drafted", "MandateIssued", "EnvelopeIssued", "Delivered"]
+    assert_eq!(flow[1], "MandateIssued")
+  }
+
+  #[test]
+  fn the_delegation_is_what_made_it_possible() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.delegation_mandate_id, "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b")
+  }
+}

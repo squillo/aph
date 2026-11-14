@@ -1,0 +1,35 @@
+// An audience pinned to a channel.
+//
+// For posts to a channel, channel_binding carries a positional pair: the
+// platform and the channel address. A credential bound to Slack channel
+// C04HLCU7MEMBERS does not verify if the same bytes are posted to a
+// different channel, which is what stops a legitimately notarized message
+// from being replayed where it was never authorized.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_binding_has_two_positions() -> () {
+    let a: Audience = { id: "slack:channel:C04HLCU7MEMBERS", channel_binding: ["slack", "C04HLCU7MEMBERS"] }
+    assert_eq!(a.channel_binding.len(), 2)
+  }
+
+  #[test]
+  fn the_platform_comes_first() -> () {
+    let a: Audience = { id: "slack:channel:C04HLCU7MEMBERS", channel_binding: ["slack", "C04HLCU7MEMBERS"] }
+    assert_eq!(a.channel_binding[0], "slack")
+  }
+
+  #[test]
+  fn the_channel_address_second() -> () {
+    let a: Audience = { id: "slack:channel:C04HLCU7MEMBERS", channel_binding: ["slack", "C04HLCU7MEMBERS"] }
+    assert_eq!(a.channel_binding[1], "C04HLCU7MEMBERS")
+  }
+}

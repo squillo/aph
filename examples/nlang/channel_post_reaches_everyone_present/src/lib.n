@@ -1,0 +1,34 @@
+// A post to a whole channel.
+//
+// A Channel class message reaches everyone present. There is no single
+// recipient to name, so the audience is a group identity. Compare the
+// Broadcast class, which also reaches many, but is a one-way announcement
+// with no expectation of replies in the same place.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_channel_post_uses_the_channel_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "Channel", body_sha256: "521b6b1996e665c4f49054800f76e3e20c5c3ba190e6b907ec310f9459e20e8c", body_size: 108, preview_lines: 1, preview: "Heads up: the staging database is being resized at 22:00 UTC tonight. Expect about ten minutes of read-only." }
+    assert_eq!(c.content_class, "Channel")
+  }
+
+  #[test]
+  fn the_audience_is_the_group() -> () {
+    let a: Audience = { id: "did:web:example.com:eng:platform-team" }
+    assert_eq!(a.id, "did:web:example.com:eng:platform-team")
+  }
+
+  #[test]
+  fn the_room_is_addressed_once() -> () {
+    let ch: ChannelDescriptor = { kind: "discord", recipient_addressing: ["1187654321098765432"], recipient_class: "Human" }
+    assert_eq!(ch.kind, "discord")
+  }
+}

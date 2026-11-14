@@ -1,0 +1,34 @@
+// An audience of one.
+//
+// The audience is who the credential is for. In the common case it is the
+// one person the message addresses. A recipient checks that the audience
+// is them before anything else about the envelope matters to them; a
+// credential for someone else is not evidence of authority to speak to you.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_audience_is_one_identity() -> () {
+    let a: Audience = { id: "did:web:example.com:people:dev-chen" }
+    assert_eq!(a.id, "did:web:example.com:people:dev-chen")
+  }
+
+  #[test]
+  fn the_channel_agrees_the_recipient_is_human() -> () {
+    let ch: ChannelDescriptor = { kind: "slack", recipient_addressing: ["C04HLCU7MEMBERS"], recipient_class: "Human" }
+    assert_eq!(ch.recipient_class, "Human")
+  }
+
+  #[test]
+  fn the_principal_is_someone_else() -> () {
+    let h: HumanPrincipalRef = { id: "did:web:example.com:people:maria-delgado", display_name: "Maria Delgado" }
+    assert_eq!(h.id, "did:web:example.com:people:maria-delgado")
+  }
+}

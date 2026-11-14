@@ -1,0 +1,34 @@
+// A delegation for people only.
+//
+// Priya Raman's community helper may talk to members, but not to other
+// bots. allowed_recipient_classes is optional on a delegation; when it is
+// present it closes the set, and a send whose channel descriptor says
+// recipient_class Agent is outside the authority.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn only_humans_may_be_addressed() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:93c6e1f0-5a2b-4c7d-8e9f-0a1b2c3d4e5f", human_principal_did: "did:web:example.com:community:priya-raman", agent_did: "did:web:example.com:agents:server-helper", allowed_channels: ["discord"], allowed_recipient_classes: ["Human"], valid_from: "2026-02-01T00:00:00Z", valid_until: "2026-08-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.allowed_recipient_classes[0], "Human")
+  }
+
+  #[test]
+  fn the_set_has_one_class() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:93c6e1f0-5a2b-4c7d-8e9f-0a1b2c3d4e5f", human_principal_did: "did:web:example.com:community:priya-raman", agent_did: "did:web:example.com:agents:server-helper", allowed_channels: ["discord"], allowed_recipient_classes: ["Human"], valid_from: "2026-02-01T00:00:00Z", valid_until: "2026-08-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.allowed_recipient_classes.len(), 1)
+  }
+
+  #[test]
+  fn a_descriptor_addressed_to_a_person_fits() -> () {
+    let ch: ChannelDescriptor = { kind: "discord", recipient_addressing: ["1098765432109876543"], recipient_class: "Human" }
+    assert_eq!(ch.recipient_class, "Human")
+  }
+}

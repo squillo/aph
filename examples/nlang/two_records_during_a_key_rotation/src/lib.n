@@ -1,0 +1,34 @@
+// A rotation in progress.
+//
+// Rotation is two records, not one. k1 keeps signing until its notAfter;
+// k2 is published now with a notBefore so verifiers already trust it when
+// it takes over. During the overlap both verify. Losing k1 after this point
+// is an ordinary rotation rather than a loss of identity.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_active_key_has_an_end_date() -> () {
+    let k1: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", not_after: "2027-05-21T00:00:00Z" }
+    assert_eq!(k1.not_after, "2027-05-21T00:00:00Z")
+  }
+
+  #[test]
+  fn the_successor_has_a_start_date() -> () {
+    let k2: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", kid: "k2", not_before: "2026-11-07T03:34:55Z", not_after: "2028-11-07T03:34:55Z" }
+    assert_eq!(k2.not_before, "2026-11-07T03:34:55Z")
+  }
+
+  #[test]
+  fn the_two_keys_differ() -> () {
+    let k2: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", kid: "k2", not_before: "2026-11-07T03:34:55Z", not_after: "2028-11-07T03:34:55Z" }
+    assert_eq!(k2.k, "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo")
+  }
+}

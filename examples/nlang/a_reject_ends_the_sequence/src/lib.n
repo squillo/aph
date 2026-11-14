@@ -1,0 +1,35 @@
+// Reject at the end.
+//
+// The recipient endpoint ran the verification algorithm and something did
+// not hold: a stale key, a body that did not hash to the digest, a mandate
+// past its window. The operation recorded is Reject, with the specific
+// error beside it. The message may have arrived, but it is treated as
+// unauthorized.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_sequence_ends_in_reject() -> () {
+    let ops: Directional<str> = ["IssueCommunicationMandate", "Notarize", "Transport", "Reject"]
+    assert_eq!(ops[3], "Reject")
+  }
+
+  #[test]
+  fn the_reason_travels_with_it() -> () {
+    let reason: Directional<str> = ["Reject", "EnvelopeBodyHashMismatch"]
+    assert_eq!(reason[1], "EnvelopeBodyHashMismatch")
+  }
+
+  #[test]
+  fn the_digest_that_did_not_match() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "1db9d5afdc296c931fb726d84d54a43d9f35b332278aa9d6f7c777efcaabc232", body_size: 33, preview_lines: 1, preview: "Thanks, the estimate is attached." }
+    assert_eq!(c.body_sha256, "1db9d5afdc296c931fb726d84d54a43d9f35b332278aa9d6f7c777efcaabc232")
+  }
+}

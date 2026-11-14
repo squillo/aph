@@ -1,0 +1,34 @@
+// A five-minute communication mandate.
+//
+// A communication mandate authorizes one message, so it does not need to
+// live long. Five minutes is enough to notarize and deliver; after that the
+// mandate is dead and the agent must ask again. Short windows keep a stolen
+// mandate nearly worthless.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn issued_at_the_half_hour() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f8a", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", human_principal_did: "did:web:example.org:practice:elena-marsh", agent_did: "did:web:example.org:agents:front-desk", channel_kind: "whatsapp", recipient_addressing: ["+15550100142"], content_class: "New", body_sha256: "dd244ba1fae44eff6d17dace433e9813b30525837bdb3198ab5cd58daf8e20ed", body_size: 70, policy_decision: "AlwaysAllow", issued_at: "2026-07-13T17:30:00Z", expires_at: "2026-07-13T17:35:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.issued_at, "2026-07-13T17:30:00Z")
+  }
+
+  #[test]
+  fn expires_five_minutes_later() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f8a", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", human_principal_did: "did:web:example.org:practice:elena-marsh", agent_did: "did:web:example.org:agents:front-desk", channel_kind: "whatsapp", recipient_addressing: ["+15550100142"], content_class: "New", body_sha256: "dd244ba1fae44eff6d17dace433e9813b30525837bdb3198ab5cd58daf8e20ed", body_size: 70, policy_decision: "AlwaysAllow", issued_at: "2026-07-13T17:30:00Z", expires_at: "2026-07-13T17:35:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.expires_at, "2026-07-13T17:35:00Z")
+  }
+
+  #[test]
+  fn the_recipient_is_one_phone_number() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f8a", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", human_principal_did: "did:web:example.org:practice:elena-marsh", agent_did: "did:web:example.org:agents:front-desk", channel_kind: "whatsapp", recipient_addressing: ["+15550100142"], content_class: "New", body_sha256: "dd244ba1fae44eff6d17dace433e9813b30525837bdb3198ab5cd58daf8e20ed", body_size: 70, policy_decision: "AlwaysAllow", issued_at: "2026-07-13T17:30:00Z", expires_at: "2026-07-13T17:35:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.recipient_addressing[0], "+15550100142")
+  }
+}

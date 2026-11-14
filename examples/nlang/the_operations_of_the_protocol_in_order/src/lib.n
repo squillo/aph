@@ -1,0 +1,34 @@
+// The operations, in order.
+//
+// Issuing a delegation happens once, ahead of time. Then, per message:
+// issue a communication mandate, notarize, transport, verify. Reject is the
+// sixth operation and can replace Verify at the end, or cut the sequence
+// short at any point before it.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_delegation_is_issued_first() -> () {
+    let ops: Directional<str> = ["IssueDelegationMandate", "IssueCommunicationMandate", "Notarize", "Transport", "Verify"]
+    assert_eq!(ops[0], "IssueDelegationMandate")
+  }
+
+  #[test]
+  fn notarization_precedes_transport() -> () {
+    let ops: Directional<str> = ["IssueDelegationMandate", "IssueCommunicationMandate", "Notarize", "Transport", "Verify"]
+    assert_eq!(ops[2], "Notarize")
+  }
+
+  #[test]
+  fn verification_is_the_recipient_s_step() -> () {
+    let ops: Directional<str> = ["IssueDelegationMandate", "IssueCommunicationMandate", "Notarize", "Transport", "Verify"]
+    assert_eq!(ops[4], "Verify")
+  }
+}

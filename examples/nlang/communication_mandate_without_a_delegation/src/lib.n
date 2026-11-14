@@ -1,0 +1,35 @@
+// A communication mandate with no delegation.
+//
+// delegation_mandate_id is optional on a communication mandate for one
+// reason: the human-present flow. Beatrice Lund approved this exact message
+// herself, so there is no standing grant to cite. The policy decision
+// recorded is AskEveryTime, which is the policy that made her presence
+// necessary.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_decision_required_the_human() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", human_principal_did: "did:web:example.org:clinic:beatrice-lund", agent_did: "did:web:example.org:agents:clinic-scheduler", channel_kind: "email", recipient_addressing: ["k.osei@example.com"], content_class: "New", body_sha256: "e7c6f55b6d92521fd5744f4abe38d97049eb132d1fd4d2c6d4860449330d4b55", body_size: 78, policy_decision: "AskEveryTime", issued_at: "2026-01-20T16:02:00Z", expires_at: "2026-01-20T16:12:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.policy_decision, "AskEveryTime")
+  }
+
+  #[test]
+  fn a_new_conversation_was_opened() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", human_principal_did: "did:web:example.org:clinic:beatrice-lund", agent_did: "did:web:example.org:agents:clinic-scheduler", channel_kind: "email", recipient_addressing: ["k.osei@example.com"], content_class: "New", body_sha256: "e7c6f55b6d92521fd5744f4abe38d97049eb132d1fd4d2c6d4860449330d4b55", body_size: 78, policy_decision: "AskEveryTime", issued_at: "2026-01-20T16:02:00Z", expires_at: "2026-01-20T16:12:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.content_class, "New")
+  }
+
+  #[test]
+  fn the_notary_still_signed_it() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d", human_principal_did: "did:web:example.org:clinic:beatrice-lund", agent_did: "did:web:example.org:agents:clinic-scheduler", channel_kind: "email", recipient_addressing: ["k.osei@example.com"], content_class: "New", body_sha256: "e7c6f55b6d92521fd5744f4abe38d97049eb132d1fd4d2c6d4860449330d4b55", body_size: 78, policy_decision: "AskEveryTime", issued_at: "2026-01-20T16:02:00Z", expires_at: "2026-01-20T16:12:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.notary_signature, "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk")
+  }
+}

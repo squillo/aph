@@ -1,0 +1,34 @@
+// A communication mandate for a channel post.
+//
+// A post that reaches every member of a space is a Channel class
+// communication. Samuel Adeyemi's policy asks him first, so this mandate
+// records AskEveryTime and cites no delegation: his approval in the moment
+// was the authority.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_space_is_the_recipient() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:b9c0d1e2-f3a4-4b5c-8d6e-7f8a9b0c1d2e", human_principal_did: "did:web:example.com:shop:samuel-adeyemi", agent_did: "did:web:example.com:agents:store-ops", channel_kind: "google_chat", recipient_addressing: ["spaces/AAAA2kLanternStaff"], content_class: "Channel", body_sha256: "a9e219b25c58ac52eacdd744372208ae0d8a35131f92f5c8e07845109864984d", body_size: 56, policy_decision: "AskEveryTime", issued_at: "2026-08-21T21:12:00Z", expires_at: "2026-08-21T21:22:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.recipient_addressing[0], "spaces/AAAA2kLanternStaff")
+  }
+
+  #[test]
+  fn the_owner_approved_it_live() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:b9c0d1e2-f3a4-4b5c-8d6e-7f8a9b0c1d2e", human_principal_did: "did:web:example.com:shop:samuel-adeyemi", agent_did: "did:web:example.com:agents:store-ops", channel_kind: "google_chat", recipient_addressing: ["spaces/AAAA2kLanternStaff"], content_class: "Channel", body_sha256: "a9e219b25c58ac52eacdd744372208ae0d8a35131f92f5c8e07845109864984d", body_size: 56, policy_decision: "AskEveryTime", issued_at: "2026-08-21T21:12:00Z", expires_at: "2026-08-21T21:22:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.policy_decision, "AskEveryTime")
+  }
+
+  #[test]
+  fn the_channel_kind_is_google_chat() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:b9c0d1e2-f3a4-4b5c-8d6e-7f8a9b0c1d2e", human_principal_did: "did:web:example.com:shop:samuel-adeyemi", agent_did: "did:web:example.com:agents:store-ops", channel_kind: "google_chat", recipient_addressing: ["spaces/AAAA2kLanternStaff"], content_class: "Channel", body_sha256: "a9e219b25c58ac52eacdd744372208ae0d8a35131f92f5c8e07845109864984d", body_size: 56, policy_decision: "AskEveryTime", issued_at: "2026-08-21T21:12:00Z", expires_at: "2026-08-21T21:22:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.channel_kind, "google_chat")
+  }
+}

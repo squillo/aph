@@ -1,0 +1,35 @@
+// What a label is for.
+//
+// Labels are about the act. "first-contact" says the agent is opening a
+// relationship; "payment-request" says money is being asked for. Neither is
+// a summary of the prose, and a policy can refuse on them without the body
+// ever leaving the notary. Here a new email asking for a deposit carries
+// both.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_act_is_a_first_contact() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["first-contact", "payment-request", "outbound-email"] }
+    assert_eq!(ac.labels[0], "first-contact")
+  }
+
+  #[test]
+  fn and_a_payment_request() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["first-contact", "payment-request", "outbound-email"] }
+    assert_eq!(ac.labels[1], "payment-request")
+  }
+
+  #[test]
+  fn which_is_why_the_policy_asked() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(p.decision, "AskEveryTime")
+  }
+}

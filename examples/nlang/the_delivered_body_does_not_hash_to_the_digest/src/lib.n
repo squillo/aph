@@ -1,0 +1,35 @@
+// The body that arrived is not the body that was notarized.
+//
+// The credential names a digest and a size. The message that reached the
+// recipient has an extra sentence asking for a wire transfer. Its SHA-256
+// does not match the digest, and its size does not match either. This is
+// the exact failure the binding exists to catch, and the refusal is
+// EnvelopeBodyHashMismatch.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_credential_names_the_authorized_digest() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." }
+    assert_eq!(c.body_sha256, "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100")
+  }
+
+  #[test]
+  fn the_delivered_text_hashes_to_something_else() -> () {
+    let delivered: CommunicationDescriptor = { content_class: "Reply", body_sha256: "728bd3a4f9674c6a4289358b8a67d23f95430c7c63f3b8f445947aa61250a817", body_size: 103, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; please wire the deposit to the new account today." }
+    assert_eq!(delivered.body_sha256, "728bd3a4f9674c6a4289358b8a67d23f95430c7c63f3b8f445947aa61250a817")
+  }
+
+  #[test]
+  fn the_refusal_is_the_hash_mismatch() -> () {
+    let refusal: Directional<str> = ["EnvelopeBodyHashMismatch"]
+    assert_eq!(refusal[0], "EnvelopeBodyHashMismatch")
+  }
+}

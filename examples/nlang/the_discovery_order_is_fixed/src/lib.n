@@ -1,0 +1,35 @@
+// The order, and the one rule about it.
+//
+// A recipient looks for the notary's key in a fixed order: did:key, DNS
+// TXT, did:web. A surface that is simply not there advances to the next.
+// A surface that was there and failed, an expired window, an unknown
+// algorithm, a timeout, refuses on the spot under its own code and never
+// falls through. Absence is not failure.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn three_surfaces_in_order() -> () {
+    let order: Directional<str> = ["DidKey", "DnsTxt", "DidWeb"]
+    assert_eq!(order.len(), 3)
+  }
+
+  #[test]
+  fn dns_sits_between_the_two_did_methods() -> () {
+    let order: Directional<str> = ["DidKey", "DnsTxt", "DidWeb"]
+    assert_eq!(order[1], "DnsTxt")
+  }
+
+  #[test]
+  fn did_web_is_the_last_resort() -> () {
+    let order: Directional<str> = ["DidKey", "DnsTxt", "DidWeb"]
+    assert_eq!(order[2], "DidWeb")
+  }
+}

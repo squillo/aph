@@ -1,0 +1,34 @@
+// NotaryAttested, by default.
+//
+// attestation_mode is optional on the policy descriptor. When it is absent
+// the mode is NotaryAttested: the notary alone vouches, and the proof is one
+// DataIntegrityProof. Writing NotaryAttested explicitly is allowed and means
+// the same thing. The two descriptors below are equivalent on the wire.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_mode_may_be_left_out() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.decision, "AlwaysAllow")
+  }
+
+  #[test]
+  fn or_stated_to_the_same_effect() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", attestation_mode: "NotaryAttested", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.attestation_mode, "NotaryAttested")
+  }
+
+  #[test]
+  fn one_proof_is_the_matching_structure() -> () {
+    let pr: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-07-13T17:30:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(pr.proof_purpose, "assertionMethod")
+  }
+}

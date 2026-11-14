@@ -1,0 +1,35 @@
+// A mutation, notarized like a message.
+//
+// Not every outbound act is a message. When an agent writes into a vault, the
+// same envelope shape carries it: the content class is Mutation, the body is
+// the mutation request, and linked_mandate.vault_mutation says which kind of
+// vault change was authorized and under which grant scope. The variant form
+// below is how N Lang spells an enum variant with fields as a prop value.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_vault_write_is_the_mutation_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "Mutation", body_sha256: "930eac7a540a46af92ed94cf2cc9dc9957612d2bb242abc1f292bd6fb622592d", body_size: 84, preview_lines: 1, preview: "op=write_into;dest_vault=vault_7f3a;artifact=quarterly-close-2026q1.xlsx;grant=gs_01" }
+    assert_eq!(c.content_class, "Mutation")
+  }
+
+  #[test]
+  fn the_linked_mandate_names_the_grant_scope() -> () {
+    let l: LinkedMandate = { vault_mutation: { kind: WriteInto { dest_vault_id: "vault_7f3a" }, grant_scope_id: "gs_01" } }
+    assert_eq!(l.vault_mutation.grant_scope_id, "gs_01")
+  }
+
+  #[test]
+  fn the_mutation_kind_carries_its_destination() -> () {
+    let v: VaultMutationMandate = { kind: WriteInto { dest_vault_id: "vault_7f3a" }, grant_scope_id: "gs_01" }
+    assert_eq!(v.grant_scope_id, "gs_01")
+  }
+}

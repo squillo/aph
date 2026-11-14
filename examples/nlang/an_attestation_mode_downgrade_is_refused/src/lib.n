@@ -1,0 +1,35 @@
+// A mode downgrade.
+//
+// Amira Haddad's delegation for lease documents requires PrincipalSigned:
+// she signs each one herself. An envelope that arrives NotaryAttested under
+// that delegation is structurally fine and still refused, because it offers
+// less than the mandate demanded. Downgrades get their own refusal code so
+// they are never mistaken for a bad signature.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_mandate_demanded_the_principal_s_signature() -> () {
+    let required: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", attestation_mode: "PrincipalSigned", act_chain: ["human_present_request", "policy_evaluation", "human_signature", "notarize"] }
+    assert_eq!(required.attestation_mode, "PrincipalSigned")
+  }
+
+  #[test]
+  fn the_envelope_offered_less() -> () {
+    let offered: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", attestation_mode: "NotaryAttested", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(offered.attestation_mode, "NotaryAttested")
+  }
+
+  #[test]
+  fn the_refusal_is_the_downgrade_code() -> () {
+    let refusal: Directional<str> = ["APH_E012", "attestation mode downgrade"]
+    assert_eq!(refusal[0], "APH_E012")
+  }
+}

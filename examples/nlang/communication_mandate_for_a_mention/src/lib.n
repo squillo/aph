@@ -1,0 +1,34 @@
+// A communication mandate for a mention.
+//
+// The mandate's recipient_addressing is the channel, because that is where
+// the bytes go. The content class Mention is what tells the policy a
+// specific person is being pinged. The audience, on the envelope, names
+// who.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_bytes_go_to_the_channel() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:f7a8b9c0-d1e2-4f3a-8b4c-5d6e7f8a9b0c", delegation_mandate_id: "urn:uuid:93c6e1f0-5a2b-4c7d-8e9f-0a1b2c3d4e5f", human_principal_did: "did:web:example.com:community:priya-raman", agent_did: "did:web:example.com:agents:server-helper", channel_kind: "discord", recipient_addressing: ["1098765432109876543"], content_class: "Mention", body_sha256: "992675cf5245bc789cb2f4f3f8c18383cf7e241f8b68ec7fb9cd71fee2913857", body_size: 69, policy_decision: "AlwaysAllow", issued_at: "2026-05-17T20:05:00Z", expires_at: "2026-05-17T20:15:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.recipient_addressing[0], "1098765432109876543")
+  }
+
+  #[test]
+  fn the_class_marks_the_interruption() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:f7a8b9c0-d1e2-4f3a-8b4c-5d6e7f8a9b0c", delegation_mandate_id: "urn:uuid:93c6e1f0-5a2b-4c7d-8e9f-0a1b2c3d4e5f", human_principal_did: "did:web:example.com:community:priya-raman", agent_did: "did:web:example.com:agents:server-helper", channel_kind: "discord", recipient_addressing: ["1098765432109876543"], content_class: "Mention", body_sha256: "992675cf5245bc789cb2f4f3f8c18383cf7e241f8b68ec7fb9cd71fee2913857", body_size: 69, policy_decision: "AlwaysAllow", issued_at: "2026-05-17T20:05:00Z", expires_at: "2026-05-17T20:15:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.content_class, "Mention")
+  }
+
+  #[test]
+  fn the_audience_says_who() -> () {
+    let a: Audience = { id: "did:web:example.com:community:kenji-watanabe" }
+    assert_eq!(a.id, "did:web:example.com:community:kenji-watanabe")
+  }
+}

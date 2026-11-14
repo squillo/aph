@@ -1,0 +1,35 @@
+// A detached JWS instead of a Data Integrity suite.
+//
+// The protocol also admits JsonWebSignature2020. There is no cryptosuite
+// tag; the algorithm lives in the JWS header. The proof value is a compact
+// JWS in detached form: header, an empty payload segment, signature. The
+// header sets b64 false and marks it critical, so the payload is the
+// canonical envelope bytes themselves, not a base64 copy of them.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_type_is_json_web_signature() -> () {
+    let p: EnvelopeProof = { type: "JsonWebSignature2020", verification_method: "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov", created: "2026-05-21T00:00:01Z", proof_purpose: "assertionMethod", proof_value: "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..MEUCIQDx7a2Jk4Lq9VbN3sYtRf6Wg1Hc8ZoPeUi5vA0mKd2TqgIgB7fXyN4cLsR9wQhZ2eJpM6kVt1oGaD3uE8nS5rY0bIc" }
+    assert_eq!(p.type, "JsonWebSignature2020")
+  }
+
+  #[test]
+  fn the_key_is_the_p256_test_vector() -> () {
+    let p: EnvelopeProof = { type: "JsonWebSignature2020", verification_method: "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov", created: "2026-05-21T00:00:01Z", proof_purpose: "assertionMethod", proof_value: "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..MEUCIQDx7a2Jk4Lq9VbN3sYtRf6Wg1Hc8ZoPeUi5vA0mKd2TqgIgB7fXyN4cLsR9wQhZ2eJpM6kVt1oGaD3uE8nS5rY0bIc" }
+    assert_eq!(p.verification_method, "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov")
+  }
+
+  #[test]
+  fn the_value_is_a_detached_compact_jws() -> () {
+    let p: EnvelopeProof = { type: "JsonWebSignature2020", verification_method: "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov", created: "2026-05-21T00:00:01Z", proof_purpose: "assertionMethod", proof_value: "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..MEUCIQDx7a2Jk4Lq9VbN3sYtRf6Wg1Hc8ZoPeUi5vA0mKd2TqgIgB7fXyN4cLsR9wQhZ2eJpM6kVt1oGaD3uE8nS5rY0bIc" }
+    assert_eq!(p.proof_value, "eyJhbGciOiJFUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..MEUCIQDx7a2Jk4Lq9VbN3sYtRf6Wg1Hc8ZoPeUi5vA0mKd2TqgIgB7fXyN4cLsR9wQhZ2eJpM6kVt1oGaD3uE8nS5rY0bIc")
+  }
+}

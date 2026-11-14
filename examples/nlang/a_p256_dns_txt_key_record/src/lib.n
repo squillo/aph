@@ -1,0 +1,35 @@
+// A P-256 key record.
+//
+// The second allowed algorithm on the DNS surface is p256. The key tag
+// carries the SEC 1 compressed point, 33 bytes, base64url without padding.
+// This one is the public key of the RFC 6979 A.2.5 test vector, the same
+// key behind the protocol's P-256 did:key examples; a fixture must never
+// carry a key whose private half is not a published test vector.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_algorithm_is_p256() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "p256", k: "A2D-1LolWp0xyWHrdMY1bWjASbiSO2H6bOZpYi5g8p-2", kid: "p1" }
+    assert_eq!(r.alg, "p256")
+  }
+
+  #[test]
+  fn the_key_is_a_compressed_point() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "p256", k: "A2D-1LolWp0xyWHrdMY1bWjASbiSO2H6bOZpYi5g8p-2", kid: "p1" }
+    assert_eq!(r.k, "A2D-1LolWp0xyWHrdMY1bWjASbiSO2H6bOZpYi5g8p-2")
+  }
+
+  #[test]
+  fn proofs_under_it_use_the_ecdsa_suite() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "ecdsa-jcs-2019", verification_method: "did:web:notary.example.com#p1", created: "2026-05-21T00:00:01Z", proof_purpose: "assertionMethod", proof_value: "zWmjchRPL6xjRmZLm7r64f6GTkXKaQxbg3GjESb6hHdqQ44VUNPGsSDtYBybnLwKjUyvGYNcDRFJapHcbEaVmBDJ" }
+    assert_eq!(p.cryptosuite, "ecdsa-jcs-2019")
+  }
+}

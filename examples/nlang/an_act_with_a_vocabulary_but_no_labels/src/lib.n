@@ -1,0 +1,34 @@
+// Evaluated, and nothing applied.
+//
+// An empty label list is not the same as no classification. Pinning the
+// vocabulary says which definitions the act was evaluated against; an empty
+// labels list says none of them applied. An auditor can tell that apart
+// from an envelope that was never classified at all.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_vocabulary_is_still_pinned() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: [] }
+    assert_eq!(ac.vocabularies.len(), 1)
+  }
+
+  #[test]
+  fn no_label_applied() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: [] }
+    assert_eq!(ac.labels.len(), 0)
+  }
+
+  #[test]
+  fn the_act_was_a_plain_reply() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "265c30a512b7174132ed589c9ec49244cef25f6dfc6b249fcc041f7e0e7109c9", body_size: 26, preview_lines: 1, preview: "Sounds good, see you then." }
+    assert_eq!(c.content_class, "Reply")
+  }
+}

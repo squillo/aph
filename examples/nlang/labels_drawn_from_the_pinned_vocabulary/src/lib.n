@@ -1,0 +1,34 @@
+// Labels and the vocabulary they come from.
+//
+// act_classification carries the vocabularies first and the labels second,
+// and every label must be defined by one of the pinned vocabularies. The
+// labels describe the act being notarized, so a policy or an auditor can
+// reason about it without reading the body.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn one_vocabulary_is_pinned() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reply", "routine-service", "existing-contact"] }
+    assert_eq!(ac.vocabularies.len(), 1)
+  }
+
+  #[test]
+  fn three_labels_describe_the_act() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reply", "routine-service", "existing-contact"] }
+    assert_eq!(ac.labels.len(), 3)
+  }
+
+  #[test]
+  fn the_labels_are_about_the_act_not_the_text() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reply", "routine-service", "existing-contact"] }
+    assert_eq!(ac.labels[2], "existing-contact")
+  }
+}

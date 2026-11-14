@@ -1,0 +1,54 @@
+// A bulk email to a neighborhood association's lists.
+//
+// Ruth Abernathy, the association secretary, sends the monthly notes to four
+// distribution lists at once. BulkSend is its own content class because the
+// risk profile differs from a single message, and her policy asks every time.
+// The body is several lines; the preview is only its first line, and
+// preview_lines says so. The digest and size still cover the whole body.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_bulk_send_addresses_several_recipients_at_once() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:2d3e4f5a-6b7c-4d8e-9f0a-1b2c3d4e5f62",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-10-18T14:00:00Z",
+      valid_until: "2026-10-18T14:10:00Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.com:gna:ruth-abernathy", display_name: "Ruth Abernathy" },
+        agent: { id: "did:web:example.com:agents:newsletter", display_name: "Newsletter Assistant", version: "2.4.0" },
+        channel: { kind: "email", recipient_addressing: ["list-a@example.com", "list-b@example.com", "list-c@example.com", "list-d@example.com"], recipient_class: "Human" },
+        communication: { content_class: "BulkSend", body_sha256: "8a86fbb36c1b7bf17d0b0593b9565be0f8f48d064e841345c5f4e712db228443", body_size: 170, preview_lines: 1, preview: "Greenfield Neighborhood Association, October notes" },
+        policy: { decision: "AskEveryTime", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:3e4f5a6b-7c8d-4e9f-8a0b-1c2d3e4f5a61", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-10-18T14:00:00Z", decision_latency_ms: 8750 },
+        audience: { id: "did:web:example.com:gna:members" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["bulk-send", "newsletter"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-10-18T14:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.recipient_addressing.len(), 4)
+  }
+
+  #[test]
+  fn the_preview_is_one_line_of_a_longer_body() -> () {
+    let c: CommunicationDescriptor = { content_class: "BulkSend", body_sha256: "8a86fbb36c1b7bf17d0b0593b9565be0f8f48d064e841345c5f4e712db228443", body_size: 170, preview_lines: 1, preview: "Greenfield Neighborhood Association, October notes" }
+    assert_eq!(c.preview_lines, 1)
+  }
+
+  #[test]
+  fn the_size_covers_the_whole_body_not_the_preview() -> () {
+    let c: CommunicationDescriptor = { content_class: "BulkSend", body_sha256: "8a86fbb36c1b7bf17d0b0593b9565be0f8f48d064e841345c5f4e712db228443", body_size: 170, preview_lines: 1, preview: "Greenfield Neighborhood Association, October notes" }
+    assert_eq!(c.body_size, 170)
+  }
+}

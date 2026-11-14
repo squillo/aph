@@ -1,0 +1,35 @@
+// An attachment-only message.
+//
+// Some messages carry no text: a scanned form sent on its own, say. The
+// descriptor still binds. SHA-256 over zero bytes is a fixed, well-known
+// value, the size is zero, and the preview is empty with zero lines. A
+// verifier that received text where the credential promised none has
+// caught a mismatch exactly as it would for altered text.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn zero_bytes_still_have_a_digest() -> () {
+    let c: CommunicationDescriptor = { content_class: "New", body_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", body_size: 0, preview_lines: 0, preview: "" }
+    assert_eq!(c.body_sha256, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+  }
+
+  #[test]
+  fn the_size_is_zero() -> () {
+    let c: CommunicationDescriptor = { content_class: "New", body_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", body_size: 0, preview_lines: 0, preview: "" }
+    assert_eq!(c.body_size, 0)
+  }
+
+  #[test]
+  fn nothing_is_previewed() -> () {
+    let c: CommunicationDescriptor = { content_class: "New", body_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", body_size: 0, preview_lines: 0, preview: "" }
+    assert_eq!(c.preview_lines, 0)
+  }
+}

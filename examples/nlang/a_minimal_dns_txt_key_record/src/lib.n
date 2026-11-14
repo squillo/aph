@@ -1,0 +1,34 @@
+// The smallest key record.
+//
+// Published at the notary's _aph._notary name, a TXT key record needs three
+// tags: the version, the algorithm, and the key bytes. kid, did and the
+// validity window are optional. On the wire the tags are joined with
+// semicolons; the typed record below is what a resolver parses them into.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_version_is_aphv1() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw" }
+    assert_eq!(r.version, "APHv1")
+  }
+
+  #[test]
+  fn the_algorithm_is_ed25519() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw" }
+    assert_eq!(r.alg, "ed25519")
+  }
+
+  #[test]
+  fn the_key_is_the_raw_public_key_encoded() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw" }
+    assert_eq!(r.k, "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw")
+  }
+}

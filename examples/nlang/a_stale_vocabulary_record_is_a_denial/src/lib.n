@@ -1,0 +1,35 @@
+// A vocabulary that moved.
+//
+// The publisher re-issued the vocabulary and the DNS record now carries a
+// new digest. An envelope still citing the old digest cannot have its
+// labels interpreted safely: the recipient does not know whether a label
+// kept its meaning. A stale record is a denial, and the resolution is out
+// of band: the sender re-pins and re-notarizes.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_envelope_cites_the_old_digest() -> () {
+    let cited: VocabularyRef = { name: "@com::example/house-rules", version: "1.1.0", digest: "sha256-Yp9vN8ugHI3KvpI9ppYsqjdyTGEyKX6yxEWpi/Xe3nY=" }
+    assert_eq!(cited.version, "1.1.0")
+  }
+
+  #[test]
+  fn the_publisher_now_records_another() -> () {
+    let published: VocabularyRef = { name: "@com::example/house-rules", version: "1.2.0", digest: "sha256-MC08fz8hH5YxKtu58gvsvSqC4GETPvBzcg7J6/NrfNw=" }
+    assert_eq!(published.version, "1.2.0")
+  }
+
+  #[test]
+  fn the_mismatch_is_a_denial() -> () {
+    let outcome: Directional<str> = ["deny", "stale vocabulary record"]
+    assert_eq!(outcome[0], "deny")
+  }
+}

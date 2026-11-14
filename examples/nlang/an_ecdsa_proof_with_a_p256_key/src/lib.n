@@ -1,0 +1,34 @@
+// The other allowed suite.
+//
+// Notaries that run on P-256 hardware sign under ecdsa-jcs-2019. The did:key
+// here is derived from a published test vector, which matters because no
+// repeated-byte fake names a valid P-256 scalar; fixtures cannot invent
+// these keys the way they might invent an Ed25519 one.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_suite_is_ecdsa_over_jcs() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "ecdsa-jcs-2019", verification_method: "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "zWmjchRPL6xjRmZLm7r64f6GTkXKaQxbg3GjESb6hHdqQ44VUNPGsSDtYBybnLwKjUyvGYNcDRFJapHcbEaVmBDJ" }
+    assert_eq!(p.cryptosuite, "ecdsa-jcs-2019")
+  }
+
+  #[test]
+  fn the_key_is_a_p256_did_key() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "ecdsa-jcs-2019", verification_method: "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "zWmjchRPL6xjRmZLm7r64f6GTkXKaQxbg3GjESb6hHdqQ44VUNPGsSDtYBybnLwKjUyvGYNcDRFJapHcbEaVmBDJ" }
+    assert_eq!(p.verification_method, "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov#zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov")
+  }
+
+  #[test]
+  fn the_issuer_is_the_same_identity() -> () {
+    let n: NotaryServiceRef = { id: "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov", name: "Example Notary Service", version: "0.2.0" }
+    assert_eq!(n.id, "did:key:zDnaerGBD7Zxzau2fdfEFaaaTDYBu5XEBYdGV2BmERp3MDSov")
+  }
+}

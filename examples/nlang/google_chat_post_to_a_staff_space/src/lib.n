@@ -1,0 +1,53 @@
+// A Google Chat post to a staff space.
+//
+// Samuel Adeyemi owns a bookshop. Posts that reach every staff member are
+// a Channel class communication, and his policy asks him each time before
+// one goes out. The audience is the staff group identity rather than a
+// person, and the space is addressed by its Chat resource name.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_space_is_addressed_by_its_resource_name() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-08-21T21:12:30Z",
+      valid_until: "2026-08-21T21:22:30Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.com:shop:samuel-adeyemi", display_name: "Samuel Adeyemi" },
+        agent: { id: "did:web:example.com:agents:store-ops", display_name: "Store Operations Agent", version: "1.3.7" },
+        channel: { kind: "google_chat", recipient_addressing: ["spaces/AAAA2kLanternStaff"], recipient_class: "Human" },
+        communication: { content_class: "Channel", body_sha256: "f6eb02a4edd4a643a152197603dc3c0428dd0ac5c57f0da0a7bfcecb146951c5", body_size: 103, preview_lines: 1, preview: "Staff: the Saturday author event moved to the back room. Doors at 6, chairs out by 5:30. Thank you all." },
+        policy: { decision: "AskEveryTime", matched_scope: "per-channel", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-08-21T21:12:30Z", decision_latency_ms: 5410 },
+        audience: { id: "did:web:example.com:shop:staff" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["channel-post", "staff-notice"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-08-21T21:12:30Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.recipient_addressing[0], "spaces/AAAA2kLanternStaff")
+  }
+
+  #[test]
+  fn a_post_to_everyone_is_the_channel_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "Channel", body_sha256: "f6eb02a4edd4a643a152197603dc3c0428dd0ac5c57f0da0a7bfcecb146951c5", body_size: 103, preview_lines: 1, preview: "Staff: the Saturday author event moved to the back room. Doors at 6, chairs out by 5:30. Thank you all." }
+    assert_eq!(c.content_class, "Channel")
+  }
+
+  #[test]
+  fn the_audience_is_a_group_not_a_person() -> () {
+    let a: Audience = { id: "did:web:example.com:shop:staff" }
+    assert_eq!(a.id, "did:web:example.com:shop:staff")
+  }
+}

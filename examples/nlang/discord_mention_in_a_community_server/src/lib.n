@@ -1,0 +1,53 @@
+// A Discord mention in a community server.
+//
+// Priya Raman moderates a game studio's community server. Her helper agent
+// may mention members in the support channel under a standing mandate; the
+// recipient addressing is the Discord channel snowflake, and the audience is
+// the member who was mentioned, not the whole channel.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_channel_is_addressed_by_its_snowflake() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:a7e3c9d1-4b5f-4e2a-9c8d-7f6e5d4c3b2a",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-05-17T20:05:44Z",
+      valid_until: "2026-05-17T20:15:44Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.com:community:priya-raman", display_name: "Priya Raman" },
+        agent: { id: "did:web:example.com:agents:server-helper", display_name: "Server Helper", version: "0.9.4" },
+        channel: { kind: "discord", recipient_addressing: ["1098765432109876543"], recipient_class: "Human" },
+        communication: { content_class: "Mention", body_sha256: "e4c7fca8e450229613d14eb7aec5ad19039e0ea06e4d2e58e919dc1e002e4932", body_size: 108, preview_lines: 1, preview: "@Kenji the patch notes you asked about are pinned in #announcements; the save-file fix shipped this morning." },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:93c6e1f0-5a2b-4c7d-8e9f-0a1b2c3d4e5f", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-05-17T20:05:44Z", decision_latency_ms: 37 },
+        audience: { id: "did:web:example.com:community:kenji-watanabe" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["mention", "community-support"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-05-17T20:05:44Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.recipient_addressing[0], "1098765432109876543")
+  }
+
+  #[test]
+  fn a_mention_is_its_own_content_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "Mention", body_sha256: "e4c7fca8e450229613d14eb7aec5ad19039e0ea06e4d2e58e919dc1e002e4932", body_size: 108, preview_lines: 1, preview: "@Kenji the patch notes you asked about are pinned in #announcements; the save-file fix shipped this morning." }
+    assert_eq!(c.content_class, "Mention")
+  }
+
+  #[test]
+  fn the_audience_is_the_mentioned_member() -> () {
+    let a: Audience = { id: "did:web:example.com:community:kenji-watanabe" }
+    assert_eq!(a.id, "did:web:example.com:community:kenji-watanabe")
+  }
+}

@@ -1,0 +1,34 @@
+// One identity in two roles that must differ.
+//
+// The notary exists to be a party other than the sender. An envelope whose
+// agent id and notary service id are the same DID has no witness: the
+// sender vouched for itself. That is a RoleViolation regardless of how good
+// the signature is.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_agent_claims_one_identity() -> () {
+    let a: AgentRef = { id: "did:web:example.com:agents:self-notarizing", display_name: "Self Notarizing Agent", version: "1.0.0" }
+    assert_eq!(a.id, "did:web:example.com:agents:self-notarizing")
+  }
+
+  #[test]
+  fn the_notary_claims_the_same_one() -> () {
+    let n: NotaryServiceRef = { id: "did:web:example.com:agents:self-notarizing", name: "Self Notarizing Agent", version: "1.0.0" }
+    assert_eq!(n.id, "did:web:example.com:agents:self-notarizing")
+  }
+
+  #[test]
+  fn the_refusal_is_a_role_violation() -> () {
+    let refusal: Directional<str> = ["RoleViolation"]
+    assert_eq!(refusal[0], "RoleViolation")
+  }
+}

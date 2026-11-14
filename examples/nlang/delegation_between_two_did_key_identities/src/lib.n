@@ -1,0 +1,35 @@
+// A delegation between two did:key identities.
+//
+// Not every principal has a web domain. did:key identities carry the public
+// key in the identifier itself, so no resolution is needed to check a
+// signature. Both keys here are the protocol's published test vectors, the
+// same ones the signed wire examples use; never put a real private key's
+// public half into a fixture.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_principal_is_a_did_key() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b", human_principal_did: "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy", agent_did: "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT", allowed_channels: ["squillo"], valid_from: "2026-05-01T00:00:00Z", valid_until: "2026-11-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.human_principal_did, "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy")
+  }
+
+  #[test]
+  fn so_is_the_agent() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b", human_principal_did: "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy", agent_did: "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT", allowed_channels: ["squillo"], valid_from: "2026-05-01T00:00:00Z", valid_until: "2026-11-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.agent_did, "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT")
+  }
+
+  #[test]
+  fn the_mandate_id_is_a_urn_uuid() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b", human_principal_did: "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy", agent_did: "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT", allowed_channels: ["squillo"], valid_from: "2026-05-01T00:00:00Z", valid_until: "2026-11-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.id, "urn:uuid:e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b")
+  }
+}

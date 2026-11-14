@@ -1,0 +1,34 @@
+// The human said no.
+//
+// From PendingDecision there are two exits. This is the short one: the
+// principal looked at the preview and declined. No mandate, no envelope, no
+// delivery. The notary keeps the decision in its own records; the recipient
+// never learns a message was considered.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn three_states_end_in_denied() -> () {
+    let flow: Directional<str> = ["Drafted", "PendingDecision", "Denied"]
+    assert_eq!(flow[2], "Denied")
+  }
+
+  #[test]
+  fn the_policy_asked_first() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_denial"] }
+    assert_eq!(p.act_chain[2], "human_denial")
+  }
+
+  #[test]
+  fn the_preview_is_what_the_human_saw() -> () {
+    let c: CommunicationDescriptor = { content_class: "New", body_sha256: "d9aa4b536770b4af57b9935585760a6266120ce90d71c1108a8ca50fb240173a", body_size: 56, preview_lines: 1, preview: "Hi, I noticed you left a review. Could we talk about it?" }
+    assert_eq!(c.preview_lines, 1)
+  }
+}

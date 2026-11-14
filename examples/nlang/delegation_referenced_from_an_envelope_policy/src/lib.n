@@ -1,0 +1,34 @@
+// The envelope points back at its delegation.
+//
+// When a send runs under a standing grant, the envelope's policy descriptor
+// carries delegation_mandate_id, the id of the DelegationMandate. A verifier
+// that wants to know whether the grant still stands follows that id to the
+// issuer's status list. A human-present send has no such id to follow.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_delegation_has_an_id() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d", human_principal_did: "did:web:example.org:households:okafor:hana", agent_did: "did:web:example.org:agents:household-okafor", allowed_channels: ["imessage"], allowed_recipient_classes: ["Human"], valid_from: "2026-01-01T00:00:00Z", valid_until: "2027-01-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.id, "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d")
+  }
+
+  #[test]
+  fn the_policy_names_that_id() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-recipient", delegation_mandate_id: "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.delegation_mandate_id, "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d")
+  }
+
+  #[test]
+  fn the_act_chain_starts_from_the_standing_mandate() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-recipient", delegation_mandate_id: "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.act_chain[0], "standing_mandate")
+  }
+}

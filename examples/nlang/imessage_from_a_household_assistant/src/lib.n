@@ -1,0 +1,53 @@
+// An iMessage from a household assistant.
+//
+// Hana Okafor set up an assistant for her family. It may message named
+// relatives, and only them: the mandate is per recipient. A notarized
+// family text looks excessive until the day someone asks whether the
+// assistant, or a stranger spoofing it, told Grandpa where to go.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_message_is_a_dm_over_imessage() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:f6a7b8c9-d0e1-4f2a-8b3c-4d5e6f7a8b9c",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-09-05T22:03:11Z",
+      valid_until: "2026-09-05T22:13:11Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.org:households:okafor:hana", display_name: "Hana Okafor" },
+        agent: { id: "did:web:example.org:agents:household-okafor", display_name: "Household Assistant", version: "0.6.0" },
+        channel: { kind: "imessage", recipient_addressing: ["+15550100277"], recipient_class: "Human" },
+        communication: { content_class: "DM", body_sha256: "27815efe0bbd043fd1e42a9c71c10f817f89396bb9581865e7aa23fadc71ca2b", body_size: 105, preview_lines: 1, preview: "Grandpa, your prescription is ready at the pharmacy on Elm. Mom will pick it up on her way home around 6." },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-recipient", delegation_mandate_id: "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-09-05T22:03:11Z", decision_latency_ms: 25 },
+        audience: { id: "did:web:example.org:households:okafor:grandpa" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["direct-message", "family"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-09-05T22:03:11Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.kind, "imessage")
+  }
+
+  #[test]
+  fn the_principal_is_a_person_with_a_display_name() -> () {
+    let h: HumanPrincipalRef = { id: "did:web:example.org:households:okafor:hana", display_name: "Hana Okafor" }
+    assert_eq!(h.display_name, "Hana Okafor")
+  }
+
+  #[test]
+  fn the_agent_carries_its_own_version() -> () {
+    let a: AgentRef = { id: "did:web:example.org:agents:household-okafor", display_name: "Household Assistant", version: "0.6.0" }
+    assert_eq!(a.version, "0.6.0")
+  }
+}

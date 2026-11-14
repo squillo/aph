@@ -1,0 +1,64 @@
+// A Slack reply, notarized.
+//
+// Harbor Light Credit Union lets its member-services agent answer routine
+// Slack questions on behalf of Maria Delgado, the branch manager. Every
+// outbound reply is notarized: the credential names the body it covers by
+// SHA-256 and byte size, so a recipient holding the message can confirm that
+// the authorized text is the text that arrived, and nothing else can be sent
+// under this credential.
+//
+// The proof value below is well formed but illustrative; the signed wire
+// fixtures live beside the protocol's conformance suite.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_envelope_binds_a_slack_channel() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:1b4e28ba-2fa1-4d7a-9f3c-6a2e5c1d8b70",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-03-04T15:00:00Z",
+      valid_until: "2026-03-04T15:10:00Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.com:people:maria-delgado", display_name: "Maria Delgado" },
+        agent: { id: "did:web:example.com:agents:member-services", display_name: "Member Services Agent", version: "3.2.0" },
+        channel: { kind: "slack", recipient_addressing: ["C04HLCU7MEMBERS"], recipient_class: "Human" },
+        communication: { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-03-04T15:00:00Z", decision_latency_ms: 41 },
+        audience: { id: "did:web:example.com:people:dev-chen" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reply", "routine-service"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.kind, "slack")
+  }
+
+  #[test]
+  fn the_body_is_named_by_its_sha256() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." }
+    assert_eq!(c.body_sha256, "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100")
+  }
+
+  #[test]
+  fn the_size_is_the_second_binding() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." }
+    assert_eq!(c.body_size, 94)
+  }
+
+  #[test]
+  fn a_standing_mandate_let_the_reply_go_without_a_prompt() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.decision, "AlwaysAllow")
+  }
+}

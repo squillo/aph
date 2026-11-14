@@ -1,0 +1,34 @@
+// NeverAllow.
+//
+// Some rules are absolute: this agent never messages external email from
+// this workspace. The notary records the decision for its own audit log and
+// the flow ends Denied. There is no envelope, because an envelope is proof
+// of authority and none was granted. What survives is the decision record.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_decision_was_never_allow() -> () {
+    let p: PolicyDescriptor = { decision: "NeverAllow", matched_scope: "per-channel", act_chain: ["human_not_present_request", "policy_evaluation", "deny"] }
+    assert_eq!(p.decision, "NeverAllow")
+  }
+
+  #[test]
+  fn the_chain_ends_in_deny() -> () {
+    let p: PolicyDescriptor = { decision: "NeverAllow", matched_scope: "per-channel", act_chain: ["human_not_present_request", "policy_evaluation", "deny"] }
+    assert_eq!(p.act_chain[2], "deny")
+  }
+
+  #[test]
+  fn the_flow_state_is_denied() -> () {
+    let flow: Directional<str> = ["Drafted", "Denied"]
+    assert_eq!(flow[1], "Denied")
+  }
+}

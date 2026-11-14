@@ -1,0 +1,33 @@
+// A direct message to one person.
+//
+// Direct messages are private and one to one. The recipient class is Human,
+// the addressing has exactly one entry, and the wire vocabulary spells the
+// class DM, in capitals, even though prose and some enums write it Dm.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_dm_has_exactly_one_recipient() -> () {
+    let ch: ChannelDescriptor = { kind: "teams", recipient_addressing: ["19:7f3a9e2b4d4e6f8a0b1c2d3e4f5a6b7c@thread.v2"], recipient_class: "Human" }
+    assert_eq!(ch.recipient_addressing.len(), 1)
+  }
+
+  #[test]
+  fn the_class_is_spelled_dm() -> () {
+    let c: CommunicationDescriptor = { content_class: "DM", body_sha256: "0219cb058f35895516d1d3eec7a06fecde40b99d1411bc49eecd9760cf4ef461", body_size: 71, preview_lines: 1, preview: "Your badge is ready at the front desk. Bring a photo ID the first time." }
+    assert_eq!(c.content_class, "DM")
+  }
+
+  #[test]
+  fn the_recipient_is_a_person() -> () {
+    let ch: ChannelDescriptor = { kind: "teams", recipient_addressing: ["19:7f3a9e2b4d4e6f8a0b1c2d3e4f5a6b7c@thread.v2"], recipient_class: "Human" }
+    assert_eq!(ch.recipient_class, "Human")
+  }
+}

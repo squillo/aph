@@ -1,0 +1,35 @@
+// AskEveryTime.
+//
+// The policy's answer for this class of message is to ask. The human said
+// yes, and the act chain records human_approval between evaluation and
+// notarization. There is no delegation id: the approval itself was the
+// authority. The decision latency is nearly three seconds because a person
+// was reading, not because the notary was slow.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_decision_was_ask_every_time() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(p.decision, "AskEveryTime")
+  }
+
+  #[test]
+  fn the_approval_sits_between_evaluation_and_notarization() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(p.act_chain[2], "human_approval")
+  }
+
+  #[test]
+  fn the_latency_is_a_human_s_reading_time() -> () {
+    let n: NotarizationMetadata = { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-04-09T13:22:10Z", decision_latency_ms: 2890 }
+    assert_eq!(n.decision_latency_ms, 2890)
+  }
+}
