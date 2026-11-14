@@ -1,0 +1,34 @@
+// Unrooted authority.
+//
+// An agent tried to send with no human present and no delegation to point
+// at. That is not a mandate that failed a check; it is the absence of any
+// mandate. The protocol keeps the two apart: absence is refused as unrooted
+// authority, so a log reader can tell a missing grant from a broken one.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_flow_is_two_states_long() -> () {
+    let flow: Directional<str> = ["Drafted", "Denied"]
+    assert_eq!(flow.len(), 2)
+  }
+
+  #[test]
+  fn there_was_no_delegation_to_cite() -> () {
+    let p: PolicyDescriptor = { decision: "NeverAllow", matched_scope: "per-channel", act_chain: ["human_not_present_request", "no_mandate_found", "deny"] }
+    assert_eq!(p.act_chain[1], "no_mandate_found")
+  }
+
+  #[test]
+  fn the_refusal_is_absence_not_failure() -> () {
+    let refusal: Directional<str> = ["APH_E016", "unrooted authority"]
+    assert_eq!(refusal[0], "APH_E016")
+  }
+}

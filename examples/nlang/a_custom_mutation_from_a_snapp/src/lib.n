@@ -1,0 +1,34 @@
+// A mutation the protocol did not anticipate.
+//
+// Snapps can define their own vault mutations. Custom carries the Snapp id
+// and a slug naming the mutation within it. The protocol does not interpret
+// the slug; it only binds it, so the Snapp's own semantics are what was
+// authorized and nothing broader.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_snapp_and_slug_are_named() -> () {
+    let v: VaultMutationMandate = { kind: Custom { snapp_id: "@com::example/ledger", mutation_slug: "close-period" }, grant_scope_id: "gs_ledger_ops" }
+    assert_eq!(v.grant_scope_id, "gs_ledger_ops")
+  }
+
+  #[test]
+  fn it_is_linked_like_any_other_mutation() -> () {
+    let l: LinkedMandate = { vault_mutation: { kind: Custom { snapp_id: "@com::example/ledger", mutation_slug: "close-period" }, grant_scope_id: "gs_ledger_ops" } }
+    assert_eq!(l.vault_mutation.grant_scope_id, "gs_ledger_ops")
+  }
+
+  #[test]
+  fn the_body_carries_the_snapp_s_own_request() -> () {
+    let c: CommunicationDescriptor = { content_class: "Mutation", body_sha256: "f479f4ef3beec3e253f21f05debe1ac5a1cd69ce70315146d1445902fbe03164", body_size: 63, preview_lines: 1, preview: "snapp=@com::example/ledger;mutation=close-period;period=2026-Q1" }
+    assert_eq!(c.content_class, "Mutation")
+  }
+}

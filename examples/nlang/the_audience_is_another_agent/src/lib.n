@@ -1,0 +1,34 @@
+// An audience that is a program.
+//
+// When one agent sends to another, the audience is the receiving agent's
+// identity, here a did:key from the published test vectors, and the channel
+// descriptor says recipient_class Agent. The receiving agent verifies the
+// envelope exactly as a person's client would.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_audience_is_the_receiving_agent() -> () {
+    let a: Audience = { id: "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT" }
+    assert_eq!(a.id, "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT")
+  }
+
+  #[test]
+  fn the_recipient_class_is_agent() -> () {
+    let ch: ChannelDescriptor = { kind: "service", recipient_addressing: ["urn:service:example:dispatch-intake"], recipient_class: "Agent" }
+    assert_eq!(ch.recipient_class, "Agent")
+  }
+
+  #[test]
+  fn the_sending_agent_is_a_different_identity() -> () {
+    let s: AgentRef = { id: "did:web:example.com:agents:dispatch-planner", display_name: "Dispatch Planner", version: "5.2.3" }
+    assert_eq!(s.id, "did:web:example.com:agents:dispatch-planner")
+  }
+}

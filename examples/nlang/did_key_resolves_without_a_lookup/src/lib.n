@@ -1,0 +1,35 @@
+// A key that carries itself.
+//
+// did:key is the first surface in the discovery order because it needs no
+// lookup: the identifier is a multicodec-prefixed public key. The
+// verification method is the DID followed by a fragment equal to its own
+// method-specific id. If the issuer is a did:key, discovery is finished
+// before it starts.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_issuer_is_a_did_key() -> () {
+    let n: NotaryServiceRef = { id: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", name: "Example Notary Service", version: "0.2.0" }
+    assert_eq!(n.id, "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV")
+  }
+
+  #[test]
+  fn the_method_fragment_repeats_the_key() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.verification_method, "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV")
+  }
+
+  #[test]
+  fn the_mechanism_is_did_key() -> () {
+    let used: Directional<str> = ["DidKey"]
+    assert_eq!(used[0], "DidKey")
+  }
+}

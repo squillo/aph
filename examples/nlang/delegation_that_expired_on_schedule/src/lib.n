@@ -1,0 +1,35 @@
+// A delegation that ran out.
+//
+// This mandate was valid through March. A send attempted in April fails
+// with MandateExpired. That is a different refusal from a revoked mandate:
+// nothing was withdrawn, the authority simply ended when the principal said
+// it would. Verifiers keep the two apart because the remedy differs: renew
+// an expired grant, investigate a revoked one.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_grant_ended_in_march() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", human_principal_did: "did:web:example.org:staff:tomas-okafor", agent_did: "did:web:example.org:agents:purchasing", allowed_channels: ["email"], valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-03-31T23:59:59Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.valid_until, "2026-03-31T23:59:59Z")
+  }
+
+  #[test]
+  fn an_april_send_falls_outside_it() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", delegation_mandate_id: "urn:uuid:a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", human_principal_did: "did:web:example.org:staff:tomas-okafor", agent_did: "did:web:example.org:agents:purchasing", channel_kind: "email", recipient_addressing: ["orders@example.net"], content_class: "Reply", body_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", body_size: 0, policy_decision: "AlwaysAllow", issued_at: "2026-04-02T10:00:00Z", expires_at: "2026-04-02T10:10:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.issued_at, "2026-04-02T10:00:00Z")
+  }
+
+  #[test]
+  fn the_refusal_is_expiry_not_revocation() -> () {
+    let refusal: Directional<str> = ["MandateExpired"]
+    assert_eq!(refusal[0], "MandateExpired")
+  }
+}

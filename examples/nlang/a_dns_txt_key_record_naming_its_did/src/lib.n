@@ -1,0 +1,34 @@
+// A record that names its DID.
+//
+// The optional did tag binds the DNS record to the notary's DID. A verifier
+// that later resolves the did:web document can check the two surfaces
+// agree on the key; a disagreement is a refusal, because a notary cannot be
+// two things to two resolvers.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_record_names_the_notary_s_did() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", did: "did:web:notary.example.com" }
+    assert_eq!(r.did, "did:web:notary.example.com")
+  }
+
+  #[test]
+  fn the_notary_reference_agrees() -> () {
+    let n: NotaryServiceRef = { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }
+    assert_eq!(n.id, "did:web:notary.example.com")
+  }
+
+  #[test]
+  fn the_key_is_the_same_on_both_surfaces() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", did: "did:web:notary.example.com" }
+    assert_eq!(r.k, "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw")
+  }
+}

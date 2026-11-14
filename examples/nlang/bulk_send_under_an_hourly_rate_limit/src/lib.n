@@ -1,0 +1,34 @@
+// A bulk send under a rate limit.
+//
+// Bulk sends are where an agent can do the most damage fastest, so the
+// delegation that permits them usually carries rate_limit_per_hour. The
+// limit is part of the signed mandate, not a setting the agent reads from
+// a config file, so the notary can refuse the thirteenth send in an hour.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_bulk_send_is_its_own_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "BulkSend", body_sha256: "1b65f29c4ec86d674937eb5e2a2c9488c28223ea806b4f4852d9e957e3dcad32", body_size: 108, preview_lines: 1, preview: "Season tickets renew on May 1. Your seats are held until then; nothing is charged without your confirmation." }
+    assert_eq!(c.content_class, "BulkSend")
+  }
+
+  #[test]
+  fn the_delegation_caps_sends_per_hour() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e", human_principal_did: "did:web:example.org:boxoffice:nadia-petrov", agent_did: "did:web:example.org:agents:season-tickets", allowed_channels: ["email"], allowed_recipient_classes: ["Human"], rate_limit_per_hour: 12, valid_from: "2026-03-01T00:00:00Z", valid_until: "2026-06-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.rate_limit_per_hour, 12)
+  }
+
+  #[test]
+  fn the_delegation_is_for_people_only() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e", human_principal_did: "did:web:example.org:boxoffice:nadia-petrov", agent_did: "did:web:example.org:agents:season-tickets", allowed_channels: ["email"], allowed_recipient_classes: ["Human"], rate_limit_per_hour: 12, valid_from: "2026-03-01T00:00:00Z", valid_until: "2026-06-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.allowed_recipient_classes[0], "Human")
+  }
+}

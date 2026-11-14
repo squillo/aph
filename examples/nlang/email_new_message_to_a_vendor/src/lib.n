@@ -1,0 +1,54 @@
+// A new email to a vendor, approved in the moment.
+//
+// Tomas Okafor runs purchasing for a produce cooperative. His assistant may
+// draft to vendors, but opening a NEW conversation is a per-recipient
+// decision the policy asks him about every time. The act chain records the
+// human approval between evaluation and notarization, and the decision
+// latency is the seconds Tomas took to answer, not the notary's clock time.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_new_conversation_is_an_email_to_one_mailbox() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:6f0d2a41-9c7e-4b83-a5f1-2e8d7c6b5a40",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-04-09T13:22:10Z",
+      valid_until: "2026-04-09T13:32:10Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.org:staff:tomas-okafor", display_name: "Tomas Okafor" },
+        agent: { id: "did:web:example.org:agents:purchasing", display_name: "Purchasing Assistant", version: "1.8.2" },
+        channel: { kind: "email", recipient_addressing: ["orders@example.net"], recipient_class: "Human" },
+        communication: { content_class: "New", body_sha256: "8a5456dc4bf2c1c6a352d8fa48e4fee25bc289f47e6945101671044f40b2ce3c", body_size: 116, preview_lines: 1, preview: "Hello Northwind team, please confirm the pallet count on purchase order 4471 before Friday. We counted 36 at intake." },
+        policy: { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-04-09T13:22:10Z", decision_latency_ms: 2890 },
+        audience: { id: "did:web:example.net:mailboxes:orders" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["new-conversation", "procurement"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-04-09T13:22:10Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.communication.content_class, "New")
+  }
+
+  #[test]
+  fn the_human_answered_before_the_notary_signed() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(p.act_chain[2], "human_approval")
+  }
+
+  #[test]
+  fn decision_latency_counts_the_wait_for_the_human() -> () {
+    let n: NotarizationMetadata = { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-04-09T13:22:10Z", decision_latency_ms: 2890 }
+    assert_eq!(n.decision_latency_ms, 2890)
+  }
+}

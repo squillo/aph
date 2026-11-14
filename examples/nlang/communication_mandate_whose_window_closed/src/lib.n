@@ -1,0 +1,34 @@
+// A communication mandate presented too late.
+//
+// The signature on this mandate is fine. What failed is time: the envelope
+// was presented after expires_at. A verifier refuses with MandateExpired
+// and does not consult the status list, because nothing was revoked. The
+// agent's remedy is to request a fresh mandate, not to argue.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_window_closed_at_ten_past() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:a8b9c0d1-e2f3-4a4b-9c5d-6e7f8a9b0c1d", delegation_mandate_id: "urn:uuid:8a0b1c2d-3e4f-4a5b-9c6d-7e8f9a0b1c2d", human_principal_did: "did:web:example.org:households:okafor:hana", agent_did: "did:web:example.org:agents:household-okafor", channel_kind: "imessage", recipient_addressing: ["+15550100277"], content_class: "DM", body_sha256: "ad89942596acf29a8beb578bcdb99ec3b94d42e6044b468ab5d74224f5c3e5af", body_size: 49, policy_decision: "AlwaysAllow", issued_at: "2026-09-05T22:03:00Z", expires_at: "2026-09-05T22:13:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.expires_at, "2026-09-05T22:13:00Z")
+  }
+
+  #[test]
+  fn the_envelope_was_created_later() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-09-05T22:41:17Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.created, "2026-09-05T22:41:17Z")
+  }
+
+  #[test]
+  fn the_refusal_names_expiry() -> () {
+    let refusal: Directional<str> = ["MandateExpired"]
+    assert_eq!(refusal[0], "MandateExpired")
+  }
+}

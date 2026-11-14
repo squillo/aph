@@ -1,0 +1,34 @@
+// A record with a key id.
+//
+// When a notary publishes more than one key, each record carries kid and
+// the proof's verification method ends in that fragment. Without kid a
+// verifier would have to try every published key; with it, the match is
+// direct and a wrong kid is a refusal rather than a search.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_record_names_k1() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1" }
+    assert_eq!(r.kid, "k1")
+  }
+
+  #[test]
+  fn the_proof_points_at_k1() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.example.com#k1", created: "2026-05-21T00:00:01Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.verification_method, "did:web:notary.example.com#k1")
+  }
+
+  #[test]
+  fn the_notary_is_the_did_web_identity() -> () {
+    let n: NotaryServiceRef = { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }
+    assert_eq!(n.id, "did:web:notary.example.com")
+  }
+}

@@ -1,0 +1,35 @@
+// Two notaries, two outcomes.
+//
+// Notary A publishes no DNS record; the resolver finds nothing and moves on
+// to did:web, where the key is. Notary B publishes a DNS record whose
+// notAfter has passed; the resolver found a surface and it failed, so it
+// refuses under the validity-window code and does not consult did:web.
+// The second notary cannot be rescued by a later surface.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn notary_a_s_path_went_to_did_web() -> () {
+    let path: Directional<str> = ["DidKey", "DnsTxt", "DidWeb"]
+    assert_eq!(path[2], "DidWeb")
+  }
+
+  #[test]
+  fn notary_b_s_record_had_expired() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", not_before: "2024-01-01T00:00:00Z", not_after: "2025-01-01T00:00:00Z" }
+    assert_eq!(r.not_after, "2025-01-01T00:00:00Z")
+  }
+
+  #[test]
+  fn so_notary_b_was_refused_not_advanced() -> () {
+    let outcome: Directional<str> = ["APH_E003", "refused at DnsTxt"]
+    assert_eq!(outcome[0], "APH_E003")
+  }
+}

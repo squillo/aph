@@ -1,0 +1,34 @@
+// A key with a window.
+//
+// notBefore and notAfter bound when a published key may be used to verify.
+// A proof created outside the window is refused under the validity-window
+// code even if the signature checks. Publishing a key with a future
+// notBefore is how a successor is announced before it signs anything.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_window_opens_in_may() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", not_before: "2026-05-21T00:00:00Z", not_after: "2027-05-21T00:00:00Z" }
+    assert_eq!(r.not_before, "2026-05-21T00:00:00Z")
+  }
+
+  #[test]
+  fn and_closes_a_year_later() -> () {
+    let r: AphTxtKeyRecord = { version: "APHv1", alg: "ed25519", k: "2Vc3Hpcg1XOoxCBT0qZQYR8WlAlBpvW0nVwRyJI5Ouw", kid: "k1", not_before: "2026-05-21T00:00:00Z", not_after: "2027-05-21T00:00:00Z" }
+    assert_eq!(r.not_after, "2027-05-21T00:00:00Z")
+  }
+
+  #[test]
+  fn a_proof_inside_the_window_is_fine() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.example.com#k1", created: "2026-05-21T00:00:01Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.created, "2026-05-21T00:00:01Z")
+  }
+}

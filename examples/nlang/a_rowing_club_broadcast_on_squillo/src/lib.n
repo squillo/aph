@@ -1,0 +1,54 @@
+// A broadcast on a Squillo channel.
+//
+// Coach Ingrid Solberg sends practice calls to the whole crew. A broadcast
+// has no single recipient, so the audience IS the channel: the audience id
+// is the channel address and channel_binding carries the positional pair
+// that pins the credential to this channel on this platform. A copy pasted
+// into another channel would not verify against this audience.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_broadcast_has_the_channel_as_its_audience() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e50",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-10-14T10:55:20Z",
+      valid_until: "2026-10-14T11:05:20Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.org:club:ingrid-solberg", display_name: "Ingrid Solberg" },
+        agent: { id: "did:web:example.org:agents:crew-coordinator", display_name: "Crew Coordinator", version: "1.0.0" },
+        channel: { kind: "squillo", recipient_addressing: ["squillo:channel:blue-heron-crew"], recipient_class: "Human" },
+        communication: { content_class: "Broadcast", body_sha256: "2ac77e4c77e1ab84dc7ddd451ca044ff52c32f2baead23ed327cf5c8f986b26e", body_size: 89, preview_lines: 1, preview: "Practice is on. Water at 5:40 AM, launch at 6. Wind is light from the west; bring layers." },
+        policy: { decision: "AskEveryTime", matched_scope: "per-channel", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-10-14T10:55:20Z", decision_latency_ms: 3120 },
+        audience: { id: "squillo:channel:blue-heron-crew", channel_binding: ["squillo", "blue-heron-crew"] },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["broadcast", "club-notice"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-10-14T10:55:20Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.audience.id, "squillo:channel:blue-heron-crew")
+  }
+
+  #[test]
+  fn channel_binding_is_positional() -> () {
+    let a: Audience = { id: "squillo:channel:blue-heron-crew", channel_binding: ["squillo", "blue-heron-crew"] }
+    assert_eq!(a.channel_binding[1], "blue-heron-crew")
+  }
+
+  #[test]
+  fn the_broadcast_class_is_distinct_from_a_channel_post() -> () {
+    let c: CommunicationDescriptor = { content_class: "Broadcast", body_sha256: "2ac77e4c77e1ab84dc7ddd451ca044ff52c32f2baead23ed327cf5c8f986b26e", body_size: 89, preview_lines: 1, preview: "Practice is on. Water at 5:40 AM, launch at 6. Wind is light from the west; bring layers." }
+    assert_eq!(c.content_class, "Broadcast")
+  }
+}

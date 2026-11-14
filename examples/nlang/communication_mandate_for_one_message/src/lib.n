@@ -1,0 +1,35 @@
+// A communication mandate for one message.
+//
+// Before the notary signs an envelope it issues a communication mandate: a
+// short-lived record that fixes the channel, the recipient, the content
+// class, the body digest and the size. The envelope must match it field for
+// field. This is the step that turns a standing delegation into authority
+// for one specific message.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_mandate_fixes_the_channel() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", delegation_mandate_id: "urn:uuid:4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b", human_principal_did: "did:web:example.com:people:amira-haddad", agent_did: "did:web:example.com:agents:leasing", channel_kind: "email", recipient_addressing: ["tenant-412@example.net"], content_class: "Reply", body_sha256: "38149766c7381a79b93464360f5c6c3f8131ffe2462528a5ff8792de4d3bda6c", body_size: 79, policy_decision: "AlwaysAllow", issued_at: "2026-02-11T09:30:00Z", expires_at: "2026-02-11T09:40:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.channel_kind, "email")
+  }
+
+  #[test]
+  fn and_the_recipient() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", delegation_mandate_id: "urn:uuid:4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b", human_principal_did: "did:web:example.com:people:amira-haddad", agent_did: "did:web:example.com:agents:leasing", channel_kind: "email", recipient_addressing: ["tenant-412@example.net"], content_class: "Reply", body_sha256: "38149766c7381a79b93464360f5c6c3f8131ffe2462528a5ff8792de4d3bda6c", body_size: 79, policy_decision: "AlwaysAllow", issued_at: "2026-02-11T09:30:00Z", expires_at: "2026-02-11T09:40:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.recipient_addressing[0], "tenant-412@example.net")
+  }
+
+  #[test]
+  fn and_the_body_by_digest_and_size() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c", delegation_mandate_id: "urn:uuid:4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b", human_principal_did: "did:web:example.com:people:amira-haddad", agent_did: "did:web:example.com:agents:leasing", channel_kind: "email", recipient_addressing: ["tenant-412@example.net"], content_class: "Reply", body_sha256: "38149766c7381a79b93464360f5c6c3f8131ffe2462528a5ff8792de4d3bda6c", body_size: 79, policy_decision: "AlwaysAllow", issued_at: "2026-02-11T09:30:00Z", expires_at: "2026-02-11T09:40:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.body_size, 79)
+  }
+}

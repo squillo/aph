@@ -1,0 +1,34 @@
+// A per-message mandate under a rate limit.
+//
+// The rate limit is a property of the delegation, not of any one message.
+// Each communication mandate is still issued one at a time; the notary
+// counts them against the delegation's hourly cap and refuses when the cap
+// is reached. The two records point at each other by id.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_delegation_sets_the_cap() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e", human_principal_did: "did:web:example.org:boxoffice:nadia-petrov", agent_did: "did:web:example.org:agents:season-tickets", allowed_channels: ["email"], rate_limit_per_hour: 12, valid_from: "2026-03-01T00:00:00Z", valid_until: "2026-06-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.rate_limit_per_hour, 12)
+  }
+
+  #[test]
+  fn the_message_mandate_cites_that_delegation() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f", delegation_mandate_id: "urn:uuid:6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e", human_principal_did: "did:web:example.org:boxoffice:nadia-petrov", agent_did: "did:web:example.org:agents:season-tickets", channel_kind: "email", recipient_addressing: ["renewals-0421@example.net"], content_class: "Reply", body_sha256: "79216484b15998368c29734e5e52705934e0957f15c2c006d32d16255c965e30", body_size: 75, policy_decision: "AlwaysAllow", issued_at: "2026-04-21T15:00:00Z", expires_at: "2026-04-21T15:10:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.delegation_mandate_id, "urn:uuid:6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e")
+  }
+
+  #[test]
+  fn and_covers_one_recipient() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f", delegation_mandate_id: "urn:uuid:6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e", human_principal_did: "did:web:example.org:boxoffice:nadia-petrov", agent_did: "did:web:example.org:agents:season-tickets", channel_kind: "email", recipient_addressing: ["renewals-0421@example.net"], content_class: "Reply", body_sha256: "79216484b15998368c29734e5e52705934e0957f15c2c006d32d16255c965e30", body_size: 75, policy_decision: "AlwaysAllow", issued_at: "2026-04-21T15:00:00Z", expires_at: "2026-04-21T15:10:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.recipient_addressing.len(), 1)
+  }
+}

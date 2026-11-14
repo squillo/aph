@@ -1,0 +1,54 @@
+// An envelope past its window.
+//
+// Envelopes carry valid_from and valid_until, usually ten minutes apart. A
+// recipient that verifies at 15:30 an envelope valid until 15:10 refuses it
+// under the validity-window code even though every signature is sound. The
+// code is MandateExpired on the wire taxonomy's window entry; it is not a
+// revocation, and the status list is not consulted.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_window_closed_at_ten_past_three() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:1b4e28ba-2fa1-4d7a-9f3c-6a2e5c1d8b70",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-03-04T15:00:00Z",
+      valid_until: "2026-03-04T15:10:00Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.com:people:maria-delgado", display_name: "Maria Delgado" },
+        agent: { id: "did:web:example.com:agents:member-services", display_name: "Member Services Agent", version: "3.2.0" },
+        channel: { kind: "slack", recipient_addressing: ["C04HLCU7MEMBERS"], recipient_class: "Human" },
+        communication: { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-03-04T15:00:00Z", decision_latency_ms: 41 },
+        audience: { id: "did:web:example.com:people:dev-chen" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reply", "routine-service"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.valid_until, "2026-03-04T15:10:00Z")
+  }
+
+  #[test]
+  fn verification_happened_twenty_minutes_later() -> () {
+    let verified_at: Directional<str> = ["2026-03-04T15:30:12Z"]
+    assert_eq!(verified_at[0], "2026-03-04T15:30:12Z")
+  }
+
+  #[test]
+  fn the_refusal_is_the_window_code() -> () {
+    let refusal: Directional<str> = ["APH_E003", "MandateExpired"]
+    assert_eq!(refusal[0], "APH_E003")
+  }
+}

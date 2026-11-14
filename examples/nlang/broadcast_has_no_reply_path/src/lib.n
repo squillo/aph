@@ -1,0 +1,34 @@
+// A broadcast announcement.
+//
+// A broadcast goes to everyone and expects no reply in the same place. Its
+// audience is the channel itself, pinned with a positional channel_binding so
+// that the same text re-posted somewhere else does not verify as this
+// announcement. A utility's advisory is the classic case.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_broadcast_uses_the_broadcast_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "Broadcast", body_sha256: "b19089d6771f57ee168a7965e0e0cd6ebb61705ee410885449aabe123823db35", body_size: 103, preview_lines: 1, preview: "Boil-water advisory lifted for the Hillcrest zone as of 6:00 AM. Flush taps for two minutes before use." }
+    assert_eq!(c.content_class, "Broadcast")
+  }
+
+  #[test]
+  fn the_audience_is_pinned_to_the_platform_and_channel() -> () {
+    let a: Audience = { id: "squillo:channel:hillcrest-water-notices", channel_binding: ["squillo", "hillcrest-water-notices"] }
+    assert_eq!(a.channel_binding[0], "squillo")
+  }
+
+  #[test]
+  fn the_digest_covers_the_advisory_text() -> () {
+    let c: CommunicationDescriptor = { content_class: "Broadcast", body_sha256: "b19089d6771f57ee168a7965e0e0cd6ebb61705ee410885449aabe123823db35", body_size: 103, preview_lines: 1, preview: "Boil-water advisory lifted for the Hillcrest zone as of 6:00 AM. Flush taps for two minutes before use." }
+    assert_eq!(c.body_size, 103)
+  }
+}

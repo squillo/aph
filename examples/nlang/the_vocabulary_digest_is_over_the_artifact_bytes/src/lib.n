@@ -1,0 +1,35 @@
+// What the digest is over.
+//
+// The digest in a VocabularyRef, and in the DNS vocabulary record, is
+// SHA-256 over the bytes a recipient fetches, rendered sha256- then base64.
+// A vocabulary artifact may carry its own internal integrity string; that
+// string is not this digest and a verifier never substitutes one for the
+// other. Hash the bytes you fetched, compare, refuse on mismatch.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_digest_is_prefixed_with_the_algorithm() -> () {
+    let v: VocabularyRef = { name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }
+    assert_eq!(v.digest, "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=")
+  }
+
+  #[test]
+  fn an_empty_artifact_has_a_known_digest() -> () {
+    let empty: VocabularyRef = { name: "@com::example/empty", version: "0.0.1", digest: "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=" }
+    assert_eq!(empty.digest, "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=")
+  }
+
+  #[test]
+  fn the_published_record_repeats_the_same_digest() -> () {
+    let txt: Directional<str> = ["v=APHv1", "n=@com::squillo/aph_guardrails", "ver=0.1.0", "h=sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc="]
+    assert_eq!(txt[3], "h=sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=")
+  }
+}

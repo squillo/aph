@@ -1,0 +1,54 @@
+// A service call from one agent to another.
+//
+// Lee Nakamura supervises dispatch for a regional carrier. The planning agent
+// hands routes to an intake service that is itself an agent. Nothing here is
+// prose: the body is a structured payload, the channel kind is service, and
+// the recipient class is Agent. The notarization binds the payload bytes the
+// same way it binds a chat message.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_recipient_is_an_agent_not_a_person() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-09-30T23:40:00Z",
+      valid_until: "2026-09-30T23:50:00Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.com:dispatch:lee-nakamura", display_name: "Lee Nakamura" },
+        agent: { id: "did:web:example.com:agents:dispatch-planner", display_name: "Dispatch Planner", version: "5.2.3" },
+        channel: { kind: "service", recipient_addressing: ["urn:service:example:dispatch-intake"], recipient_class: "Agent" },
+        communication: { content_class: "New", body_sha256: "b0d5497dd4644e6d186eafb3329b4b79df9846fbd2a14290d7702e67bb539726", body_size: 68, preview_lines: 1, preview: "route=R-118;stops=14;depart=2026-10-01T05:30:00-05:00;driver=pending" },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-09-30T23:40:00Z", decision_latency_ms: 18 },
+        audience: { id: "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["service-call", "logistics"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-09-30T23:40:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.recipient_class, "Agent")
+  }
+
+  #[test]
+  fn a_structured_payload_is_still_bound_by_its_digest() -> () {
+    let c: CommunicationDescriptor = { content_class: "New", body_sha256: "b0d5497dd4644e6d186eafb3329b4b79df9846fbd2a14290d7702e67bb539726", body_size: 68, preview_lines: 1, preview: "route=R-118;stops=14;depart=2026-10-01T05:30:00-05:00;driver=pending" }
+    assert_eq!(c.body_size, 68)
+  }
+
+  #[test]
+  fn the_audience_is_the_receiving_agent_s_key() -> () {
+    let a: Audience = { id: "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT" }
+    assert_eq!(a.id, "did:key:z6MkiaMbhXHNA4eJVCCj8dbzKzTgYDKf6crKgHVHid1F1WCT")
+  }
+}

@@ -1,0 +1,35 @@
+// An acceptance claim.
+//
+// Some channels require proof that the human accepted a usage agreement
+// before an agent may speak for them. The claim names the user, the device,
+// a hash of the agreement text as shown, the time, and the kind of
+// document. It is optional on the credential subject and present only
+// where a channel demands it.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_claim_names_the_agreement_by_hash() -> () {
+    let c: AppleAurAcceptanceClaim = { user_id: "did:web:example.org:households:okafor:hana", device_id: "device_4c1f9a", aur_version_hash: "8c240b98a20b966c5d7634139d0c1b7c587963c803eb51b0721f53e2a2977c57", accepted_at: "2026-01-09T18:21:05Z", document_kind: "agent_usage_agreement" }
+    assert_eq!(c.aur_version_hash, "8c240b98a20b966c5d7634139d0c1b7c587963c803eb51b0721f53e2a2977c57")
+  }
+
+  #[test]
+  fn acceptance_is_dated() -> () {
+    let c: AppleAurAcceptanceClaim = { user_id: "did:web:example.org:households:okafor:hana", device_id: "device_4c1f9a", aur_version_hash: "8c240b98a20b966c5d7634139d0c1b7c587963c803eb51b0721f53e2a2977c57", accepted_at: "2026-01-09T18:21:05Z", document_kind: "agent_usage_agreement" }
+    assert_eq!(c.accepted_at, "2026-01-09T18:21:05Z")
+  }
+
+  #[test]
+  fn the_device_is_part_of_the_claim() -> () {
+    let c: AppleAurAcceptanceClaim = { user_id: "did:web:example.org:households:okafor:hana", device_id: "device_4c1f9a", aur_version_hash: "8c240b98a20b966c5d7634139d0c1b7c587963c803eb51b0721f53e2a2977c57", accepted_at: "2026-01-09T18:21:05Z", document_kind: "agent_usage_agreement" }
+    assert_eq!(c.device_id, "device_4c1f9a")
+  }
+}

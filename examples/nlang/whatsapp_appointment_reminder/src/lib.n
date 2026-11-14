@@ -1,0 +1,73 @@
+// A WhatsApp appointment reminder.
+//
+// A dental practice sends next-day reminders through WhatsApp. Dr. Elena
+// Marsh authorized the front-desk agent for this channel once; each reminder
+// is still individually notarized so the patient, or the practice's own
+// auditor, can tie any message back to the authority it was sent under.
+// The number is in the 555-0100 block reserved for fiction.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_reminder_goes_to_one_phone_number() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:d8e9f0a1-b2c3-4d4e-9f5a-6b7c8d9e0f1a",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-07-13T17:30:00Z",
+      valid_until: "2026-07-13T17:40:00Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.org:practice:elena-marsh", display_name: "Dr. Elena Marsh" },
+        agent: { id: "did:web:example.org:agents:front-desk", display_name: "Front Desk Assistant", version: "4.1.0" },
+        channel: { kind: "whatsapp", recipient_addressing: ["+15550100142"], recipient_class: "Human" },
+        communication: { content_class: "New", body_sha256: "65237cdef6820e50e93d208bd7007297ed0708e359f1db6b47190761a4ddb471", body_size: 125, preview_lines: 1, preview: "Reminder from Riverbend Family Dental: your cleaning is tomorrow, Tuesday, at 2:30 PM. Reply C to confirm or R to reschedule." },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-07-13T17:30:00Z", decision_latency_ms: 33 },
+        audience: { id: "did:web:example.org:patients:p-20481" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reminder", "appointment"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-07-13T17:30:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.credential_subject.channel.recipient_addressing[0], "+15550100142")
+  }
+
+  #[test]
+  fn the_channel_kind_is_whatsapp() -> () {
+    let ch: ChannelDescriptor = { kind: "whatsapp", recipient_addressing: ["+15550100142"], recipient_class: "Human" }
+    assert_eq!(ch.kind, "whatsapp")
+  }
+
+  #[test]
+  fn the_validity_window_is_ten_minutes() -> () {
+    let e: NotarizationEnvelope = {
+      aph_version: "0.1",
+      context: ["https://www.w3.org/ns/credentials/v2"],
+      type: ["VerifiableCredential", "AgentSendAuthorizationCredential"],
+      id: "urn:uuid:d8e9f0a1-b2c3-4d4e-9f5a-6b7c8d9e0f1a",
+      issuer: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV",
+      valid_from: "2026-07-13T17:30:00Z",
+      valid_until: "2026-07-13T17:40:00Z",
+      credential_subject: {
+        human_principal: { id: "did:web:example.org:practice:elena-marsh", display_name: "Dr. Elena Marsh" },
+        agent: { id: "did:web:example.org:agents:front-desk", display_name: "Front Desk Assistant", version: "4.1.0" },
+        channel: { kind: "whatsapp", recipient_addressing: ["+15550100142"], recipient_class: "Human" },
+        communication: { content_class: "New", body_sha256: "65237cdef6820e50e93d208bd7007297ed0708e359f1db6b47190761a4ddb471", body_size: 125, preview_lines: 1, preview: "Reminder from Riverbend Family Dental: your cleaning is tomorrow, Tuesday, at 2:30 PM. Reply C to confirm or R to reschedule." },
+        policy: { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:5e7a9c1b-3d2f-4a6e-8b0c-9d1e2f3a4b5c", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] },
+        notarization: { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-07-13T17:30:00Z", decision_latency_ms: 33 },
+        audience: { id: "did:web:example.org:patients:p-20481" },
+        act_classification: { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["reminder", "appointment"] }
+      },
+      proof: { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-07-13T17:30:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    }
+    assert_eq!(e.valid_until, "2026-07-13T17:40:00Z")
+  }
+}

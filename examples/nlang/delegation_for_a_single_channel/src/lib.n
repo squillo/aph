@@ -1,0 +1,34 @@
+// A delegation for one channel.
+//
+// The smallest useful delegation: Maria Delgado authorizes the member
+// services agent to speak for her on Slack, and nowhere else, for six
+// months. The principal signs to grant it; the notary signs to say it saw
+// the grant. Both signatures are illustrative here.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn one_channel_is_allowed() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", human_principal_did: "did:web:example.com:people:maria-delgado", agent_did: "did:web:example.com:agents:member-services", allowed_channels: ["slack"], valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-07-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.allowed_channels.len(), 1)
+  }
+
+  #[test]
+  fn the_channel_is_slack() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", human_principal_did: "did:web:example.com:people:maria-delgado", agent_did: "did:web:example.com:agents:member-services", allowed_channels: ["slack"], valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-07-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.allowed_channels[0], "slack")
+  }
+
+  #[test]
+  fn the_principal_and_the_agent_are_different_identities() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", human_principal_did: "did:web:example.com:people:maria-delgado", agent_did: "did:web:example.com:agents:member-services", allowed_channels: ["slack"], valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-07-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.agent_did, "did:web:example.com:agents:member-services")
+  }
+}

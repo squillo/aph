@@ -1,0 +1,35 @@
+// A preview that is shorter than the body.
+//
+// The preview exists so a human approver can see what is going out without
+// the policy engine shipping the whole body around. preview_lines records how
+// many lines of the body the preview reproduces. The digest and size are over
+// the full body, so a preview can be truthful and still not be the thing that
+// is bound.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn two_of_three_lines_are_previewed() -> () {
+    let c: CommunicationDescriptor = { content_class: "Channel", body_sha256: "ec3f57f24677fe0fa3903690d58570aea2006fc6d5478f91ca50af6ef5a0187d", body_size: 125, preview_lines: 2, preview: "Minutes, planning committee, April 7\nPresent: Ortiz, Blum, Kaur, Nakashima" }
+    assert_eq!(c.preview_lines, 2)
+  }
+
+  #[test]
+  fn the_size_is_the_whole_body() -> () {
+    let c: CommunicationDescriptor = { content_class: "Channel", body_sha256: "ec3f57f24677fe0fa3903690d58570aea2006fc6d5478f91ca50af6ef5a0187d", body_size: 125, preview_lines: 2, preview: "Minutes, planning committee, April 7\nPresent: Ortiz, Blum, Kaur, Nakashima" }
+    assert_eq!(c.body_size, 125)
+  }
+
+  #[test]
+  fn the_digest_is_the_whole_body_too() -> () {
+    let c: CommunicationDescriptor = { content_class: "Channel", body_sha256: "ec3f57f24677fe0fa3903690d58570aea2006fc6d5478f91ca50af6ef5a0187d", body_size: 125, preview_lines: 2, preview: "Minutes, planning committee, April 7\nPresent: Ortiz, Blum, Kaur, Nakashima" }
+    assert_eq!(c.body_sha256, "ec3f57f24677fe0fa3903690d58570aea2006fc6d5478f91ca50af6ef5a0187d")
+  }
+}

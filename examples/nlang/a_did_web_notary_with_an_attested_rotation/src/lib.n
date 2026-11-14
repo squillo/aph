@@ -1,0 +1,34 @@
+// A rotation the old key vouched for.
+//
+// When a notary rotates, the retiring key can sign a statement introducing
+// the successor. The notary reference carries the digest of that statement
+// and where to fetch it, so a verifier that pinned the old key can walk to
+// the new one on the old key's authority instead of on trust.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_reference_carries_the_attestation_digest() -> () {
+    let n: NotaryServiceRef = { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0", attested_digest: "sha256-g8fU/dq/gCMiwhfo26RfOntlnA0facdSzpnnduKqwpM=", attestation_uri: "did:web:notary.example.com:attestations:k1-to-k2" }
+    assert_eq!(n.attestation_uri, "did:web:notary.example.com:attestations:k1-to-k2")
+  }
+
+  #[test]
+  fn the_digest_is_sri_form() -> () {
+    let n: NotaryServiceRef = { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0", attested_digest: "sha256-g8fU/dq/gCMiwhfo26RfOntlnA0facdSzpnnduKqwpM=", attestation_uri: "did:web:notary.example.com:attestations:k1-to-k2" }
+    assert_eq!(n.attested_digest, "sha256-g8fU/dq/gCMiwhfo26RfOntlnA0facdSzpnnduKqwpM=")
+  }
+
+  #[test]
+  fn the_proof_now_names_the_successor() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:web:notary.example.com#k2", created: "2026-11-08T12:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.verification_method, "did:web:notary.example.com#k2")
+  }
+}

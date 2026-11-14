@@ -1,0 +1,35 @@
+// The human was supposed to sign.
+//
+// A lease document goes out only with Amira Haddad's own signature. The
+// policy asked for PrincipalSigned; what arrived has a notary proof and no
+// principal proof with proof_purpose authentication ahead of it. The notary
+// cannot supply a human's authentication, so the refusal is
+// HumanAuthenticationRequired.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_policy_required_the_principal() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", attestation_mode: "PrincipalSigned", act_chain: ["human_present_request", "policy_evaluation", "notarize"] }
+    assert_eq!(p.attestation_mode, "PrincipalSigned")
+  }
+
+  #[test]
+  fn the_chain_shows_no_human_signature_step() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", attestation_mode: "PrincipalSigned", act_chain: ["human_present_request", "policy_evaluation", "notarize"] }
+    assert_eq!(p.act_chain.len(), 3)
+  }
+
+  #[test]
+  fn the_refusal_asks_for_the_human() -> () {
+    let refusal: Directional<str> = ["HumanAuthenticationRequired"]
+    assert_eq!(refusal[0], "HumanAuthenticationRequired")
+  }
+}

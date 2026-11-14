@@ -1,0 +1,34 @@
+// A payment intent alongside the message.
+//
+// When the message is about money, the AP2 intent mandate that authorizes
+// the payment can ride in linked_mandate: a URI for the mandate and its
+// signed payload, base64. The notarization does not interpret the payment;
+// it binds the message and the intent together so neither can be swapped.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_intent_is_named_by_uri() -> () {
+    let l: LinkedMandate = { ap2_intent_mandate_uri: "urn:ap2:intent:3f9c2a7e-1b4d-4e8f-9a0b-6c5d4e3f2a1b", ap2_signed_payload_b64: "eyJpbnRlbnQiOiJwYXkiLCJhbW91bnQiOiIxNDAuMDAiLCJjdXJyZW5jeSI6IlVTRCJ9" }
+    assert_eq!(l.ap2_intent_mandate_uri, "urn:ap2:intent:3f9c2a7e-1b4d-4e8f-9a0b-6c5d4e3f2a1b")
+  }
+
+  #[test]
+  fn the_signed_payload_travels_with_it() -> () {
+    let l: LinkedMandate = { ap2_intent_mandate_uri: "urn:ap2:intent:3f9c2a7e-1b4d-4e8f-9a0b-6c5d4e3f2a1b", ap2_signed_payload_b64: "eyJpbnRlbnQiOiJwYXkiLCJhbW91bnQiOiIxNDAuMDAiLCJjdXJyZW5jeSI6IlVTRCJ9" }
+    assert_eq!(l.ap2_signed_payload_b64, "eyJpbnRlbnQiOiJwYXkiLCJhbW91bnQiOiIxNDAuMDAiLCJjdXJyZW5jeSI6IlVTRCJ9")
+  }
+
+  #[test]
+  fn the_act_is_labeled_as_a_payment() -> () {
+    let ac: ActClassification = { vocabularies: [{ name: "@com::squillo/aph_guardrails", version: "0.1.0", digest: "sha256-mhSlBjnzsw25+HiXcIJkijKokYkdf0CnUTj4xT0oWJc=" }], labels: ["payment-request", "existing-contact"] }
+    assert_eq!(ac.labels[0], "payment-request")
+  }
+}

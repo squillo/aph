@@ -1,0 +1,35 @@
+// Two latencies.
+//
+// decision_latency_ms measures from request to decision. Under a standing
+// delegation it is the notary's own work, tens of milliseconds. In the
+// human-present flow it includes the time a person spent reading, and runs
+// to seconds. The number is diagnostic: a sub-second latency on an
+// AskEveryTime decision suggests nobody actually read anything.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_delegation_decides_in_milliseconds() -> () {
+    let n: NotarizationMetadata = { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-09-30T23:40:00Z", decision_latency_ms: 18 }
+    assert_eq!(n.decision_latency_ms, 18)
+  }
+
+  #[test]
+  fn a_human_decides_in_seconds() -> () {
+    let n: NotarizationMetadata = { notary_service: { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }, decision_timestamp: "2026-10-18T14:00:00Z", decision_latency_ms: 8750 }
+    assert_eq!(n.decision_latency_ms, 8750)
+  }
+
+  #[test]
+  fn the_slow_one_was_an_ask() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-channel", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(p.decision, "AskEveryTime")
+  }
+}

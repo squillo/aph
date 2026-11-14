@@ -1,0 +1,34 @@
+// AlwaysAllow.
+//
+// The policy found a standing rule for this channel and the delegation
+// behind it was valid, so the send went through with no prompt. The act
+// chain begins at the standing mandate rather than at a human request: that
+// is how a reader tells a quiet, authorized send from an approved one.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_decision_was_always_allow() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.decision, "AlwaysAllow")
+  }
+
+  #[test]
+  fn no_human_step_appears_in_the_chain() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.act_chain.len(), 3)
+  }
+
+  #[test]
+  fn the_standing_mandate_is_cited() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.delegation_mandate_id, "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b")
+  }
+}

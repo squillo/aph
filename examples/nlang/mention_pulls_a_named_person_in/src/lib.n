@@ -1,0 +1,34 @@
+// A mention in a shared channel.
+//
+// A mention is posted to a channel but aimed at a person. The channel
+// descriptor carries the channel; the audience carries the person. Policies
+// can treat mentions differently from plain channel posts because a mention
+// interrupts someone, and the content class makes that visible to the policy.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn a_mention_is_posted_to_a_channel() -> () {
+    let ch: ChannelDescriptor = { kind: "slack", recipient_addressing: ["C07REALTYTEAM"], recipient_class: "Human" }
+    assert_eq!(ch.recipient_addressing[0], "C07REALTYTEAM")
+  }
+
+  #[test]
+  fn but_its_audience_is_the_person_named() -> () {
+    let a: Audience = { id: "did:web:example.com:realty:rosa-villanueva" }
+    assert_eq!(a.id, "did:web:example.com:realty:rosa-villanueva")
+  }
+
+  #[test]
+  fn the_class_is_mention() -> () {
+    let c: CommunicationDescriptor = { content_class: "Mention", body_sha256: "6f134113423916a064e679c6ec3556278bf543ab75452179c387448ef07aedf2", body_size: 71, preview_lines: 1, preview: "@Rosa can you take the 3 PM walkthrough? The buyer moved up by an hour." }
+    assert_eq!(c.content_class, "Mention")
+  }
+}

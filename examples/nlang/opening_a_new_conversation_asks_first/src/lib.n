@@ -1,0 +1,34 @@
+// Opening a new conversation.
+//
+// The first message to a recipient is where unwanted outreach happens, so the
+// New class is where policies most often say AskEveryTime. This communication
+// mandate has no delegation_mandate_id at all: the human was present and
+// approved this one message, so there is no standing authority to point to.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_first_message_is_the_new_class() -> () {
+    let c: CommunicationDescriptor = { content_class: "New", body_sha256: "43ec076f2475e334dba2ae295e01a976918bee840ec7bbc7a100815a792f5a13", body_size: 113, preview_lines: 1, preview: "Hi Dr. Osei, I am writing on behalf of the clinic to ask whether you have availability for a locum week in March." }
+    assert_eq!(c.content_class, "New")
+  }
+
+  #[test]
+  fn a_human_present_mandate_names_no_delegation() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d", human_principal_did: "did:web:example.org:clinic:beatrice-lund", agent_did: "did:web:example.org:agents:clinic-scheduler", channel_kind: "email", recipient_addressing: ["k.osei@example.com"], content_class: "New", body_sha256: "43ec076f2475e334dba2ae295e01a976918bee840ec7bbc7a100815a792f5a13", body_size: 113, policy_decision: "AskEveryTime", issued_at: "2026-01-20T16:02:00Z", expires_at: "2026-01-20T16:12:00Z", notary_signature: "z3Kp9LmNq2RsTu4VwXy6ZaBc8DeFg0HiJk1LmNo3PqRs5TuVw7XyZa9BcDe2FgHi4JkLm6NoPq8RsTu0VwXy" }
+    assert_eq!(m.policy_decision, "AskEveryTime")
+  }
+
+  #[test]
+  fn the_recipient_is_a_single_mailbox() -> () {
+    let ch: ChannelDescriptor = { kind: "email", recipient_addressing: ["k.osei@example.com"], recipient_class: "Human" }
+    assert_eq!(ch.recipient_addressing.len(), 1)
+  }
+}

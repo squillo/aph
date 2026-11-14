@@ -1,0 +1,35 @@
+// The human-present flow, start to finish.
+//
+// When the policy says ask, the flow has seven states and this is the path
+// through six of them: the draft waits for a decision, the human approves,
+// the notary issues a communication mandate, then an envelope, then the
+// channel adapter delivers. The seventh state, Denied, is the other exit
+// from PendingDecision.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn six_states_on_the_happy_path() -> () {
+    let flow: Directional<str> = ["Drafted", "PendingDecision", "Approved", "MandateIssued", "EnvelopeIssued", "Delivered"]
+    assert_eq!(flow.len(), 6)
+  }
+
+  #[test]
+  fn the_decision_waits_before_approval() -> () {
+    let flow: Directional<str> = ["Drafted", "PendingDecision", "Approved", "MandateIssued", "EnvelopeIssued", "Delivered"]
+    assert_eq!(flow[1], "PendingDecision")
+  }
+
+  #[test]
+  fn the_mandate_comes_before_the_envelope() -> () {
+    let flow: Directional<str> = ["Drafted", "PendingDecision", "Approved", "MandateIssued", "EnvelopeIssued", "Delivered"]
+    assert_eq!(flow[3], "MandateIssued")
+  }
+}

@@ -1,0 +1,35 @@
+// PrincipalSigned.
+//
+// In PrincipalSigned mode the human principal signs the envelope themselves,
+// with proof_purpose authentication, and the notary countersigns with a
+// second proof whose previous_proof is the id of the first. Order matters:
+// principal first, notary second. The mode label on the policy descriptor
+// must agree with that two-proof structure or the envelope is refused.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_policy_declares_the_mode() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", attestation_mode: "PrincipalSigned", act_chain: ["human_present_request", "policy_evaluation", "human_signature", "notarize"] }
+    assert_eq!(p.attestation_mode, "PrincipalSigned")
+  }
+
+  #[test]
+  fn the_principal_s_proof_authenticates() -> () {
+    let first: EnvelopeProof = { id: "urn:uuid:9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a", type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy#z6MkfAkfRZ3v9zJWh9LM2YQbWLh6hqGYDVxxC7ueoVcd5dGy", created: "2026-06-02T08:44:50Z", proof_purpose: "authentication", proof_value: "z58DAdFfa9SkqZMVPxAQpic7ndSayn1PzZs6ZjWp1CktyGesjuTSwRdoWhAfGFCF5bppETSTojQCrfFPP2oumHKtz" }
+    assert_eq!(first.proof_purpose, "authentication")
+  }
+
+  #[test]
+  fn the_notary_s_proof_points_back_at_it() -> () {
+    let second: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-06-02T08:45:03Z", proof_purpose: "assertionMethod", previous_proof: "urn:uuid:9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(second.previous_proof, "urn:uuid:9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a")
+  }
+}

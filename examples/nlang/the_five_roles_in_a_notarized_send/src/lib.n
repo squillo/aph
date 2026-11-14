@@ -1,0 +1,35 @@
+// Who is who.
+//
+// A notarized send involves five roles. The human principal owns the
+// authority; the agent sender acts; the notary service decides and signs;
+// the channel adapter carries the bytes; the recipient endpoint verifies.
+// One party can fill two roles, but the roles never collapse into each
+// other: a notary that is also the sender has notarized nothing.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn there_are_five_roles() -> () {
+    let roles: Directional<str> = ["HumanPrincipal", "AgentSender", "NotaryService", "ChannelAdapter", "RecipientEndpoint"]
+    assert_eq!(roles.len(), 5)
+  }
+
+  #[test]
+  fn the_principal_is_a_person() -> () {
+    let h: HumanPrincipalRef = { id: "did:web:example.com:people:maria-delgado", display_name: "Maria Delgado" }
+    assert_eq!(h.display_name, "Maria Delgado")
+  }
+
+  #[test]
+  fn the_notary_is_a_service_with_a_version() -> () {
+    let n: NotaryServiceRef = { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0" }
+    assert_eq!(n.version, "0.2.0")
+  }
+}

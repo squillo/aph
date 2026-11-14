@@ -1,0 +1,35 @@
+// A notary key nobody can find.
+//
+// The proof's verification method names a key. The recipient resolves the
+// notary's published keys through the discovery order and finds that this
+// one is not among them. The signature may be mathematically valid for the
+// key it names, but the key is not the notary's, so the notary did not sign
+// this: NotarySignatureInvalid.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_notary_s_published_key() -> () {
+    let n: NotaryServiceRef = { id: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", name: "Example Notary Service", version: "0.2.0" }
+    assert_eq!(n.id, "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV")
+  }
+
+  #[test]
+  fn the_proof_names_a_different_one() -> () {
+    let p: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkwSD8dBdqcXQzKJZQFPy2hh2izzxskndKCjdmC2dBpfME#z6MkwSD8dBdqcXQzKJZQFPy2hh2izzxskndKCjdmC2dBpfME", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(p.verification_method, "did:key:z6MkwSD8dBdqcXQzKJZQFPy2hh2izzxskndKCjdmC2dBpfME#z6MkwSD8dBdqcXQzKJZQFPy2hh2izzxskndKCjdmC2dBpfME")
+  }
+
+  #[test]
+  fn the_refusal_is_the_notary_signature_error() -> () {
+    let refusal: Directional<str> = ["NotarySignatureInvalid"]
+    assert_eq!(refusal[0], "NotarySignatureInvalid")
+  }
+}

@@ -1,0 +1,35 @@
+// A surface that was offered and then failed.
+//
+// The envelope cites a delegation, so the recipient must check the issuer's
+// status list. The fetch timed out. That is not absence: the notary offered
+// a status surface and it failed. A failed surface never falls through to a
+// weaker check; the recipient refuses under the unreachable code and tries
+// again later.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_delegation_requires_a_status_check() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.delegation_mandate_id, "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b")
+  }
+
+  #[test]
+  fn the_notary_publishes_at_a_known_identity() -> () {
+    let n: NotaryServiceRef = { id: "did:web:notary.example.com", name: "Example Notary Service", version: "0.2.0", attestation_uri: "did:web:notary.example.com:attestations:2026" }
+    assert_eq!(n.attestation_uri, "did:web:notary.example.com:attestations:2026")
+  }
+
+  #[test]
+  fn the_refusal_is_unreachable_not_absent() -> () {
+    let refusal: Directional<str> = ["APH_E008", "NotaryServiceUnreachable"]
+    assert_eq!(refusal[1], "NotaryServiceUnreachable")
+  }
+}

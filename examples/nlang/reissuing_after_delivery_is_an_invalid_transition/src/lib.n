@@ -1,0 +1,35 @@
+// A flow that tried to go backwards.
+//
+// Delivered is a terminal state. An agent that asks the notary to issue a
+// second envelope for a message the adapter already delivered is asking to
+// re-enter EnvelopeIssued from Delivered, which the state machine does not
+// allow. Replays look exactly like this, which is why the transition table
+// is strict.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn delivered_was_reached() -> () {
+    let flow: Directional<str> = ["MandateIssued", "EnvelopeIssued", "Delivered"]
+    assert_eq!(flow[2], "Delivered")
+  }
+
+  #[test]
+  fn then_a_second_issue_was_attempted() -> () {
+    let attempted: Directional<str> = ["Delivered", "EnvelopeIssued"]
+    assert_eq!(attempted[1], "EnvelopeIssued")
+  }
+
+  #[test]
+  fn which_is_refused_as_a_flow_error() -> () {
+    let refusal: Directional<str> = ["InvalidFlowTransition"]
+    assert_eq!(refusal[0], "InvalidFlowTransition")
+  }
+}

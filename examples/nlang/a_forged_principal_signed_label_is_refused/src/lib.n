@@ -1,0 +1,35 @@
+// A label that the proof does not back up.
+//
+// An attacker who controls the agent could write PrincipalSigned into the
+// policy descriptor hoping a verifier reads the label and relaxes. It does
+// not: PrincipalSigned requires a two-proof chain with the principal's
+// authentication proof first. One notary proof under that label is a
+// structural mismatch and the envelope is refused on that ground alone.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_label_claims_principal_signed() -> () {
+    let p: PolicyDescriptor = { decision: "AlwaysAllow", matched_scope: "per-channel", attestation_mode: "PrincipalSigned", act_chain: ["standing_mandate", "policy_evaluation", "notarize"] }
+    assert_eq!(p.attestation_mode, "PrincipalSigned")
+  }
+
+  #[test]
+  fn but_the_only_proof_is_the_notary_s() -> () {
+    let pr: EnvelopeProof = { type: "DataIntegrityProof", cryptosuite: "eddsa-jcs-2022", verification_method: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV", created: "2026-03-04T15:00:00Z", proof_purpose: "assertionMethod", proof_value: "z3FXQjecWufY46yg5abdVZsXqLhxhueuSoZgNSARiKBk9czhSePTFehP8c3PGfb6a22gkfUKods5D2UAUL5n2Brbx" }
+    assert_eq!(pr.verification_method, "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV#z6MkpTHR8VNsBxYAAWHut2Geadd9jSdoVTwBaPaeT1KhFmkV")
+  }
+
+  #[test]
+  fn so_the_verifier_refuses_on_structure() -> () {
+    let refusal: Directional<str> = ["APH_E013", "attestation label does not match the proof structure"]
+    assert_eq!(refusal[0], "APH_E013")
+  }
+}

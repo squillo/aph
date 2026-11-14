@@ -1,0 +1,34 @@
+// The mandate and the envelope agree.
+//
+// The notary's check is simple to state: the envelope's communication
+// descriptor must match the communication mandate it cites, in class,
+// digest and size. Here both are built from the same body so the equality
+// a verifier expects holds by construction.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_mandate_s_digest() -> () {
+    let m: CommunicationMandate = { id: "urn:uuid:e6f7a8b9-c0d1-4e2f-9a3b-4c5d6e7f8a9b", delegation_mandate_id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", human_principal_did: "did:web:example.com:people:maria-delgado", agent_did: "did:web:example.com:agents:member-services", channel_kind: "slack", recipient_addressing: ["C04HLCU7MEMBERS"], content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, policy_decision: "AlwaysAllow", issued_at: "2026-03-04T15:00:00Z", expires_at: "2026-03-04T15:10:00Z", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(m.body_sha256, "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100")
+  }
+
+  #[test]
+  fn is_the_descriptor_s_digest() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." }
+    assert_eq!(c.body_sha256, "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100")
+  }
+
+  #[test]
+  fn and_the_sizes_agree() -> () {
+    let c: CommunicationDescriptor = { content_class: "Reply", body_sha256: "b787db2a6a2c06145bd3ca8c1da9731c86ac5a2832a0f43ca3dc498923e55100", body_size: 94, preview_lines: 1, preview: "Thanks, Maria. The revised loan estimate is attached; nothing else on the application changed." }
+    assert_eq!(c.body_size, 94)
+  }
+}

@@ -1,0 +1,35 @@
+// A channel outside the grant.
+//
+// The delegation lists slack. The envelope is on whatsapp. The notary
+// refuses with ChannelNotAllowed before it evaluates any policy, because the
+// delegation never reached that channel and there is nothing for a policy
+// to decide. The fix is a new delegation from the principal, not a policy
+// change.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_delegation_lists_only_slack() -> () {
+    let d: DelegationMandate = { id: "urn:uuid:7c1f3a9e-2b4d-4e6f-8a0b-1c2d3e4f5a6b", human_principal_did: "did:web:example.com:people:maria-delgado", agent_did: "did:web:example.com:agents:member-services", allowed_channels: ["slack"], valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-07-01T00:00:00Z", principal_signature: "z2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy", notary_signature: "z4Jl6Gh2FdSa1QwErTy3UiOp5AsDfGh7JkLz9XcVbNm0QwErTy2VbNmKj8LpOy5TgHs3FdAq9ZcXv7BnMk" }
+    assert_eq!(d.allowed_channels[0], "slack")
+  }
+
+  #[test]
+  fn the_send_was_on_whatsapp() -> () {
+    let ch: ChannelDescriptor = { kind: "whatsapp", recipient_addressing: ["+15550100142"], recipient_class: "Human" }
+    assert_eq!(ch.kind, "whatsapp")
+  }
+
+  #[test]
+  fn the_refusal_names_the_channel() -> () {
+    let refusal: Directional<str> = ["ChannelNotAllowed"]
+    assert_eq!(refusal[0], "ChannelNotAllowed")
+  }
+}

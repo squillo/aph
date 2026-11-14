@@ -1,0 +1,33 @@
+// Passing a grant onward.
+//
+// Redelegate hands part of a grant to someone downstream. It is the most
+// consequential vault mutation because it creates new authority, so the
+// variant names the grantee explicitly and policies almost always ask.
+
+@deps {
+  "@com::squillo/aph@0.1.0" {
+    use { * },
+    from: "../../../snapp/aph@0.1.0.nbin",
+    integrity: "sha256-647ee58f80474f0d46a64e4cea4a447085cdf9a0e59d4a5d71f016137cf91245"
+  }
+}
+
+mod * {
+  #[test]
+  fn the_downstream_grantee_is_named() -> () {
+    let v: VaultMutationMandate = { kind: Redelegate { downstream_grantee_id: "did:web:example.org:contractors:kiln-studio" }, grant_scope_id: "gs_site_assets" }
+    assert_eq!(v.grant_scope_id, "gs_site_assets")
+  }
+
+  #[test]
+  fn it_is_linked_from_the_envelope() -> () {
+    let l: LinkedMandate = { vault_mutation: { kind: Redelegate { downstream_grantee_id: "did:web:example.org:contractors:kiln-studio" }, grant_scope_id: "gs_site_assets" } }
+    assert_eq!(l.vault_mutation.grant_scope_id, "gs_site_assets")
+  }
+
+  #[test]
+  fn new_authority_meant_a_human_decided() -> () {
+    let p: PolicyDescriptor = { decision: "AskEveryTime", matched_scope: "per-recipient", act_chain: ["human_present_request", "policy_evaluation", "human_approval", "notarize"] }
+    assert_eq!(p.act_chain[2], "human_approval")
+  }
+}
