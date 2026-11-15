@@ -33,6 +33,21 @@ nlang test  -r examples/nlang/slack_reply_bound_to_its_body
 The compiler writes its resolved dependency copy and build cache under the
 package's `.n/` directory; both are ignored by git.
 
+## When the bundle is re-emitted
+
+The pin is the SHA-256 of the committed bundle, as sixty-four lowercase hex
+digits, so re-emitting `snapp/aph@0.1.0.nbin` must re-pin every example in
+the same change. A weld in the conformance crate's tests fails `cargo test`
+otherwise. From the repository root:
+
+```
+new=$(shasum -a 256 snapp/aph@0.1.0.nbin | cut -d' ' -f1)
+old=$(grep -oh 'sha256-[0-9a-f]\{64\}' examples/nlang/*/src/lib.n | sort -u | cut -c8-)
+sed -i '' "s/$old/$new/" examples/nlang/*/src/lib.n
+```
+
+Then run `nlang check` and `nlang test` on the packages before committing.
+
 ## What the examples hold to
 
 - Every identifier is fictional or a published test vector. People,
