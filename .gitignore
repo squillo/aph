@@ -17,3 +17,6 @@ interpreters/rust/target/
 **/build/
 **/.n/build/
 **/.n/wal/
+# The compiler materializes @deps artifacts under .n/deps/ (a local copy plus a
+# digest-keyed cache) when it checks an example package; both are regenerable.
+**/.n/deps/
