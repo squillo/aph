@@ -123,7 +123,7 @@ EnvelopeIssued -> Delivered
 
 Any other transition MUST be rejected with `APH_E002`.
 
-## Error taxonomy (spec §11) — closed set of 15
+## Error taxonomy (spec §11) — closed set of 20, plus four from the v0.2 delta (below)
 
 | Code | Variant | Meaning |
 |---|---|---|
