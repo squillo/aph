@@ -20,3 +20,6 @@ interpreters/rust/target/
 # The compiler materializes @deps artifacts under .n/deps/ (a local copy plus a
 # digest-keyed cache) when it checks an example package; both are regenerable.
 **/.n/deps/
+
+# The engine writes its last check/test diagnostics beside each package config; regenerable.
+**/.n/last_diagnostics.json
