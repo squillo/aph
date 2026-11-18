@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`aph_guardrails@0.1.0` blessed** (supersedes same-day alpha.1 blessing): the re-minted bundle `snapp/aph_guardrails@0.1.0.json` (freshness-welded to its sources in CI) — 16 families, 184 labels (the README's "182" was a miscount), explicit `fail_posture = "fail_closed"` on the two risk families — cited SRI-style per RFC 0010. The alpha.1 artifact stays frozen in-repo for citations already minted against it.
 - **Rotation attestation publication tooling (v0.2 §5 / RFC 0001 §3.1).** `aph_core::discovery::publish::render_did_document_with_rotation` renders the §8.4.4 document with the signed attestation under `https://w3id.org/aph/v1#rotationAttestation`, refusing (`APH_E024`) before anything renders unless the statement verifies under the PUBLISHED predecessor and the named successor is published under the same bytes; the plain renderer is byte-identical to before. The `aph` CLI gains `attest-rotation` (the one verb holding a private key: the predecessor seed on STDIN only, self-verified before printing) and `render-did --attestation <file>`. First used 2026-11-07 to publish `did:web:aph-notary.squillo.com#k2` beside `#k1`.
 
+### Changed
+
+- **Bundles re-emitted on nlang 18b7564e3 (wire 42), and the guardrails coordinate re-blessed.** `snapp/aph@0.1.0` and `snapp/aph_guardrails@0.1.0` are rebuilt for the engine that refuses wire-41 bundles, with source spans recorded relative to each package; the 102 N Lang examples re-pin to the new aph bundle. The guardrails citation's digest is now `sha256-6dGvaAYYCFAA1lnvFVGy5iafdHQ5LW8yARwdpTwxssM=` (SHA-256 over `snapp/aph_guardrails@0.1.0.json`, RFC 0010), and the 2026-11-08 digest is retired.
+
 ## [0.2.0] — 2026-08-29
 
 **THE 0.2 CUT.** `spec/aph-0.2.md` is FINAL for the v0.2 line, published
