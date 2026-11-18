@@ -14,7 +14,7 @@
   "@com::squillo/aph@0.1.0" {
     use { * },
     from: "../../../snapp/aph@0.1.0.nbin",
-    integrity: "sha256-38f231f3876067f05850fdb6ef959259d401ee1eaafc543fe77488032669d0b3"
+    integrity: "sha256-125e2d3a19920a1d4ef7b3d7b96984214957907c76e72d077db965986dd088ea"
   }
 }
 

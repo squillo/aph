@@ -123,7 +123,9 @@ npm run mint                  # regenerates examples/ts_minted_envelope.json
 3. **Absent `attestationMode` means `NotaryAttested`.** A `PrincipalSigned`
    label is never trusted alone: structure is checked (`APH_E013` on a forged
    label), and mode downgrades are refused (`APH_E012`).
-4. **The error taxonomy is a closed set of sixteen** (`APH_E001`–`APH_E016`).
+4. **The error taxonomy is a closed set of twenty-four.** `APH_E001`–`APH_E020`
+   are the §11 table in `spec/aph-0.1.md`; `APH_E021`–`APH_E024` are declared
+   by the v0.2 delta (`spec/aph-0.2.md`) and implemented in `aph-core`.
    `APH_E014` is TERMINAL ABSENCE of a discovery surface and nothing else —
    absence advances the §8.4.6 order (`did:key` → DNS TXT → `did:web`). A
    surface that was offered and then FAILED never falls through: it refuses on
